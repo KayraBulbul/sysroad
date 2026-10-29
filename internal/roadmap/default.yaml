@@ -1,0 +1,976 @@
+title: "Systems Engineering Roadmap"
+sections:
+  - id: setup
+    title: "00 · Setup & Workflow"
+    summary: |-
+      A comfortable C workflow on both machines: compiler, build system, debugger and
+      sanitizers. The Mac is arm64, so anything x86-64-only (Bomb/Attack labs, Valgrind,
+      perf, epoll, namespaces) happens on the Omarchy desktop. Steps tagged with a
+      platform tell you where to do them.
+    resources:
+      - title: "The Missing Semester of Your CS Education (MIT)"
+        url: "https://missing.csail.mit.edu/"
+      - title: "Makefile Tutorial"
+        url: "https://makefiletutorial.com/"
+      - title: "Beej's Quick Guide to GDB"
+        url: "https://beej.us/guide/bggdb/"
+      - title: "Clang AddressSanitizer docs"
+        url: "https://clang.llvm.org/docs/AddressSanitizer.html"
+    steps:
+      - id: setup-1
+        title: "Missing Semester: shell, scripting, debugging & profiling lectures"
+        kind: read
+        hours: 4
+        url: "https://missing.csail.mit.edu/"
+        detail: |-
+          Skim what you already know. Pay attention to the "Debugging and Profiling"
+          and "Metaprogramming" (build systems) lectures.
+      - id: setup-2
+        title: "Install the toolchain on both machines"
+        kind: setup
+        hours: 1
+        detail: |-
+          Mac:     xcode-select --install; brew install make qemu
+          Omarchy: sudo pacman -S base-devel gdb valgrind strace ltrace man-pages qemu-full perf
+          Done when: cc, a debugger (lldb / gdb) and `man 2 open` work on both.
+      - id: setup-3
+        title: "Write a reusable C Makefile template"
+        kind: exercise
+        hours: 2
+        url: "https://makefiletutorial.com/"
+        detail: |-
+          Debug + release builds, -std=c17 -Wall -Wextra -Wpedantic -g, automatic header
+          dependencies (-MMD -MP), a `make asan` target (-fsanitize=address,undefined) and
+          `make test`. Every later project starts from this.
+      - id: setup-4
+        title: "Debugger drills (gdb on Linux, lldb on Mac)"
+        kind: exercise
+        hours: 2
+        url: "https://beej.us/guide/bggdb/"
+        detail: |-
+          Breakpoints, watchpoints, backtrace, frame selection, examining memory (x/16xb),
+          stepping into a segfault, attaching to a running process. Repeat in lldb using
+          the GDB→LLDB command map: https://lldb.llvm.org/use/map.html
+      - id: setup-5
+        title: "Sanitizers & Valgrind — catch five deliberate bugs"
+        kind: exercise
+        hours: 2
+        detail: |-
+          Write tiny programs with: use-after-free, heap overflow, leak, signed-overflow UB,
+          uninitialised read. Catch each with ASan/UBSan (both machines) and with Valgrind
+          memcheck (Linux only). Note which tool catches what.
+      - id: setup-6
+        title: "Create a repo for all roadmap work"
+        kind: setup
+        hours: 0.5
+        detail: |-
+          e.g. ~/dev/systems with one folder per phase/capstone. Put links to the
+          relevant folders in each step's notes as you go.
+
+  - id: c
+    title: "01 · Modern C"
+    summary: |-
+      You already know C/C++ — this phase is about writing idiomatic, modern C (C17/C23),
+      the memory model and undefined behaviour, and building the data-structure toolkit
+      you'll reuse in every later project.
+    resources:
+      - title: "Beej's Guide to C Programming"
+        url: "https://beej.us/guide/bgc/"
+      - title: "Modern C — Jens Gustedt"
+        url: "https://gustedt.gitlabpages.inria.fr/modern-c/"
+        note: "free PDF"
+      - title: "The C Programming Language (K&R, 2e)"
+        paid: true
+        note: "optional; classic exercises"
+      - title: "Effective C, 2e — Robert Seacord"
+        paid: true
+        note: "optional; great on UB and secure C"
+      - title: "Build Your Own Text Editor (kilo)"
+        url: "https://viewsourcecode.org/snaptoken/kilo/"
+    steps:
+      - id: c-1
+        title: "Beej's Guide to C — pointers, arrays, structs, memory, types"
+        kind: read
+        hours: 6
+        url: "https://beej.us/guide/bgc/"
+        detail: |-
+          Skim the basics; read carefully: pointers & arrays, strings, manual memory
+          allocation, types II–IV (conversions, qualifiers, restrict), variadics,
+          and anything on undefined behaviour.
+      - id: c-2
+        title: "Modern C — Levels 1–2 (Acquaintance, Cognition)"
+        kind: read
+        hours: 10
+        url: "https://gustedt.gitlabpages.inria.fr/modern-c/"
+        detail: |-
+          Do the in-text exercises and challenges. Level 3+ is optional reading later.
+      - id: c-3
+        title: "String library from scratch, with tests"
+        kind: exercise
+        hours: 3
+        detail: |-
+          strlen, strlcpy, strtok_r, atoi with overflow detection, itoa, a length-
+          prefixed string type. Unit-test each with assert() and run under ASan.
+      - id: c-4
+        title: "Dynamic array (vector)"
+        kind: exercise
+        hours: 3
+        detail: |-
+          void* + element size (or macro-generated typed versions). Growth policy,
+          push/pop/insert/remove, bounds-checked get. Benchmark growth factors 1.5 vs 2.
+      - id: c-5
+        title: "Hash table (open addressing)"
+        kind: exercise
+        hours: 4
+        detail: |-
+          Linear probing, tombstones, resize at load factor, FNV-1a hash. Benchmark
+          against a separate-chaining version. You'll reuse this in the interpreter
+          and the KV store, so make the API clean.
+      - id: c-6
+        title: "Arena allocator + string builder"
+        kind: exercise
+        hours: 2
+        detail: |-
+          Bump allocator with alignment, reset/free-all, then a growable string
+          builder that allocates from it.
+      - id: c-7
+        title: "Integers & bits — promotions, overflow, bit tricks"
+        kind: exercise
+        hours: 2
+        detail: |-
+          popcount, rotate, next power of two; checked add/mul both manually and with
+          __builtin_*_overflow; write examples of every integer promotion surprise.
+      - id: c-8
+        title: "CLI tools — mywc and myhexdump"
+        kind: exercise
+        hours: 3
+        detail: |-
+          Write with stdio first, then rewrite the I/O with raw read(2)/write(2)
+          and a fixed buffer. Compare speed on a 1 GB file.
+      - id: c-9
+        title: "Capstone — terminal text editor (kilo)"
+        kind: capstone
+        hours: 15
+        url: "https://viewsourcecode.org/snaptoken/kilo/"
+        detail: |-
+          Follow Build Your Own Text Editor: raw mode, rendering, file I/O, search,
+          syntax highlighting. Then extend with at least two of: undo/redo, gap buffer
+          or rope storage, multiple buffers, a status-line command prompt.
+          The raw-mode/line-editing code gets reused in your shell.
+
+  - id: csapp-data
+    title: "02 · CSAPP I — Data & Machine Code"
+    summary: |-
+      How bits become integers and floats, and how C becomes x86-64 machine code.
+      Bomb and Attack labs ship x86-64 Linux binaries — do them on the desktop.
+    resources:
+      - title: "Computer Systems: A Programmer's Perspective, 3e (Bryant & O'Hallaron)"
+        url: "http://csapp.cs.cmu.edu/"
+        paid: true
+      - title: "CSAPP self-study lab handouts"
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+      - title: "CMU 15-213 course page (lectures, recitations)"
+        url: "https://www.cs.cmu.edu/~213/"
+      - title: "Compiler Explorer"
+        url: "https://godbolt.org/"
+    steps:
+      - id: csapp-data-1
+        title: "CSAPP ch.1 — A Tour of Computer Systems"
+        kind: read
+        hours: 1.5
+      - id: csapp-data-2
+        title: "CSAPP ch.2 — Representing and Manipulating Information"
+        kind: read
+        hours: 8
+        detail: |-
+          Do every practice problem as you go (solutions are at the end of the chapter).
+          Floating point (2.4) is worth taking slowly.
+      - id: csapp-data-3
+        title: "CSAPP ch.2 homework problems"
+        kind: exercise
+        hours: 4
+        detail: |-
+          Pick at least 10, prioritising the bit-level integer coding rule problems
+          and the float problems.
+      - id: csapp-data-4
+        title: "Data Lab"
+        kind: lab
+        hours: 6
+        platform: linux
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+        detail: |-
+          Bit puzzles with a restricted operator set. The Makefile uses -m32; on Arch
+          enable multilib (lib32-gcc-libs) or just drop -m32 from the Makefile.
+      - id: csapp-data-5
+        title: "CSAPP ch.3 — Machine-Level Representation of Programs"
+        kind: read
+        hours: 12
+        detail: |-
+          The biggest chapter. Compile your own snippets on godbolt at -O0 and -O1
+          alongside the reading.
+      - id: csapp-data-6
+        title: "Predict-the-assembly drills (x86-64 vs arm64)"
+        kind: exercise
+        hours: 3
+        detail: |-
+          Write 10 small functions (loops, switch, structs, recursion). Predict the
+          x86-64 output, then check on godbolt. Compile the same on the Mac
+          (clang -S -O1) and compare with arm64.
+      - id: csapp-data-7
+        title: "Bomb Lab"
+        kind: lab
+        hours: 8
+        platform: x86-64 linux
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+        detail: |-
+          Defuse all six phases with gdb (then find the secret phase).
+          Done when: all phases defused without brute force.
+      - id: csapp-data-8
+        title: "Attack Lab"
+        kind: lab
+        hours: 8
+        platform: x86-64 linux
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+        detail: |-
+          Code-injection attacks on ctarget, then return-oriented programming on rtarget.
+          Run with -q (self-study mode, no grading server).
+      - id: csapp-data-9
+        title: "CSAPP ch.4 — Processor Architecture (skim)"
+        kind: read
+        hours: 4
+        optional: true
+        detail: |-
+          Y86-64 and pipelining. Optional; the Architecture Lab is optional too.
+
+  - id: csapp-perf
+    title: "03 · CSAPP II — Performance, Memory Hierarchy & Linking"
+    summary: |-
+      Why the same algorithm can be 10× faster with a different memory access pattern,
+      and what the linker actually does with your object files.
+    resources:
+      - title: "CSAPP 3e chapters 5–7"
+        paid: true
+      - title: "What Every Programmer Should Know About Memory — Ulrich Drepper"
+        url: "https://people.freebsd.org/~lstewart/articles/cpumemory.pdf"
+      - title: "Linkers and Loaders — John Levine"
+        url: "https://www.iecc.com/linker/"
+        note: "free draft chapters; reference"
+    steps:
+      - id: csapp-perf-1
+        title: "CSAPP ch.5 — Optimizing Program Performance"
+        kind: read
+        hours: 6
+      - id: csapp-perf-2
+        title: "Optimise a real loop and measure it"
+        kind: exercise
+        hours: 3
+        detail: |-
+          Take a matrix multiply or your hash table lookup loop. Measure with
+          `perf stat` (Linux) or Instruments (Mac), apply ch.5 techniques (multiple
+          accumulators, unrolling, removing aliasing), log each speedup in your notes.
+      - id: csapp-perf-3
+        title: "CSAPP ch.6 — The Memory Hierarchy"
+        kind: read
+        hours: 6
+      - id: csapp-perf-4
+        title: "Memory mountain on both machines"
+        kind: exercise
+        hours: 2
+        detail: |-
+          Build the memory mountain program from ch.6 and plot it for the M-series Mac
+          and your desktop CPU. Explain the ridges using each CPU's cache sizes.
+      - id: csapp-perf-5
+        title: "Cache Lab"
+        kind: lab
+        hours: 8
+        platform: linux
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+        detail: |-
+          Part A: a cache simulator in C driven by valgrind traces.
+          Part B: a cache-blocked matrix transpose minimising misses.
+      - id: csapp-perf-6
+        title: "Drepper — sections 3 (CPU caches) and 6 (what programmers can do)"
+        kind: read
+        hours: 4
+        optional: true
+        url: "https://people.freebsd.org/~lstewart/articles/cpumemory.pdf"
+      - id: csapp-perf-7
+        title: "CSAPP ch.7 — Linking"
+        kind: read
+        hours: 5
+      - id: csapp-perf-8
+        title: "Static/shared libraries and library interpositioning by hand"
+        kind: exercise
+        hours: 3
+        platform: linux
+        detail: |-
+          Build a .a and a .so manually; inspect with nm, objdump -d, readelf -a.
+          Then interpose malloc/free with LD_PRELOAD to log every call (ch.7.13).
+      - id: csapp-perf-9
+        title: "Project — mini readelf"
+        kind: project
+        hours: 6
+        detail: |-
+          Parse an ELF64 file from scratch: header, program headers, section headers,
+          symbol + string tables. Compare output with `readelf -a`. Reused later in the
+          debugger and kernel ELF loader.
+
+  - id: processes
+    title: "04 · Processes, Signals & the Shell"
+    summary: |-
+      Exceptional control flow, processes, scheduling, signals and job control —
+      CSAPP ch.8 plus OSTEP's CPU virtualisation chapters. Ends with your own Unix shell.
+    resources:
+      - title: "Operating Systems: Three Easy Pieces (OSTEP)"
+        url: "https://pages.cs.wisc.edu/~remzi/OSTEP/"
+        note: "free chapters"
+      - title: "OSTEP homework (simulators + coding)"
+        url: "https://github.com/remzi-arpacidusseau/ostep-homework"
+      - title: "OSTEP projects"
+        url: "https://github.com/remzi-arpacidusseau/ostep-projects"
+      - title: "The Linux Programming Interface — Michael Kerrisk"
+        url: "https://man7.org/tlpi/"
+        paid: true
+        note: "the reference for anything syscall-related"
+      - title: "Tutorial — Write a Shell in C (Stephen Brennan)"
+        url: "https://brennan.io/2015/01/16/write-a-shell-in-c/"
+    steps:
+      - id: processes-1
+        title: "OSTEP ch.4–6 — processes, process API, limited direct execution"
+        kind: read
+        hours: 6
+        detail: |-
+          Do the process-run.py simulator homework and the ch.5 coding homework
+          (fork/exec/wait/pipe exercises).
+      - id: processes-2
+        title: "OSTEP ch.7–10 — scheduling (FIFO/SJF/RR, MLFQ, lottery, multiprocessor)"
+        kind: read
+        hours: 5
+        detail: "Do the scheduler.py, mlfq.py and lottery.py homework."
+      - id: processes-3
+        title: "CSAPP ch.8 — Exceptional Control Flow"
+        kind: read
+        hours: 8
+      - id: processes-4
+        title: "Signals & reaping drills"
+        kind: exercise
+        hours: 3
+        detail: |-
+          Programs that show fork/exec/wait ordering, create and reap zombies, and a
+          correct SIGCHLD handler using only async-signal-safe functions
+          (sigprocmask around the job list, sigsuspend instead of busy waiting).
+      - id: processes-5
+        title: "OSTEP project — initial-utilities (wcat, wgrep, wzip, wunzip)"
+        kind: exercise
+        hours: 4
+        url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/initial-utilities"
+        detail: "Done when: the repo's test scripts pass for all four."
+      - id: processes-6
+        title: "Shell Lab (tsh)"
+        kind: lab
+        hours: 8
+        platform: linux
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+        detail: |-
+          Job control: fg/bg/jobs, forwarding SIGINT/SIGTSTP to the foreground job.
+          Done when: your output matches tshref on all 16 traces.
+      - id: processes-7
+        title: "OSTEP project — processes-shell (wish)"
+        kind: exercise
+        hours: 6
+        url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/processes-shell"
+        detail: "Paths, redirection, parallel commands (&). Done when: repo tests pass."
+      - id: processes-8
+        title: "Capstone — your own Unix shell"
+        kind: capstone
+        hours: 25
+        detail: |-
+          From scratch, combining both labs:
+            - pipelines of N commands, redirection (< > >> 2> 2>&1)
+            - job control with process groups + tcsetpgrp, fg/bg/jobs
+            - builtins: cd, exit, export, unset, jobs, fg, bg
+            - quoting, escaping, $VAR and $? expansion
+            - line editing + history using your kilo raw-mode code
+            - globbing (glob(3) first, then your own matcher)
+          Done when: you can use it as your interactive shell for an hour.
+
+  - id: memory
+    title: "05 · Virtual Memory & Allocators"
+    summary: |-
+      Address spaces, paging, TLBs and how malloc really works — then your own
+      allocator that can run real programs.
+    resources:
+      - title: "OSTEP — Virtualization: memory chapters"
+        url: "https://pages.cs.wisc.edu/~remzi/OSTEP/"
+      - title: "CSAPP 3e chapter 9"
+        paid: true
+      - title: "Doug Lea — A Memory Allocator (dlmalloc design)"
+        url: "https://gee.cs.oswego.edu/dl/html/malloc.html"
+      - title: "mimalloc: Free List Sharding in Action (tech report)"
+        url: "https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/"
+    steps:
+      - id: memory-1
+        title: "OSTEP ch.13–17 — address spaces, memory API, translation, segmentation, free space"
+        kind: read
+        hours: 7
+        detail: "Do the relocation.py, segmentation.py and malloc.py homework."
+      - id: memory-2
+        title: "OSTEP ch.18–23 — paging, TLBs, multi-level tables, swapping, VAX/VMS & Linux VM"
+        kind: read
+        hours: 9
+        detail: "Do the paging-*.py homework."
+      - id: memory-3
+        title: "OSTEP ch.19 homework — measure the TLB"
+        kind: exercise
+        hours: 3
+        detail: |-
+          Write tlb.c: time page accesses as the number of pages grows, pin to one CPU,
+          plot it, and find the TLB sizes for both machines.
+      - id: memory-4
+        title: "CSAPP ch.9 — Virtual Memory (incl. 9.9 dynamic memory allocation)"
+        kind: read
+        hours: 8
+      - id: memory-5
+        title: "mmap playground"
+        kind: exercise
+        hours: 3
+        detail: |-
+          Map a file, MAP_PRIVATE vs MAP_SHARED, MAP_ANONYMOUS, mprotect guard pages,
+          catching SIGSEGV with sigaction + si_addr. Observe copy-on-write after fork.
+      - id: memory-6
+        title: "Malloc Lab"
+        kind: lab
+        hours: 15
+        platform: linux
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+        detail: |-
+          Implicit list (book version) → explicit free list → segregated fits.
+          Record utilisation and throughput for each version in your notes.
+      - id: memory-7
+        title: "Capstone — your own malloc"
+        kind: capstone
+        hours: 25
+        detail: |-
+          libmymalloc.so implementing malloc/free/calloc/realloc/posix_memalign on top
+          of mmap: size classes, boundary-tag coalescing, large allocations straight
+          from mmap, thread safety (global lock first, then per-thread caches).
+          Debug mode with canaries and double-free detection.
+          Done when: LD_PRELOAD=./libmymalloc.so nvim (and python3) run normally.
+      - id: memory-8
+        title: "How real allocators work — dlmalloc, jemalloc, mimalloc"
+        kind: read
+        hours: 3
+        optional: true
+
+  - id: concurrency
+    title: "06 · Concurrency"
+    summary: |-
+      Threads, locks, condition variables, semaphores, atomics and the bugs they cause.
+      Builds the thread pool you'll use in the HTTP server.
+    resources:
+      - title: "OSTEP — Concurrency chapters"
+        url: "https://pages.cs.wisc.edu/~remzi/OSTEP/"
+      - title: "The Little Book of Semaphores — Allen Downey"
+        url: "https://greenteapress.com/wp/semaphores/"
+      - title: "CSAPP 3e chapter 12"
+        paid: true
+      - title: "Preshing on Programming (atomics & memory ordering)"
+        url: "https://preshing.com/"
+    steps:
+      - id: concurrency-1
+        title: "OSTEP ch.26–33 — threads, locks, concurrent data structures, CVs, semaphores, bugs, events"
+        kind: read
+        hours: 14
+        detail: |-
+          Do the x86.py simulator homework, and the ch.27 thread API homework with
+          valgrind --tool=helgrind (Linux).
+      - id: concurrency-2
+        title: "CSAPP ch.12 — Concurrent Programming"
+        kind: read
+        hours: 5
+      - id: concurrency-3
+        title: "Build locks — spinlock, ticket lock, futex mutex"
+        kind: exercise
+        hours: 4
+        platform: linux
+        detail: |-
+          C11 <stdatomic.h> spinlock and ticket lock, then a mutex on futex(2).
+          Benchmark against pthread_mutex under contention with 1–16 threads.
+      - id: concurrency-4
+        title: "Little Book of Semaphores — classic problems"
+        kind: exercise
+        hours: 6
+        url: "https://greenteapress.com/wp/semaphores/"
+        detail: |-
+          Rendezvous, barrier, producer-consumer, readers-writers (no starvation),
+          dining philosophers. Implement in C with pthreads + semaphores.
+      - id: concurrency-5
+        title: "Concurrent data structures (OSTEP ch.29)"
+        kind: exercise
+        hours: 4
+        detail: |-
+          Approximate (sloppy) counter, hand-over-hand linked list, striped-lock hash
+          table. Measure how each scales with thread count.
+      - id: concurrency-6
+        title: "OSTEP project — concurrency-pzip"
+        kind: project
+        hours: 6
+        url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/concurrency-pzip"
+      - id: concurrency-7
+        title: "Project — thread pool library"
+        kind: project
+        hours: 6
+        detail: |-
+          Bounded work queue, condition variables, futures/wait-all, graceful shutdown.
+          Done when: clean under -fsanitize=thread with a stress test.
+      - id: concurrency-8
+        title: "Project — user-level threads (coroutines) with hand-written context switch"
+        kind: project
+        hours: 10
+        optional: true
+        detail: |-
+          Save/restore callee-saved registers in assembly (x86-64 and/or arm64),
+          a round-robin scheduler, yield, and a channel primitive.
+
+  - id: network
+    title: "07 · Networking & the HTTP Server"
+    summary: |-
+      Sockets, I/O multiplexing and HTTP/1.1. Ends with a fast, fuzzed HTTP server in
+      plain C.
+    resources:
+      - title: "Beej's Guide to Network Programming"
+        url: "https://beej.us/guide/bgnet/"
+      - title: "CSAPP 3e chapters 10–11"
+        paid: true
+      - title: "RFC 9112 — HTTP/1.1"
+        url: "https://www.rfc-editor.org/rfc/rfc9112"
+      - title: "RFC 9110 — HTTP Semantics"
+        url: "https://www.rfc-editor.org/rfc/rfc9110"
+      - title: "The C10K problem"
+        url: "http://www.kegel.com/c10k.html"
+      - title: "Lord of the io_uring"
+        url: "https://unixism.net/loti/"
+    steps:
+      - id: network-1
+        title: "CSAPP ch.10 — System-Level I/O"
+        kind: read
+        hours: 3
+      - id: network-2
+        title: "Beej's Guide to Network Programming (whole guide)"
+        kind: read
+        hours: 6
+        url: "https://beej.us/guide/bgnet/"
+        detail: "Type in and run the stream/datagram client & server examples."
+      - id: network-3
+        title: "CSAPP ch.11 — Network Programming (Tiny web server)"
+        kind: read
+        hours: 4
+      - id: network-4
+        title: "Echo server three ways"
+        kind: exercise
+        hours: 4
+        detail: |-
+          Iterative → fork per connection → thread per connection. Write a load client
+          that opens N concurrent connections and compare throughput & latency.
+      - id: network-5
+        title: "Event-loop echo server — poll, then epoll and kqueue"
+        kind: exercise
+        hours: 5
+        detail: |-
+          Non-blocking sockets with poll(), then a small backend abstraction with
+          epoll (Linux) and kqueue (macOS) implementations.
+      - id: network-6
+        title: "Proxy Lab"
+        kind: lab
+        hours: 12
+        url: "http://csapp.cs.cmu.edu/3e/labs.html"
+        detail: "Sequential → concurrent → caching HTTP proxy."
+      - id: network-7
+        title: "OSTEP project — concurrency-webserver"
+        kind: project
+        hours: 6
+        url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/concurrency-webserver"
+      - id: network-8
+        title: "Capstone — HTTP/1.1 server in plain C"
+        kind: capstone
+        hours: 30
+        detail: |-
+          - incremental request parser (request line, headers, Content-Length + chunked)
+          - static files with MIME types, directory index, Range requests
+          - keep-alive, timeouts, limits on header/body size
+          - epoll/kqueue event loop + your thread pool for file I/O
+          - access log; graceful shutdown on SIGTERM
+          - benchmark with wrk or oha; fuzz the parser with libFuzzer or AFL++
+          Done when: it survives an hour of fuzzing and serves a real site.
+      - id: network-9
+        title: "Add an io_uring backend"
+        kind: project
+        hours: 10
+        optional: true
+        platform: linux
+        url: "https://unixism.net/loti/"
+
+  - id: storage
+    title: "08 · Persistence & the KV Store"
+    summary: |-
+      Disks, file systems, fsync and crash consistency, then log-structured storage.
+      Ends with a key-value store with a write-ahead log that never loses an
+      acknowledged write.
+    resources:
+      - title: "OSTEP — Persistence chapters"
+        url: "https://pages.cs.wisc.edu/~remzi/OSTEP/"
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data"
+        url: "https://riak.com/assets/bitcask-intro.pdf"
+      - title: "Files are hard — Dan Luu"
+        url: "https://danluu.com/file-consistency/"
+      - title: "All File Systems Are Not Created Equal (OSDI '14)"
+        url: "https://www.usenix.org/conference/osdi14/technical-sessions/presentation/pillai"
+      - title: "Designing Data-Intensive Applications — Martin Kleppmann"
+        paid: true
+        note: "the Storage and Retrieval chapter"
+      - title: "Database Internals — Alex Petrov"
+        paid: true
+        note: "optional, deep dive"
+      - title: "Build Your Own Database / Redis (build-your-own.org)"
+        url: "https://build-your-own.org/"
+      - title: "CMU 15-445 Database Systems (lectures)"
+        url: "https://15445.courses.cs.cmu.edu/"
+    steps:
+      - id: storage-1
+        title: "OSTEP ch.36–40 — I/O devices, disks, RAID, files & directories, FS implementation"
+        kind: read
+        hours: 10
+      - id: storage-2
+        title: "OSTEP ch.39 homework — stat, ls -l, tail, find"
+        kind: exercise
+        hours: 4
+      - id: storage-3
+        title: "OSTEP ch.41–45 — FFS, crash consistency & journaling, LFS, SSDs, data integrity"
+        kind: read
+        hours: 10
+      - id: storage-4
+        title: "Files are hard + All File Systems Are Not Created Equal"
+        kind: read
+        hours: 3
+        url: "https://danluu.com/file-consistency/"
+        detail: "Write down the exact fsync/rename dance needed for a safe file update."
+      - id: storage-5
+        title: "OSTEP project — initial-kv"
+        kind: exercise
+        hours: 2
+        url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/initial-kv"
+      - id: storage-6
+        title: "Bitcask paper + DDIA Storage and Retrieval"
+        kind: read
+        hours: 5
+        detail: "Hash indexes, SSTables and LSM trees, B-trees, and their trade-offs."
+      - id: storage-7
+        title: "Crash-test harness"
+        kind: exercise
+        hours: 3
+        detail: |-
+          A writer that appends CRC32-checksummed records and a driver that kill -9s it
+          at random points, then verifies what survived. Try with and without fsync.
+          You'll point this at the KV store.
+      - id: storage-8
+        title: "Capstone — key-value store with a write-ahead log"
+        kind: capstone
+        hours: 30
+        detail: |-
+          - in-memory hash index (your phase-01 table) + append-only WAL with
+            length-prefixed, CRC'd records
+          - configurable fsync policy (always / batched group commit / none)
+          - recovery by replaying the log, tolerating a torn final record
+          - snapshotting + log compaction
+          - a network protocol: a RESP subset so redis-cli works, or HTTP via your server
+          Done when: the crash harness never loses an acknowledged write.
+      - id: storage-9
+        title: "Upgrade the engine — LSM tree or B+tree"
+        kind: project
+        hours: 25
+        optional: true
+        detail: |-
+          LSM: memtable → SSTables with sparse index + bloom filter → compaction.
+          Or B+tree: fixed-size pages, a buffer pool, page splits.
+      - id: storage-10
+        title: "Database Internals Part I or CMU 15-445 storage lectures"
+        kind: read
+        hours: 10
+        optional: true
+
+  - id: interpreters
+    title: "09 · Interpreters (Crafting Interpreters)"
+    summary: |-
+      Build Lox twice: a tree-walking interpreter (jlox), then a bytecode VM with a
+      garbage collector in C (clox). Every chapter ends with challenges — do at least
+      one per chapter. This phase is fairly independent; pull it earlier if you want.
+    resources:
+      - title: "Crafting Interpreters — Robert Nystrom"
+        url: "https://craftinginterpreters.com/"
+        note: "free online; print edition paid"
+      - title: "Writing a C Compiler — Nora Sandler"
+        url: "https://nostarch.com/writing-c-compiler"
+        paid: true
+      - title: "chibicc — a small C compiler (Rui Ueyama)"
+        url: "https://github.com/rui314/chibicc"
+    steps:
+      - id: interpreters-1
+        title: "Ch.1–3 — Introduction, A Map of the Territory, The Lox Language"
+        kind: read
+        hours: 2
+        url: "https://craftinginterpreters.com/contents.html"
+      - id: interpreters-2
+        title: "jlox ch.4–7 — scanning, representing code, parsing & evaluating expressions"
+        kind: project
+        hours: 10
+        detail: |-
+          The book uses Java. Writing jlox in Go, Rust or Odin instead is a good
+          extra challenge (clox is still in C).
+      - id: interpreters-3
+        title: "jlox ch.8–10 — statements & state, control flow, functions"
+        kind: project
+        hours: 8
+      - id: interpreters-4
+        title: "jlox ch.11–13 — resolving & binding, classes, inheritance"
+        kind: project
+        hours: 8
+      - id: interpreters-5
+        title: "clox ch.14–19 — chunks, VM, scanner, compiler, values, strings"
+        kind: project
+        hours: 12
+      - id: interpreters-6
+        title: "clox ch.20–23 — hash tables, globals, locals, jumping"
+        kind: project
+        hours: 10
+      - id: interpreters-7
+        title: "clox ch.24–25 — calls & functions, closures"
+        kind: project
+        hours: 8
+      - id: interpreters-8
+        title: "clox ch.26 — garbage collection"
+        kind: project
+        hours: 5
+        detail: "Run the test suite with the stress-GC flag and ASan on."
+      - id: interpreters-9
+        title: "clox ch.27–30 — classes, methods, superclasses, optimisation"
+        kind: project
+        hours: 10
+      - id: interpreters-10
+        title: "Capstone — extend clox into your own language"
+        kind: capstone
+        hours: 25
+        detail: |-
+          Pick at least three: list/map literals, modules/import, string interpolation,
+          exceptions, a REPL with line editing, native file + socket functions (then
+          write a tiny HTTP server in your language), NaN-boxing benchmarks.
+      - id: interpreters-11
+        title: "Writing a C Compiler (Sandler) — C subset → x86-64"
+        kind: project
+        hours: 60
+        optional: true
+        url: "https://nostarch.com/writing-c-compiler"
+        detail: |-
+          Has a full test suite. Targets x86-64: on the Mac it runs under Rosetta
+          (the book covers macOS), or do it on the desktop.
+
+  - id: kernel
+    title: "10 · Kernels & Bare Metal"
+    summary: |-
+      Read and hack a real teaching OS (xv6 on RISC-V), then boot your own x86-64
+      kernel in QEMU and grow it until it runs user programs.
+    resources:
+      - title: "MIT 6.1810 Operating System Engineering"
+        url: "https://pdos.csail.mit.edu/6.1810/"
+        note: "labs, lectures and the xv6 book are free"
+      - title: "The little book about OS development"
+        url: "https://littleosbook.github.io/"
+      - title: "OSDev Wiki"
+        url: "https://wiki.osdev.org/"
+      - title: "OSDev — Limine Bare Bones"
+        url: "https://wiki.osdev.org/Limine_Bare_Bones"
+      - title: "Writing an OS in Rust — Philipp Oppermann"
+        url: "https://os.phil-opp.com/"
+        note: "excellent explanations even if you write C"
+    steps:
+      - id: kernel-1
+        title: "Install the RISC-V toolchain + QEMU and boot xv6-riscv"
+        kind: setup
+        hours: 2
+        url: "https://pdos.csail.mit.edu/6.1810/"
+        detail: "Follow the course's Tools page on both machines (Homebrew / pacman)."
+      - id: kernel-2
+        title: "xv6 book ch.1–2 + Lab util (sleep, pingpong, primes, find, xargs)"
+        kind: lab
+        hours: 8
+      - id: kernel-3
+        title: "Lab syscall (system call tracing, sysinfo)"
+        kind: lab
+        hours: 6
+      - id: kernel-4
+        title: "xv6 book ch.3 + Lab page tables"
+        kind: lab
+        hours: 10
+      - id: kernel-5
+        title: "xv6 book ch.4 + Lab traps (backtrace, alarm)"
+        kind: lab
+        hours: 8
+      - id: kernel-6
+        title: "Lab copy-on-write fork"
+        kind: lab
+        hours: 8
+      - id: kernel-7
+        title: "Labs lock, fs, mmap, net"
+        kind: lab
+        hours: 30
+        optional: true
+      - id: kernel-8
+        title: "little book about OS development ch.1–6"
+        kind: read
+        hours: 6
+        url: "https://littleosbook.github.io/"
+        detail: |-
+          Booting, getting to C, output, segmentation, interrupts. Read for concepts;
+          the capstone uses x86-64 + Limine rather than the book's 32-bit GRUB setup.
+      - id: kernel-9
+        title: "Capstone M1 — boot: kernel prints to serial + framebuffer in QEMU"
+        kind: capstone
+        hours: 6
+        url: "https://wiki.osdev.org/Limine_Bare_Bones"
+        detail: |-
+          Limine bare bones. clang -target x86_64-elf works as a cross compiler on
+          both machines (or brew install x86_64-elf-gcc). Add a kprintf.
+      - id: kernel-10
+        title: "Capstone M2 — GDT, IDT, exceptions, timer + keyboard interrupts"
+        kind: capstone
+        hours: 10
+      - id: kernel-11
+        title: "Capstone M3 — physical frame allocator, paging, kernel heap"
+        kind: capstone
+        hours: 12
+        detail: "Port your phase-05 malloc as the kernel heap."
+      - id: kernel-12
+        title: "Capstone M4 — processes: context switch, scheduler, user mode, syscalls"
+        kind: capstone
+        hours: 20
+        detail: |-
+          Preemptive round-robin scheduler, ring 3 with syscall/sysret, load a user
+          program from a Limine module (initrd).
+          Done when: a user-mode program prints via your write() syscall.
+      - id: kernel-13
+        title: "Capstone stretch — ELF loader, tiny filesystem, port your shell"
+        kind: capstone
+        hours: 25
+        optional: true
+
+  - id: zig
+    title: "11 · Zig"
+    summary: |-
+      Carry everything over to Zig: explicit allocators, comptime, error unions and
+      seamless C interop. Zig changes quickly — match docs to your installed version.
+    resources:
+      - title: "Ziglings"
+        url: "https://codeberg.org/ziglings/exercises"
+      - title: "Zig Language Reference"
+        url: "https://ziglang.org/documentation/master/"
+      - title: "zig.guide"
+        url: "https://zig.guide/"
+    steps:
+      - id: zig-1
+        title: "Install Zig on both machines"
+        kind: setup
+        hours: 0.5
+        detail: "brew install zig / sudo pacman -S zig — keep the versions in sync."
+      - id: zig-2
+        title: "Ziglings — all exercises"
+        kind: exercise
+        hours: 15
+        url: "https://codeberg.org/ziglings/exercises"
+      - id: zig-3
+        title: "Language reference — comptime, allocators, errors, optionals"
+        kind: read
+        hours: 5
+        url: "https://ziglang.org/documentation/master/"
+      - id: zig-4
+        title: "C interop — @cImport your C hash table; build C with zig cc / build.zig"
+        kind: exercise
+        hours: 3
+      - id: zig-5
+        title: "Capstone — port the KV store or HTTP server to Zig"
+        kind: capstone
+        hours: 25
+        detail: |-
+          Use explicit allocators throughout. Compare code size, bugs the compiler
+          caught, and performance against the C version.
+
+  - id: side
+    title: "Side Quests"
+    optional: true
+    summary: |-
+      Optional projects. The [after NN] tag says which phase gives you the background.
+      Pick whatever sounds fun when you want a break from the main path.
+    resources:
+      - title: "Build Your Own X"
+        url: "https://github.com/codecrafters-io/build-your-own-x"
+    steps:
+      - id: side-chip8
+        title: "CHIP-8 emulator, then a Game Boy emulator [after 01]"
+        kind: project
+        hours: 10
+        url: "https://gbdev.io/pandocs/"
+        detail: "CHIP-8 is a weekend. The Game Boy (Pan Docs) is a multi-week project."
+      - id: side-regex
+        title: "Regex engine — Thompson NFA [after 01]"
+        kind: project
+        hours: 8
+        url: "https://swtch.com/~rsc/regexp/regexp1.html"
+        detail: "Russ Cox's article series. Then add a lazy DFA."
+      - id: side-debugger
+        title: "Debugger with ptrace [after 04]"
+        kind: project
+        hours: 20
+        platform: linux
+        detail: |-
+          int3 breakpoints, single-step, registers and memory, symbol lookup using your
+          mini readelf, then DWARF line tables for source-level breakpoints.
+      - id: side-container
+        title: "Container runtime from scratch [after 05]"
+        kind: project
+        hours: 12
+        platform: linux
+        detail: "Namespaces, cgroups v2, pivot_root, seccomp. See Liz Rice's 'Containers from scratch' talk."
+      - id: side-lockfree
+        title: "Lock-free queues — SPSC ring buffer, then Vyukov MPMC [after 06]"
+        kind: project
+        hours: 8
+        detail: "Verify with TSan and long stress runs on both architectures (arm64 is weakly ordered)."
+      - id: side-tcpip
+        title: "TCP/IP stack on a TUN/TAP device [after 07]"
+        kind: project
+        hours: 30
+        platform: linux
+        url: "https://www.saminiir.com/lets-code-tcp-ip-stack-1-ethernet-arp/"
+        detail: "Ethernet, ARP, IPv4, ICMP (ping your stack), then a minimal TCP."
+      - id: side-git
+        title: "Write yourself a Git [after 08]"
+        kind: project
+        hours: 15
+        url: "https://wyag.thb.lt/"
+        detail: "Objects, trees, commits, refs, index. Do it in C rather than Python."
+      - id: side-fuse
+        title: "FUSE filesystem [after 08]"
+        kind: project
+        hours: 15
+        platform: linux
+        detail: "An in-memory FS first, then one backed by your KV store."
+      - id: side-sync
+        title: "Self-host sysroad sync [after 07 + 08]"
+        kind: project
+        hours: 10
+        detail: |-
+          Replace sysroad's git sync with your own HTTP server + KV store holding the
+          event log. The tracker you're reading becomes a client of your own systems.
+      - id: side-nand2tetris
+        title: "Nand2Tetris — a computer from NAND gates up [anytime]"
+        kind: project
+        hours: 40
+        url: "https://www.nand2tetris.org/"
