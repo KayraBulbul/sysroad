@@ -19,6 +19,10 @@ var ErrBusy = errors.New("sync already in progress")
 func git(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_MERGE_AUTOEDIT=no")
+	// Never let ssh prompt (passphrase, host key) while a TUI owns the terminal.
+	if os.Getenv("GIT_SSH_COMMAND") == "" {
+		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	}
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	err := cmd.Run()
@@ -27,9 +31,21 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 		if s == "" {
 			s = err.Error()
 		}
-		return s, fmt.Errorf("git %s: %s", args[0], lastLine(s))
+		return s, gitError(args[0], s)
 	}
 	return s, nil
+}
+
+// ErrAuth means git has no usable credentials for the remote.
+var ErrAuth = errors.New("git couldn't authenticate. With HTTPS URLs run `gh auth setup-git`; with SSH (git@github.com:…) make sure your key is loaded in ssh-agent")
+
+func gitError(sub, out string) error {
+	for _, sign := range []string{"could not read Username", "Authentication failed", "Permission denied (publickey)", "terminal prompts disabled"} {
+		if strings.Contains(out, sign) {
+			return fmt.Errorf("git %s: %w", sub, ErrAuth)
+		}
+	}
+	return fmt.Errorf("git %s: %s", sub, lastLine(out))
 }
 
 func lastLine(s string) string {
@@ -135,7 +151,7 @@ func Clone(ctx context.Context, remote, dir string) error {
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git clone: %s", lastLine(string(out)))
+		return gitError("clone", string(out))
 	}
 	return nil
 }

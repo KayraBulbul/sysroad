@@ -2,6 +2,7 @@ package gitsync_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,5 +76,16 @@ func TestTwoMachineSync(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(macDir, ".git", "sysroad-sync.lock")); err == nil {
 		t.Error("sync lock left behind")
+	}
+}
+
+func TestNetworkFailureIsNotReportedAsAuth(t *testing.T) {
+	err := gitsync.Clone(context.Background(), "https://user@invalid.invalid/x.git", filepath.Join(t.TempDir(), "x"))
+	if err == nil {
+		t.Skip("unexpectedly reachable")
+	}
+	// Not an auth failure: should not claim to be one.
+	if errors.Is(err, gitsync.ErrAuth) {
+		t.Errorf("DNS failure reported as auth error: %v", err)
 	}
 }

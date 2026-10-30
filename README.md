@@ -31,10 +31,13 @@ sysroad init
 gh repo create sysroad-data --private --source ~/.local/share/sysroad --push
 ```
 
-On **every other machine**:
+On **every other machine**, clone it. The data repo is private and sysroad never prompts
+for credentials (it syncs in the background), so use the URL that matches how git is
+logged in:
 
 ```sh
-sysroad init -clone https://github.com/<you>/sysroad-data.git
+sysroad init -clone git@github.com:<you>/sysroad-data.git       # SSH (key must be in ssh-agent)
+sysroad init -clone https://github.com/<you>/sysroad-data.git   # HTTPS (after `gh auth setup-git`)
 ```
 
 ## Usage
