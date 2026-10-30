@@ -23,10 +23,13 @@ sections:
         hours: 4
         url: "https://missing.csail.mit.edu/"
         detail: |-
-          Skim what you already know. Pay attention to the "Debugging and Profiling"
-          and "Code Quality" (testing, CI, command runners) lectures. The 2026 edition
-          dropped "Metaprogramming"; for build systems and make, read the 2020 lecture:
-          https://missing.csail.mit.edu/2020/metaprogramming/
+          Watch or read the lectures, skimming what you already know. Pay attention to
+          "Debugging and Profiling" and "Code Quality" (testing, CI, command runners).
+          The 2026 edition dropped "Metaprogramming"; for build systems and make, read
+          the 2020 lecture: https://missing.csail.mit.edu/2020/metaprogramming/
+        done_when: |-
+          You've been through the shell, debugging/profiling and code-quality lectures
+          plus the 2020 metaprogramming one, and done at least a few exercises from each.
       - id: setup-2
         title: "Install the toolchain on both machines"
         kind: setup
@@ -34,45 +37,78 @@ sections:
         detail: |-
           Mac:     xcode-select --install; brew install make qemu
           Omarchy: sudo pacman -S base-devel gdb valgrind strace ltrace man-pages qemu-full perf
-          Done when: cc, a debugger (lldb / gdb) and `man 2 open` work on both.
+        done_when: |-
+          On both machines: `cc --version` works, a debugger starts (lldb on the Mac,
+          gdb on the desktop), and `man 2 open` shows the syscall man page.
       - id: setup-3
         title: "Write a reusable C Makefile template"
         kind: exercise
         hours: 2
         url: "https://makefiletutorial.com/"
         detail: |-
-          Debug + release builds, -std=c17 -Wall -Wextra -Wpedantic -g, automatic header
-          dependencies (-MMD -MP), a `make asan` target (-fsanitize=address,undefined) and
-          `make test`. Every later project starts from this.
+          One Makefile you copy into every new project, assuming src/ for code, tests/
+          for test_*.c files and build/ for output. It should give you:
+            - make / make release: debug (-O0 -g) and optimised (-O2 -DNDEBUG) builds,
+              each in its own build/ subfolder
+            - warnings: -std=c17 -Wall -Wextra -Wpedantic
+            - header dependencies via -MMD -MP and -include $(DEPS), so editing a .h
+              recompiles the files that include it
+            - make asan: a build with -fsanitize=address,undefined
+            - make test: builds each tests/test_*.c against your objects (minus main.o)
+              and runs them; any failed assert() fails the target
+            - make clean, and .PHONY for the non-file targets
+          Build it up one feature at a time and check each before adding the next.
+          Read makefiletutorial.com first; compare with its "Makefile Cookbook" after.
+        done_when: |-
+          Copied into an empty project with a couple of .c/.h files, it works after only
+          changing the program name. `touch` on a header recompiles only the files that
+          include it, `make asan` catches a deliberate overflow, and `make test; echo $?`
+          prints non-zero when an assert fails.
       - id: setup-4
         title: "Debugger drills (gdb on Linux, lldb on Mac)"
         kind: exercise
         hours: 2
         url: "https://beej.us/guide/bggdb/"
         detail: |-
-          Breakpoints, watchpoints, backtrace, frame selection, examining memory (x/16xb),
-          stepping into a segfault, attaching to a running process. Repeat in lldb using
-          the GDB→LLDB command map: https://lldb.llvm.org/use/map.html
+          Write a small buggy program (e.g. a linked list with an off-by-one and a NULL
+          dereference) and use the debugger to find both bugs. Practise: breakpoints
+          (by line and function), conditional breakpoints, watchpoints, `bt`, moving
+          between frames, printing structs and arrays, `x/16xb` to dump memory, and
+          attaching to a running process. Repeat in lldb using the GDB→LLDB command
+          map: https://lldb.llvm.org/use/map.html
+        done_when: |-
+          You found both bugs using only the debugger (no printf), and you can do each
+          of the operations above from memory in both gdb and lldb.
       - id: setup-5
         title: "Sanitizers & Valgrind — catch five deliberate bugs"
         kind: exercise
         hours: 2
         detail: |-
-          Write tiny programs with: use-after-free, heap overflow, leak, signed-overflow UB,
-          uninitialised read. Catch each with ASan/UBSan (both machines) and with Valgrind
-          memcheck (Linux only). Note which tool catches what.
+          Write five tiny programs, one bug each: use-after-free, heap buffer overflow,
+          memory leak, signed integer overflow, and reading an uninitialised variable.
+          Run each under ASan+UBSan (-fsanitize=address,undefined -g) on both machines,
+          and under `valgrind --leak-check=full` on the desktop. On the Mac, check the
+          leak with `leaks --atExit -- ./prog`.
+        done_when: |-
+          A note on this step records which tool caught which bug on which machine,
+          including the ones each tool missed (e.g. ASan doesn't report uninitialised
+          reads; Valgrind doesn't catch signed overflow).
       - id: setup-6
         title: "Create a repo for all roadmap work"
         kind: setup
         hours: 0.5
         detail: |-
-          e.g. ~/dev/systems with one folder per phase/capstone. Put links to the
-          relevant folders in each step's notes as you go.
+          e.g. ~/dev/systems with one folder per phase or capstone, a .gitignore for
+          build/ output, pushed to GitHub. Paste the folder path into each step's notes
+          as you go so you can find past work.
+        done_when: |-
+          The repo exists on GitHub and is cloned on both machines, with your Makefile
+          template committed in it.
 
   - id: c
     title: "01 · Modern C"
     summary: |-
-      You already know C/C++ — this phase is about writing idiomatic, modern C (C17/C23),
+      You already know C/C++. This phase is about writing idiomatic, modern C (C17/C23),
       the memory model and undefined behaviour, and building the data-structure toolkit
       you'll reuse in every later project.
     resources:
@@ -96,75 +132,122 @@ sections:
         hours: 6
         url: "https://beej.us/guide/bgc/"
         detail: |-
-          Skim the basics; read carefully: pointers & arrays, strings, manual memory
-          allocation, types II–IV (conversions, qualifiers, restrict), variadics,
-          and anything on undefined behaviour.
+          Skim the basics. Read carefully: pointers and arrays (and how they differ),
+          strings, manual memory allocation, the "Types" chapters (conversions,
+          qualifiers, restrict), variadic functions, and anything on undefined
+          behaviour. Type in and run the examples you're unsure about.
+        done_when: |-
+          You can explain, without looking: why sizeof(array) differs from
+          sizeof(pointer), what `const char *` vs `char *const` means, what integer
+          promotion is, and three common kinds of undefined behaviour.
       - id: c-2
         title: "Modern C — Levels 1–2 (Acquaintance, Cognition)"
         kind: read
         hours: 10
         url: "https://gustedt.gitlabpages.inria.fr/modern-c/"
         detail: |-
-          Do the in-text exercises and challenges. Level 3+ is optional reading later.
+          Gustedt's book is organised into levels; read Level 1 (Acquaintance) and
+          Level 2 (Cognition). Do the exercises and "challenges" in the text. Level 3+
+          is optional reading for later.
+        done_when: |-
+          You've finished both levels and done at least half the challenges, with your
+          solutions committed to your roadmap repo.
       - id: c-3
         title: "String library from scratch, with tests"
         kind: exercise
         hours: 3
         detail: |-
-          strlen, strlcpy, strtok_r, atoi with overflow detection, itoa, a length-
-          prefixed string type. Unit-test each with assert() and run under ASan.
+          Implement, without <string.h>: strlen, strlcpy (truncating, always
+          NUL-terminated), strtok_r, atoi that detects overflow, itoa, and a simple
+          length-prefixed string struct (pointer + length) with create/append/free.
+          Write tests with assert() for normal cases and edge cases (empty strings,
+          INT_MIN, buffer exactly full).
+        done_when: |-
+          `make test` passes under `make asan` with no sanitizer reports, and your atoi
+          rejects "2147483648" while accepting "-2147483648".
       - id: c-4
         title: "Dynamic array (vector)"
         kind: exercise
         hours: 3
         detail: |-
-          void* + element size (or macro-generated typed versions). Growth policy,
-          push/pop/insert/remove, bounds-checked get. Benchmark growth factors 1.5 vs 2.
+          A growable array storing elements of any size (void* + element size, or a
+          macro that generates a typed version). Operations: push, pop, insert at
+          index, remove at index, get with bounds checking, and free. Benchmark pushing
+          10 million ints with growth factors 1.5 and 2.
+        done_when: |-
+          Tests cover every operation, including inserting at index 0 and at the end,
+          and pass under ASan. Your note records the benchmark results.
       - id: c-5
         title: "Hash table (open addressing)"
         kind: exercise
         hours: 4
         detail: |-
-          Linear probing, tombstones, resize at load factor, FNV-1a hash. Benchmark
-          against a separate-chaining version. You'll reuse this in the interpreter
-          and the KV store, so make the API clean.
+          String keys to void* values, linear probing, tombstones for deletion,
+          resizing when the load factor passes ~0.7, and an FNV-1a hash. Then a
+          separate-chaining version, and benchmark both with 1M inserts and lookups.
+          The interpreter and KV store reuse this, so keep the API clean
+          (create/get/set/delete/iterate/free).
+        done_when: |-
+          Tests pass under ASan, including deleting then re-inserting the same keys
+          and running through several resizes. Your note has the benchmark comparison.
       - id: c-6
         title: "Arena allocator + string builder"
         kind: exercise
         hours: 2
         detail: |-
-          Bump allocator with alignment, reset/free-all, then a growable string
-          builder that allocates from it.
+          An arena: one big block that hands out allocations by bumping a pointer,
+          respecting alignment, and frees everything at once with reset(). On top of
+          it, a string builder that grows by allocating from the arena (append string,
+          append formatted with vsnprintf, finish).
+        done_when: |-
+          Tests show alignment is correct for 1-, 8- and 16-byte types, building a
+          1 MB string works, and ASan is clean.
       - id: c-7
         title: "Integers & bits — promotions, overflow, bit tricks"
         kind: exercise
         hours: 2
         detail: |-
-          popcount, rotate, next power of two; checked add/mul both manually and with
-          __builtin_*_overflow; write examples of every integer promotion surprise.
+          Implement popcount, rotate-left/right, and round-up-to-power-of-two with
+          bit operations. Write checked add and multiply twice: once by hand, once
+          with __builtin_add_overflow / __builtin_mul_overflow. Then write five tiny
+          programs that surprise you via integer promotion or signed/unsigned
+          comparison (e.g. `-1 < 0u`).
+        done_when: |-
+          Your bit functions match __builtin_popcount and friends on 1M random inputs,
+          and you can explain why each of the five surprising programs prints what it does.
       - id: c-8
         title: "CLI tools — mywc and myhexdump"
         kind: exercise
         hours: 3
         detail: |-
-          Write with stdio first, then rewrite the I/O with raw read(2)/write(2)
-          and a fixed buffer. Compare speed on a 1 GB file.
+          mywc: count lines, words and bytes like `wc`. myhexdump: output like
+          `hexdump -C`. Write them with stdio first, then rewrite the I/O using raw
+          read(2)/write(2) with a fixed buffer, and time both on a 1 GB file (make one
+          with `head -c 1G /dev/urandom > big`).
+        done_when: |-
+          Both tools' output is identical to `wc` and `hexdump -C` on several files
+          (check with diff), and your note records stdio vs raw syscall timings.
       - id: c-9
         title: "Capstone — terminal text editor (kilo)"
         kind: capstone
         hours: 15
         url: "https://viewsourcecode.org/snaptoken/kilo/"
         detail: |-
-          Follow Build Your Own Text Editor: raw mode, rendering, file I/O, search,
-          syntax highlighting. Then extend with at least two of: undo/redo, gap buffer
-          or rope storage, multiple buffers, a status-line command prompt.
-          The raw-mode/line-editing code gets reused in your shell.
+          Follow Build Your Own Text Editor all the way through: raw mode, rendering,
+          file I/O, search, syntax highlighting. Then add at least two features of your
+          own: undo/redo, a gap buffer or rope instead of an array of rows, multiple
+          buffers, or a command prompt in the status line. Your shell reuses the
+          raw-mode and line-editing code later.
+        done_when: |-
+          You can open, edit, search and save a real source file without crashes,
+          your two extra features work, and you've written a short note on what you'd
+          change about the design.
 
   - id: csapp-data
     title: "02 · CSAPP I — Data & Machine Code"
     summary: |-
       How bits become integers and floats, and how C becomes x86-64 machine code.
-      Bomb and Attack labs ship x86-64 Linux binaries — do them on the desktop.
+      Bomb and Attack labs ship x86-64 Linux binaries, so do them on the desktop.
     resources:
       - title: "Computer Systems: A Programmer's Perspective, 3e (Bryant & O'Hallaron)"
         url: "http://csapp.cs.cmu.edu/"
@@ -180,20 +263,34 @@ sections:
         title: "CSAPP ch.1 — A Tour of Computer Systems"
         kind: read
         hours: 1.5
+        detail: |-
+          A short overview of how a program goes from source to running process. It
+          names everything the rest of the book covers, so read it quickly but fully.
+        done_when: |-
+          You can describe the path of hello.c from source file to output on screen:
+          preprocessor, compiler, assembler, linker, loader, then the CPU and OS.
       - id: csapp-data-2
         title: "CSAPP ch.2 — Representing and Manipulating Information"
         kind: read
         hours: 8
         detail: |-
-          Do every practice problem as you go (solutions are at the end of the chapter).
-          Floating point (2.4) is worth taking slowly.
+          Bits, two's complement, unsigned arithmetic, overflow, shifts, and IEEE 754
+          floating point. Do every practice problem as you reach it; the answers are at
+          the end of the chapter. Take floating point (2.4) slowly.
+        done_when: |-
+          You've done all the chapter 2 practice problems, and can convert a decimal
+          number to its 32-bit float bit pattern by hand.
       - id: csapp-data-3
         title: "CSAPP ch.2 homework problems"
         kind: exercise
         hours: 4
         detail: |-
-          Pick at least 10, prioritising the bit-level integer coding rule problems
-          and the float problems.
+          The homework problems at the end of chapter 2 (no answers given). Prioritise
+          the "bit-level integer coding rules" problems, which restrict which operators
+          you may use, and the floating-point ones. Test your solutions with code.
+        done_when: |-
+          At least 10 homework problems are solved and checked by test programs,
+          including 4+ bit-level coding problems and 2+ float problems.
       - id: csapp-data-4
         title: "Data Lab"
         kind: lab
@@ -201,23 +298,37 @@ sections:
         platform: linux
         url: "http://csapp.cs.cmu.edu/3e/labs.html"
         detail: |-
-          Bit puzzles with a restricted operator set. The Makefile uses -m32; on Arch
-          enable multilib (lib32-gcc-libs) or just drop -m32 from the Makefile.
+          Download the self-study handout. You fill in bits.c: puzzles solved using
+          only a limited set of bitwise operators and no loops or ifs. `./dlc bits.c`
+          checks you followed the operator rules and `./btest` checks correctness. The
+          Makefile uses -m32; on Arch enable multilib (lib32-gcc-libs) or remove -m32.
+        done_when: |-
+          `./dlc bits.c` reports no violations and `./btest` gives full marks on every
+          puzzle.
       - id: csapp-data-5
         title: "CSAPP ch.3 — Machine-Level Representation of Programs"
         kind: read
         hours: 12
         detail: |-
-          The biggest chapter. Compile your own snippets on godbolt at -O0 and -O1
-          alongside the reading.
+          x86-64 assembly: registers, addressing modes, arithmetic, control flow,
+          procedures and the stack, arrays and structs, and buffer overflows. The
+          biggest chapter. Do the practice problems, and compile your own snippets on
+          godbolt at -O0 and -O1 as you read.
+        done_when: |-
+          You've done the practice problems, and can read a 20-line x86-64 function
+          and say what C it came from, including how it uses the stack.
       - id: csapp-data-6
         title: "Predict-the-assembly drills (x86-64 vs arm64)"
         kind: exercise
         hours: 3
         detail: |-
-          Write 10 small functions (loops, switch, structs, recursion). Predict the
-          x86-64 output, then check on godbolt. Compile the same on the Mac
-          (clang -S -O1) and compare with arm64.
+          Write 10 small functions: a loop, a switch, struct field access, array
+          indexing, recursion, a function with 7+ arguments, and so on. Before
+          compiling, write down the x86-64 you expect, then check on godbolt (gcc -O1).
+          Also compile each on the Mac (`clang -S -O1`) and compare with arm64.
+        done_when: |-
+          For all 10 functions your prediction got the overall structure right, and
+          your note lists three differences between x86-64 and arm64 code you noticed.
       - id: csapp-data-7
         title: "Bomb Lab"
         kind: lab
@@ -225,8 +336,14 @@ sections:
         platform: x86-64 linux
         url: "http://csapp.cs.cmu.edu/3e/labs.html"
         detail: |-
-          Defuse all six phases with gdb (then find the secret phase).
-          Done when: all phases defused without brute force.
+          A compiled "bomb" asks for six passwords. You find each by disassembling it
+          (objdump -d) and stepping through it in gdb. Set a breakpoint on
+          explode_bomb first so mistakes don't count. There's also a hidden secret
+          phase.
+        done_when: |-
+          A solution file defuses all six phases in one run (`./bomb solutions.txt`),
+          found by reading the assembly rather than guessing, and you've found the
+          secret phase.
       - id: csapp-data-8
         title: "Attack Lab"
         kind: lab
@@ -234,20 +351,28 @@ sections:
         platform: x86-64 linux
         url: "http://csapp.cs.cmu.edu/3e/labs.html"
         detail: |-
-          Code-injection attacks on ctarget, then return-oriented programming on rtarget.
-          Run with -q (self-study mode, no grading server).
+          Exploit buffer overflows in two programs. Phases 1–3 use code injection on
+          ctarget; phases 4–5 use return-oriented programming (ROP) on rtarget, which
+          has protections against injection. Run both with -q, since there's no
+          grading server in self-study.
+        done_when: |-
+          All five phases pass, and you can explain why phases 4–5 need ROP instead of
+          injected code.
       - id: csapp-data-9
         title: "CSAPP ch.4 — Processor Architecture (skim)"
         kind: read
         hours: 4
         optional: true
         detail: |-
-          Y86-64 and pipelining. Optional; the Architecture Lab is optional too.
+          The book's simplified Y86-64 instruction set, and how a pipelined CPU runs it.
+          Optional; the Architecture Lab is optional too.
+        done_when: |-
+          You can explain what pipelining is, and what data and control hazards are.
 
   - id: csapp-perf
     title: "03 · CSAPP II — Performance, Memory Hierarchy & Linking"
     summary: |-
-      Why the same algorithm can be 10× faster with a different memory access pattern,
+      Why the same algorithm can be 10x faster with a different memory access pattern,
       and what the linker actually does with your object files.
     resources:
       - title: "CSAPP 3e chapters 5–7"
@@ -262,25 +387,48 @@ sections:
         title: "CSAPP ch.5 — Optimizing Program Performance"
         kind: read
         hours: 6
+        detail: |-
+          What stops compilers optimising (aliasing, function calls), loop unrolling,
+          multiple accumulators, and how CPU pipelines limit throughput. Do the
+          practice problems.
+        done_when: |-
+          You can explain what "latency bound" and "throughput bound" mean for a loop,
+          and why multiple accumulators help.
       - id: csapp-perf-2
         title: "Optimise a real loop and measure it"
         kind: exercise
         hours: 3
         detail: |-
-          Take a matrix multiply or your hash table lookup loop. Measure with
-          `perf stat` (Linux) or Instruments (Mac), apply ch.5 techniques (multiple
-          accumulators, unrolling, removing aliasing), log each speedup in your notes.
+          Take a naive matrix multiply (or your hash-table lookup loop). Measure it
+          with `perf stat` on the desktop or `time` on both, then apply one chapter-5
+          technique at a time: hoisting work out of the loop, removing aliasing,
+          multiple accumulators, unrolling. Measure after each change.
+        done_when: |-
+          Your note has a table of each change with its time and speedup, and the
+          final version is at least 2x faster than where you started.
       - id: csapp-perf-3
         title: "CSAPP ch.6 — The Memory Hierarchy"
         kind: read
         hours: 6
+        detail: |-
+          Storage technologies, locality, and how caches work (direct-mapped vs
+          set-associative, hits and misses, block size). Cache Lab is built on this
+          chapter, so do the practice problems carefully.
+        done_when: |-
+          Given a cache's parameters (sets, lines per set, block size) and an address,
+          you can work out the set index, tag and offset, and whether an access hits.
       - id: csapp-perf-4
         title: "Memory mountain on both machines"
         kind: exercise
         hours: 2
         detail: |-
-          Build the memory mountain program from ch.6 and plot it for the M-series Mac
-          and your desktop CPU. Explain the ridges using each CPU's cache sizes.
+          The memory mountain (section 6.6) measures read speed for different data
+          sizes and strides. Get mountain.c from the book's code examples (csapp.cs.cmu.edu,
+          "Code examples"), run it on the M-series Mac and your desktop, and plot both
+          (gnuplot or Python).
+        done_when: |-
+          Both plots are in your repo, and your note points out where each machine's L1,
+          L2 and L3 cache sizes show up as ridges, matched to that CPU's real cache sizes.
       - id: csapp-perf-5
         title: "Cache Lab"
         kind: lab
@@ -288,39 +436,66 @@ sections:
         platform: linux
         url: "http://csapp.cs.cmu.edu/3e/labs.html"
         detail: |-
-          Part A: a cache simulator in C driven by valgrind traces.
-          Part B: a cache-blocked matrix transpose minimising misses.
+          Part A: write csim.c, a cache simulator that replays valgrind memory traces
+          and counts hits, misses and evictions (LRU replacement). Part B: write a matrix
+          transpose that minimises cache misses using blocking, for 32x32, 64x64 and
+          61x67 matrices.
+        done_when: |-
+          `./test-csim` matches the reference simulator on every trace, and
+          `./driver.py` gives full marks on Part B (miss counts under the handout's
+          limits for all three sizes).
       - id: csapp-perf-6
         title: "Drepper — sections 3 (CPU caches) and 6 (what programmers can do)"
         kind: read
         hours: 4
         optional: true
         url: "https://people.freebsd.org/~lstewart/articles/cpumemory.pdf"
+        detail: |-
+          A deeper look at caches than CSAPP: associativity, prefetching, false
+          sharing, and concrete techniques for cache-friendly code.
+        done_when: |-
+          You can explain false sharing and show it with a small two-thread benchmark.
       - id: csapp-perf-7
         title: "CSAPP ch.7 — Linking"
         kind: read
         hours: 5
+        detail: |-
+          Object files, symbol resolution, relocation, static vs shared libraries,
+          position-independent code, and library interpositioning.
+        done_when: |-
+          You can explain what happens when two files both define a global with the same
+          name, and how a call into a shared library gets resolved at run time (PLT/GOT).
       - id: csapp-perf-8
         title: "Static/shared libraries and library interpositioning by hand"
         kind: exercise
         hours: 3
         platform: linux
         detail: |-
-          Build a .a and a .so manually; inspect with nm, objdump -d, readelf -a.
-          Then interpose malloc/free with LD_PRELOAD to log every call (ch.7.13).
+          Build one of your phase-01 libraries as a static library (`ar rcs`) and as a
+          shared library (`-fPIC -shared`), link a program against each, and inspect
+          them with nm, objdump -d and readelf -a. Then write a malloc/free wrapper
+          loaded with LD_PRELOAD that logs every call (CSAPP 7.13).
+        done_when: |-
+          `LD_PRELOAD=./mymalloc_log.so ls` prints every malloc and free that `ls`
+          makes, and you can find your library's symbols in the nm and readelf output.
       - id: csapp-perf-9
         title: "Project — mini readelf"
         kind: project
         hours: 6
         detail: |-
-          Parse an ELF64 file from scratch: header, program headers, section headers,
-          symbol + string tables. Compare output with `readelf -a`. Reused later in the
-          debugger and kernel ELF loader.
+          Read an ELF64 file from scratch: the ELF header, program headers, section
+          headers, and the symbol table with its string table. Define the structs
+          yourself or use <elf.h>. Print them in a readable format. The debugger and
+          the kernel's ELF loader reuse this later.
+        done_when: |-
+          On /bin/ls and on one of your own programs, your section and symbol listings
+          match `readelf -S` and `readelf -s`, and a truncated or non-ELF file gives
+          an error instead of a crash.
 
   - id: processes
     title: "04 · Processes, Signals & the Shell"
     summary: |-
-      Exceptional control flow, processes, scheduling, signals and job control —
+      Exceptional control flow, processes, scheduling, signals and job control:
       CSAPP ch.8 plus OSTEP's CPU virtualisation chapters. Ends with your own Unix shell.
     resources:
       - title: "Operating Systems: Three Easy Pieces (OSTEP)"
@@ -342,31 +517,56 @@ sections:
         kind: read
         hours: 6
         detail: |-
-          Do the process-run.py simulator homework and the ch.5 coding homework
-          (fork/exec/wait/pipe exercises).
+          What a process is, fork/exec/wait, and how the OS switches between
+          processes (traps, timer interrupts, context switches). Do the process-run.py
+          simulator homework and the ch.5 coding homework.
+        done_when: |-
+          The ch.5 coding homework programs are written and run, and you can explain
+          what a context switch saves and when it happens.
       - id: processes-2
         title: "OSTEP ch.7–10 — scheduling (FIFO/SJF/RR, MLFQ, lottery, multiprocessor)"
         kind: read
         hours: 5
-        detail: "Do the scheduler.py, mlfq.py and lottery.py homework."
+        detail: |-
+          Scheduling policies and their trade-offs. Do the scheduler.py, mlfq.py and
+          lottery.py homework, predicting each answer before checking it with -c.
+        done_when: |-
+          You've done the homework for all three simulators, and can explain the MLFQ
+          rules and why it periodically boosts all jobs to the top queue.
       - id: processes-3
         title: "CSAPP ch.8 — Exceptional Control Flow"
         kind: read
         hours: 8
+        detail: |-
+          Exceptions, processes, signals and non-local jumps, from the programmer's
+          side. Section 8.5 on signals matters most: Shell Lab depends on it.
+        done_when: |-
+          You've done the practice problems, and can explain which functions are safe
+          to call in a signal handler and why.
       - id: processes-4
         title: "Signals & reaping drills"
         kind: exercise
         hours: 3
         detail: |-
-          Programs that show fork/exec/wait ordering, create and reap zombies, and a
-          correct SIGCHLD handler using only async-signal-safe functions
-          (sigprocmask around the job list, sigsuspend instead of busy waiting).
+          Small programs that: show fork/exec/wait ordering; create a zombie (see it in
+          `ps`) and then reap it; install a SIGCHLD handler that reaps every finished
+          child using only async-signal-safe functions; and block signals with
+          sigprocmask around a shared job list, waiting with sigsuspend instead of a
+          busy loop.
+        done_when: |-
+          Starting 100 short-lived children leaves no zombies in `ps`, and your
+          handler calls nothing outside the async-signal-safe list (man 7 signal-safety).
       - id: processes-5
         title: "OSTEP project — initial-utilities (wcat, wgrep, wzip, wunzip)"
         kind: exercise
         hours: 4
         url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/initial-utilities"
-        detail: "Done when: the repo's test scripts pass for all four."
+        detail: |-
+          Four small Unix-style tools: cat, grep, and a run-length-encoding compressor
+          and decompressor. Follow the README spec exactly; the test scripts compare
+          your output byte for byte.
+        done_when: |-
+          The repo's test scripts pass for all four tools.
       - id: processes-6
         title: "Shell Lab (tsh)"
         kind: lab
@@ -374,32 +574,43 @@ sections:
         platform: linux
         url: "http://csapp.cs.cmu.edu/3e/labs.html"
         detail: |-
-          Job control: fg/bg/jobs, forwarding SIGINT/SIGTSTP to the foreground job.
-          Done when: your output matches tshref on all 16 traces.
+          Finish a tiny shell with job control: running jobs in the foreground or
+          background, the jobs/fg/bg builtins, and forwarding ctrl-c and ctrl-z
+          (SIGINT/SIGTSTP) to the foreground job. Compare against the reference shell
+          with `make rtestNN` and `make testNN`.
+        done_when: |-
+          Your output matches tshref's on all the trace files (apart from process IDs).
       - id: processes-7
         title: "OSTEP project — processes-shell (wish)"
         kind: exercise
         hours: 6
         url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/processes-shell"
-        detail: "Paths, redirection, parallel commands (&). Done when: repo tests pass."
+        detail: |-
+          A different shell spec: interactive and batch mode, a configurable search path,
+          output redirection with >, and parallel commands with &.
+        done_when: |-
+          The repo's test script passes every test.
       - id: processes-8
         title: "Capstone — your own Unix shell"
         kind: capstone
         hours: 25
         detail: |-
-          From scratch, combining both labs:
-            - pipelines of N commands, redirection (< > >> 2> 2>&1)
-            - job control with process groups + tcsetpgrp, fg/bg/jobs
+          From scratch, combining what both labs taught you:
+            - pipelines of any length, and redirection (< > >> 2> 2>&1)
+            - job control with process groups and tcsetpgrp, plus fg/bg/jobs
             - builtins: cd, exit, export, unset, jobs, fg, bg
             - quoting, escaping, $VAR and $? expansion
-            - line editing + history using your kilo raw-mode code
-            - globbing (glob(3) first, then your own matcher)
-          Done when: you can use it as your interactive shell for an hour.
+            - line editing and history, reusing your kilo raw-mode code
+            - globbing: glob(3) first, then your own matcher
+        done_when: |-
+          `cat file | grep x | sort | uniq -c > out` and ctrl-z then fg on a running
+          `vim` both work, you've used it as your interactive shell for an hour, and it
+          has a test script for parsing and expansion.
 
   - id: memory
     title: "05 · Virtual Memory & Allocators"
     summary: |-
-      Address spaces, paging, TLBs and how malloc really works — then your own
+      Address spaces, paging, TLBs and how malloc really works, then your own
       allocator that can run real programs.
     resources:
       - title: "OSTEP — Virtualization: memory chapters"
@@ -415,30 +626,59 @@ sections:
         title: "OSTEP ch.13–17 — address spaces, memory API, translation, segmentation, free space"
         kind: read
         hours: 7
-        detail: "Do the relocation.py, segmentation.py and malloc.py homework."
+        detail: |-
+          How the OS gives each process its own address space, base-and-bounds
+          translation, segmentation, and free-space management (splitting, coalescing,
+          best/first fit). Do the relocation.py, segmentation.py and malloc.py homework.
+        done_when: |-
+          You've done all three simulator homeworks and can translate a virtual address
+          to a physical one by hand under base-and-bounds and under segmentation.
       - id: memory-2
         title: "OSTEP ch.18–23 — paging, TLBs, multi-level tables, swapping, VAX/VMS & Linux VM"
         kind: read
         hours: 9
-        detail: "Do the paging-*.py homework."
+        detail: |-
+          Page tables, TLBs, multi-level page tables, swapping and page-replacement
+          policies, ending with how real systems (VAX/VMS, Linux) put it all together.
+          Do the paging-*.py homework.
+        done_when: |-
+          You can walk a two-level page table by hand from virtual to physical address,
+          and explain why multi-level tables save memory.
       - id: memory-3
         title: "OSTEP ch.19 homework — measure the TLB"
         kind: exercise
         hours: 3
         detail: |-
-          Write tlb.c: time page accesses as the number of pages grows, pin to one CPU,
-          plot it, and find the TLB sizes for both machines.
+          Write tlb.c as the chapter's homework describes: touch one int per page across
+          a growing number of pages, many times over, and time the average access. Pin it
+          to one CPU on Linux (taskset), stop the compiler optimising the loop away, and
+          plot time against number of pages.
+        done_when: |-
+          The plot shows clear jumps, and your note says which TLB sizes those jumps
+          suggest for each machine.
       - id: memory-4
         title: "CSAPP ch.9 — Virtual Memory (incl. 9.9 dynamic memory allocation)"
         kind: read
         hours: 8
+        detail: |-
+          Virtual memory from the programmer's side: page faults, memory mapping, and
+          (9.9) how malloc works internally: headers, free lists, coalescing.
+          Section 9.9 is the guide for Malloc Lab, so read it slowly.
+        done_when: |-
+          You can sketch an implicit free list with boundary tags and explain how
+          free() merges a block with its neighbours.
       - id: memory-5
         title: "mmap playground"
         kind: exercise
         hours: 3
         detail: |-
-          Map a file, MAP_PRIVATE vs MAP_SHARED, MAP_ANONYMOUS, mprotect guard pages,
-          catching SIGSEGV with sigaction + si_addr. Observe copy-on-write after fork.
+          Small programs that: map a file and edit it through memory; show the
+          difference between MAP_PRIVATE and MAP_SHARED; use MAP_ANONYMOUS as an
+          allocator; make a guard page with mprotect and catch the SIGSEGV
+          (sigaction, si_addr); and show copy-on-write after fork.
+        done_when: |-
+          Each program runs and prints what it demonstrates, and the guard-page one
+          reports the exact faulting address.
       - id: memory-6
         title: "Malloc Lab"
         kind: lab
@@ -446,23 +686,36 @@ sections:
         platform: linux
         url: "http://csapp.cs.cmu.edu/3e/labs.html"
         detail: |-
-          Implicit list (book version) → explicit free list → segregated fits.
-          Record utilisation and throughput for each version in your notes.
+          Write mm_malloc, mm_free and mm_realloc. Start with the book's implicit list,
+          then an explicit free list, then segregated free lists. Run `./mdriver -V`
+          after each version and record utilisation and throughput.
+        done_when: |-
+          mdriver runs every trace with no errors, your final version beats the implicit
+          list's performance index, and your note compares all three versions.
       - id: memory-7
         title: "Capstone — your own malloc"
         kind: capstone
         hours: 25
         detail: |-
-          libmymalloc.so implementing malloc/free/calloc/realloc/posix_memalign on top
-          of mmap: size classes, boundary-tag coalescing, large allocations straight
-          from mmap, thread safety (global lock first, then per-thread caches).
-          Debug mode with canaries and double-free detection.
-          Done when: LD_PRELOAD=./libmymalloc.so nvim (and python3) run normally.
+          A shared library (libmymalloc.so) providing malloc, free, calloc, realloc
+          and posix_memalign, built on mmap: size classes, coalescing with boundary
+          tags, very large allocations straight from mmap, and thread safety (one
+          global lock first, then per-thread caches). Add a debug mode with canaries
+          and double-free detection.
+        done_when: |-
+          `LD_PRELOAD=./libmymalloc.so nvim` and `LD_PRELOAD=./libmymalloc.so python3`
+          run normally on the desktop, a multi-threaded stress test passes under TSan,
+          and debug mode catches a deliberate double free.
       - id: memory-8
         title: "How real allocators work — dlmalloc, jemalloc, mimalloc"
         kind: read
         hours: 3
         optional: true
+        detail: |-
+          Doug Lea's dlmalloc design note, then the mimalloc tech report. Compare their
+          ideas with what you built.
+        done_when: |-
+          Your note lists two ideas from these allocators you'd add to yours, and why.
 
   - id: concurrency
     title: "06 · Concurrency"
@@ -484,55 +737,96 @@ sections:
         kind: read
         hours: 14
         detail: |-
-          Do the x86.py simulator homework, and the ch.27 thread API homework with
-          valgrind --tool=helgrind (Linux).
+          The whole concurrency part. Do the x86.py simulator homework (race
+          conditions), and the ch.27 thread-API homework using
+          `valgrind --tool=helgrind` on the desktop to find races and lock-order bugs.
+        done_when: |-
+          You've done the x86.py and ch.27 homework, and can explain why a condition
+          variable wait must be inside a while loop rather than an if.
       - id: concurrency-2
         title: "CSAPP ch.12 — Concurrent Programming"
         kind: read
         hours: 5
+        detail: |-
+          Three ways to write a concurrent server (processes, I/O multiplexing, threads),
+          then semaphores, thread safety and deadlock. A good bridge into networking.
+        done_when: |-
+          You can list the pros and cons of process-based, event-based and thread-based
+          servers, and name the four classes of thread-unsafe functions.
       - id: concurrency-3
         title: "Build locks — spinlock, ticket lock, futex mutex"
         kind: exercise
         hours: 4
         platform: linux
         detail: |-
-          C11 <stdatomic.h> spinlock and ticket lock, then a mutex on futex(2).
-          Benchmark against pthread_mutex under contention with 1–16 threads.
+          With C11 <stdatomic.h>: a spinlock (atomic exchange), a ticket lock (fair, in
+          order), then a mutex that sleeps using the futex(2) syscall instead of
+          spinning. Benchmark all three against pthread_mutex with 1, 2, 4, 8 and 16
+          threads incrementing a shared counter.
+        done_when: |-
+          The counter is exactly right with every lock at every thread count, and your
+          note has the benchmark table with an explanation of the results.
       - id: concurrency-4
         title: "Little Book of Semaphores — classic problems"
         kind: exercise
         hours: 6
         url: "https://greenteapress.com/wp/semaphores/"
         detail: |-
-          Rendezvous, barrier, producer-consumer, readers-writers (no starvation),
-          dining philosophers. Implement in C with pthreads + semaphores.
+          Work through chapter 3 (basic synchronisation patterns) and chapter 4 (classic
+          problems). Implement in C with pthreads and POSIX semaphores: rendezvous,
+          reusable barrier, producer-consumer, readers-writers without starvation, and
+          dining philosophers.
+        done_when: |-
+          All five run correctly with many threads, repeated in a loop thousands of
+          times, without deadlocking or breaking their invariants.
       - id: concurrency-5
         title: "Concurrent data structures (OSTEP ch.29)"
         kind: exercise
         hours: 4
         detail: |-
-          Approximate (sloppy) counter, hand-over-hand linked list, striped-lock hash
-          table. Measure how each scales with thread count.
+          Build the chapter's three structures: an approximate ("sloppy") counter, a
+          linked list with hand-over-hand locking, and a hash table with one lock per
+          bucket. Measure how throughput changes from 1 to 16 threads.
+        done_when: |-
+          Each structure passes a multi-threaded test under TSan, and your note shows
+          which ones scale with thread count and which don't.
       - id: concurrency-6
         title: "OSTEP project — concurrency-pzip"
         kind: project
         hours: 6
         url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/concurrency-pzip"
+        detail: |-
+          A parallel version of your wzip: map the input with mmap, split it among
+          threads, and stitch the results together in the right order.
+        done_when: |-
+          Output is identical to your single-threaded wzip, and it's measurably faster
+          with 4 threads on a large file.
       - id: concurrency-7
         title: "Project — thread pool library"
         kind: project
         hours: 6
         detail: |-
-          Bounded work queue, condition variables, futures/wait-all, graceful shutdown.
-          Done when: clean under -fsanitize=thread with a stress test.
+          A reusable library: a fixed set of worker threads, a bounded work queue
+          guarded by a mutex and condition variables, submit() returning a handle you
+          can wait on, and a clean shutdown that finishes queued work. The HTTP server
+          uses this.
+        done_when: |-
+          A stress test submitting 1M small tasks from several threads finishes with
+          correct results, is clean under -fsanitize=thread, and shuts down without
+          leaks.
       - id: concurrency-8
         title: "Project — user-level threads (coroutines) with hand-written context switch"
         kind: project
         hours: 10
         optional: true
         detail: |-
-          Save/restore callee-saved registers in assembly (x86-64 and/or arm64),
-          a round-robin scheduler, yield, and a channel primitive.
+          Threads without the kernel: write the context switch in assembly (save and
+          restore the callee-saved registers and stack pointer) for x86-64 and/or
+          arm64, plus a round-robin scheduler, yield(), and a simple channel for
+          passing values between coroutines.
+        done_when: |-
+          A producer/consumer demo with 1000 coroutines passing values over channels
+          runs correctly on at least one architecture.
 
   - id: network
     title: "07 · Networking & the HTTP Server"
@@ -557,53 +851,97 @@ sections:
         title: "CSAPP ch.10 — System-Level I/O"
         kind: read
         hours: 3
+        detail: |-
+          File descriptors, short reads and writes, the book's Rio package for robust
+          I/O, how open files are shared after fork, and dup2 redirection.
+        done_when: |-
+          You can explain why read() can return fewer bytes than you asked for, and
+          write a readn() that loops until it has them all.
       - id: network-2
         title: "Beej's Guide to Network Programming (whole guide)"
         kind: read
         hours: 6
         url: "https://beej.us/guide/bgnet/"
-        detail: "Type in and run the stream/datagram client & server examples."
+        detail: |-
+          Sockets from the ground up: getaddrinfo, socket/bind/listen/accept/connect,
+          TCP vs UDP, byte order, and poll(). Type in and run the stream and datagram
+          client/server examples rather than just reading them.
+        done_when: |-
+          Your typed-in stream server and client talk to each other between the Mac
+          and the desktop over your local network.
       - id: network-3
         title: "CSAPP ch.11 — Network Programming (Tiny web server)"
         kind: read
         hours: 4
+        detail: |-
+          The client-server model and the sockets interface, ending with Tiny, a
+          minimal web server. Build Tiny and serve a page to your browser.
+        done_when: |-
+          Tiny serves a static page and a CGI result to your browser, and you can
+          explain each part of its code.
       - id: network-4
         title: "Echo server three ways"
         kind: exercise
         hours: 4
         detail: |-
-          Iterative → fork per connection → thread per connection. Write a load client
-          that opens N concurrent connections and compare throughput & latency.
+          An echo server (sends back what it receives) written three times: one client
+          at a time, a new process per connection (fork), and a new thread per
+          connection. Also write a load-testing client that opens N connections at once
+          and measures throughput and latency.
+        done_when: |-
+          All three versions pass your load client with 100 simultaneous connections,
+          and your note compares their throughput and latency.
       - id: network-5
         title: "Event-loop echo server — poll, then epoll and kqueue"
         kind: exercise
         hours: 5
         detail: |-
-          Non-blocking sockets with poll(), then a small backend abstraction with
-          epoll (Linux) and kqueue (macOS) implementations.
+          One thread handling many connections: non-blocking sockets and poll() first.
+          Then put a small interface in front of the event mechanism, with an epoll
+          implementation (Linux) and a kqueue one (macOS), chosen at compile time.
+        done_when: |-
+          The same code builds and handles 1000 simultaneous connections on both
+          machines, with epoll on the desktop and kqueue on the Mac.
       - id: network-6
         title: "Proxy Lab"
         kind: lab
         hours: 12
         url: "http://csapp.cs.cmu.edu/3e/labs.html"
-        detail: "Sequential → concurrent → caching HTTP proxy."
+        detail: |-
+          A web proxy built in three stages: forward requests one at a time, then
+          handle many clients at once with threads, then add an in-memory cache with
+          LRU eviction. Check it with the lab's driver.sh.
+        done_when: |-
+          driver.sh gives full marks for all three parts (basic, concurrency, cache),
+          and your browser works through the proxy.
       - id: network-7
         title: "OSTEP project — concurrency-webserver"
         kind: project
         hours: 6
         url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/concurrency-webserver"
+        detail: |-
+          Take the provided single-threaded web server and add a fixed-size worker
+          thread pool with a bounded request buffer, following the project spec.
+        done_when: |-
+          It serves many concurrent requests correctly, as the spec describes, and
+          never deadlocks under load from your load client.
       - id: network-8
         title: "Capstone — HTTP/1.1 server in plain C"
         kind: capstone
         hours: 30
         detail: |-
-          - incremental request parser (request line, headers, Content-Length + chunked)
-          - static files with MIME types, directory index, Range requests
-          - keep-alive, timeouts, limits on header/body size
-          - epoll/kqueue event loop + your thread pool for file I/O
-          - access log; graceful shutdown on SIGTERM
-          - benchmark with wrk or oha; fuzz the parser with libFuzzer or AFL++
-          Done when: it survives an hour of fuzzing and serves a real site.
+            - a request parser that copes with data arriving in pieces (request line,
+              headers, Content-Length and chunked bodies)
+            - static files with correct MIME types, directory index pages, and Range
+              requests
+            - keep-alive, timeouts, and limits on header and body size
+            - your epoll/kqueue event loop, plus your thread pool for disk I/O
+            - an access log, and a clean shutdown on SIGTERM
+            - benchmark with wrk or oha; fuzz the parser with libFuzzer or AFL++
+        done_when: |-
+          It serves a real static site (e.g. a copy of your portfolio) to your
+          browser, curl -v shows correct keep-alive and Range behaviour, wrk results
+          are in your notes, and the parser survives an hour of fuzzing under ASan.
       - id: network-9
         title: "Add an io_uring backend"
         kind: project
@@ -611,6 +949,12 @@ sections:
         optional: true
         platform: linux
         url: "https://unixism.net/loti/"
+        detail: |-
+          io_uring is Linux's newer asynchronous I/O interface. Use liburing to add a
+          third backend to your server next to epoll and kqueue.
+        done_when: |-
+          The server passes the same tests on the io_uring backend, and your note
+          compares its wrk numbers with epoll's.
 
   - id: storage
     title: "08 · Persistence & the KV Store"
@@ -642,74 +986,138 @@ sections:
         title: "OSTEP ch.36–40 — I/O devices, disks, RAID, files & directories, FS implementation"
         kind: read
         hours: 10
+        detail: |-
+          How the OS talks to devices, how hard disks work and what makes them slow,
+          RAID levels, the file and directory API (open, link, unlink, fsync, rename),
+          and a very simple file system's on-disk layout (inodes, bitmaps, data blocks).
+          Do the disk.py and raid.py homework.
+        done_when: |-
+          You can trace the disk reads needed to open /foo/bar and read its first
+          block in the chapter-40 file system, and explain the difference between a
+          hard link and a symlink.
       - id: storage-2
         title: "OSTEP ch.39 homework — stat, ls -l, tail, find"
         kind: exercise
         hours: 4
+        detail: |-
+          The chapter's coding homework: your own `stat`, an `ls -l` (permissions,
+          owner, size, modification time), `tail -n` that seeks from the end instead of
+          reading the whole file, and a recursive directory search like `find`.
+        done_when: |-
+          Each tool's output matches the real command on a few test directories, and
+          your tail is fast on a 1 GB file.
       - id: storage-3
         title: "OSTEP ch.41–45 — FFS, crash consistency & journaling, LFS, SSDs, data integrity"
         kind: read
         hours: 10
+        detail: |-
+          Locality-aware file systems, what a crash in the middle of a write can do and
+          how journaling prevents it, log-structured file systems, how SSDs work, and
+          checksums for detecting corruption. Chapter 42 (journaling) leads straight
+          into your KV store's write-ahead log.
+        done_when: |-
+          You can explain data vs metadata journaling, and why an LFS needs a garbage
+          collector.
       - id: storage-4
         title: "Files are hard + All File Systems Are Not Created Equal"
         kind: read
         hours: 3
         url: "https://danluu.com/file-consistency/"
-        detail: "Write down the exact fsync/rename dance needed for a safe file update."
+        detail: |-
+          Dan Luu's summary of how hard crash-safe file updates really are, then the
+          OSDI '14 paper it draws on, which found crash bugs in real applications.
+        done_when: |-
+          Your note has the exact sequence of syscalls to replace a file's contents
+          crash-safely (write temp, fsync, rename, fsync the directory) and why each
+          one is needed.
       - id: storage-5
         title: "OSTEP project — initial-kv"
         kind: exercise
         hours: 2
         url: "https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/initial-kv"
+        detail: |-
+          A small persistent key-value store run from the command line, following the
+          project README. A warm-up: don't worry about crash safety yet.
+        done_when: |-
+          Every command in the README spec works, and data survives between runs.
       - id: storage-6
         title: "Bitcask paper + DDIA Storage and Retrieval"
         kind: read
         hours: 5
-        detail: "Hash indexes, SSTables and LSM trees, B-trees, and their trade-offs."
+        detail: |-
+          Bitcask is a short paper on an append-only log with an in-memory hash index,
+          which is close to your capstone design. Then DDIA's storage chapter compares
+          hash indexes, SSTables, LSM trees and B-trees.
+        done_when: |-
+          You can sketch Bitcask's design (log files, keydir, merging, hint files),
+          and explain when an LSM tree beats a B-tree and vice versa.
       - id: storage-7
         title: "Crash-test harness"
         kind: exercise
         hours: 3
         detail: |-
-          A writer that appends CRC32-checksummed records and a driver that kill -9s it
-          at random points, then verifies what survived. Try with and without fsync.
-          You'll point this at the KV store.
+          Two programs. A writer appends records (length + data + CRC32) to a log and
+          prints each record's number once it's safely written. A driver starts the
+          writer, kills it with `kill -9` at a random moment, then checks the log:
+          every acknowledged record must be intact. Try it with and without fsync.
+          You'll point this harness at the KV store later.
+        done_when: |-
+          Running the driver 1000 times shows no lost acknowledged records with fsync,
+          and your note records what happens without it.
       - id: storage-8
         title: "Capstone — key-value store with a write-ahead log"
         kind: capstone
         hours: 30
         detail: |-
-          - in-memory hash index (your phase-01 table) + append-only WAL with
-            length-prefixed, CRC'd records
-          - configurable fsync policy (always / batched group commit / none)
-          - recovery by replaying the log, tolerating a torn final record
-          - snapshotting + log compaction
-          - a network protocol: a RESP subset so redis-cli works, or HTTP via your server
-          Done when: the crash harness never loses an acknowledged write.
+            - an in-memory hash index (your phase-01 hash table) plus an append-only
+              log of length-prefixed, CRC-checked records
+            - a configurable fsync policy: every write, batched (group commit), or never
+            - recovery on startup by replaying the log, ignoring a half-written last record
+            - snapshots and log compaction so the log doesn't grow forever
+            - a network protocol: a subset of Redis's RESP so `redis-cli` works, or
+              HTTP via your server
+        done_when: |-
+          Your crash harness, run 1000 times against the server with fsync-every-write,
+          never loses an acknowledged write. `redis-cli` (or curl) can GET/SET/DEL, and
+          compaction shrinks the log while keeping all data.
       - id: storage-9
         title: "Upgrade the engine — LSM tree or B+tree"
         kind: project
         hours: 25
         optional: true
         detail: |-
-          LSM: memtable → SSTables with sparse index + bloom filter → compaction.
-          Or B+tree: fixed-size pages, a buffer pool, page splits.
+          Pick one. LSM: an in-memory sorted memtable written out as sorted SSTable
+          files, each with a sparse index and a bloom filter, merged by background
+          compaction. B+tree: fixed-size pages on disk, a buffer pool caching them,
+          and page splits on insert.
+        done_when: |-
+          It supports range scans, which the hash index couldn't, and still passes the
+          crash harness.
       - id: storage-10
         title: "Database Internals Part I or CMU 15-445 storage lectures"
         kind: read
         hours: 10
         optional: true
+        detail: |-
+          A deeper look at storage engines: on-disk layouts, B-tree variants, buffer
+          management, and recovery.
+        done_when: |-
+          Your note lists three techniques you'd add to your KV store, and why.
 
   - id: interpreters
     title: "09 · Interpreters (Crafting Interpreters)"
     summary: |-
       Build Lox twice: a tree-walking interpreter (jlox), then a bytecode VM with a
-      garbage collector in C (clox). Every chapter ends with challenges — do at least
+      garbage collector in C (clox). Every chapter ends with challenges; do at least
       one per chapter. This phase is fairly independent; pull it earlier if you want.
+      The book's repo (github.com/munificent/craftinginterpreters) has a test suite
+      split by chapter that you can run against your own implementation.
     resources:
       - title: "Crafting Interpreters — Robert Nystrom"
         url: "https://craftinginterpreters.com/"
         note: "free online; print edition paid"
+      - title: "Crafting Interpreters repo and test suite"
+        url: "https://github.com/munificent/craftinginterpreters"
       - title: "Writing a C Compiler — Nora Sandler"
         url: "https://nostarch.com/writing-c-compiler"
         paid: true
@@ -721,50 +1129,107 @@ sections:
         kind: read
         hours: 2
         url: "https://craftinginterpreters.com/contents.html"
+        detail: |-
+          The overview chapters: the stages of a language implementation and the Lox
+          language you'll build. Also clone the book's repo and get its test runner
+          working, since you'll use it in every later step.
+        done_when: |-
+          You can name the stages from source text to execution, and the repo's test
+          runner runs (even though every test fails for now).
       - id: interpreters-2
         title: "jlox ch.4–7 — scanning, representing code, parsing & evaluating expressions"
         kind: project
         hours: 10
         detail: |-
-          The book uses Java. Writing jlox in Go, Rust or Odin instead is a good
-          extra challenge (clox is still in C).
+          The scanner (text to tokens), the syntax tree classes, a recursive-descent
+          parser for expressions, and an evaluator. The book uses Java; writing jlox
+          in Go, Rust or Odin instead is a good extra challenge (clox stays in C).
+        done_when: |-
+          Your REPL evaluates expressions like `(1 + 2) * -3 == -9` and reports syntax
+          errors with line numbers. The tests for chapters 4–7 pass, and you've done
+          at least one challenge per chapter.
       - id: interpreters-3
         title: "jlox ch.8–10 — statements & state, control flow, functions"
         kind: project
         hours: 8
+        detail: |-
+          Variables and scopes, if/while/for, and functions with closures.
+        done_when: |-
+          A recursive Fibonacci and a closure-based counter run correctly, the tests
+          for chapters 8–10 pass, and you've done at least one challenge per chapter.
       - id: interpreters-4
         title: "jlox ch.11–13 — resolving & binding, classes, inheritance"
         kind: project
         hours: 8
+        detail: |-
+          A resolver pass that fixes variable binding bugs, then classes, methods,
+          `this`, initialisers, inheritance and `super`.
+        done_when: |-
+          The complete jlox test suite passes, and you've done at least one challenge
+          per chapter.
       - id: interpreters-5
         title: "clox ch.14–19 — chunks, VM, scanner, compiler, values, strings"
         kind: project
         hours: 12
+        detail: |-
+          Start again in C: bytecode chunks, a stack-based virtual machine, an on-demand
+          scanner, a single-pass Pratt-parser compiler, dynamically typed values, and
+          heap-allocated strings. Use your Makefile template and build with ASan.
+        done_when: |-
+          The tests for chapters 14–19 pass under ASan, the disassembler prints
+          readable bytecode, and you've done at least one challenge per chapter.
       - id: interpreters-6
         title: "clox ch.20–23 — hash tables, globals, locals, jumping"
         kind: project
         hours: 10
+        detail: |-
+          A hash table for string interning and globals (compare it with your phase-01
+          one), local variables on the stack, and jump instructions for if/while/for.
+        done_when: |-
+          The tests for chapters 20–23 pass under ASan, and you've done at least one
+          challenge per chapter.
       - id: interpreters-7
         title: "clox ch.24–25 — calls & functions, closures"
         kind: project
         hours: 8
+        detail: |-
+          Call frames, native functions, then closures with upvalues, the trickiest
+          part of the book.
+        done_when: |-
+          The tests for chapters 24–25 pass under ASan, and you can explain how an
+          upvalue moves off the stack when the enclosing function returns.
       - id: interpreters-8
         title: "clox ch.26 — garbage collection"
         kind: project
         hours: 5
-        detail: "Run the test suite with the stress-GC flag and ASan on."
+        detail: |-
+          A mark-and-sweep garbage collector. Bugs here are subtle, so build with the
+          book's stress-GC flag (collect on every allocation) and ASan on.
+        done_when: |-
+          The full test suite so far passes with stress-GC and ASan both on, and a
+          long-running loop that allocates strings keeps memory use flat.
       - id: interpreters-9
         title: "clox ch.27–30 — classes, methods, superclasses, optimisation"
         kind: project
         hours: 10
+        detail: |-
+          Classes, instances, methods, initialisers and inheritance in the VM, then
+          the optimisation chapter (faster hash-table lookups, NaN boxing).
+        done_when: |-
+          The complete clox test suite passes, and your note has benchmark timings from
+          before and after the optimisations.
       - id: interpreters-10
         title: "Capstone — extend clox into your own language"
         kind: capstone
         hours: 25
         detail: |-
-          Pick at least three: list/map literals, modules/import, string interpolation,
-          exceptions, a REPL with line editing, native file + socket functions (then
-          write a tiny HTTP server in your language), NaN-boxing benchmarks.
+          Pick at least three: list and map literals, modules/import, string
+          interpolation, exceptions, a REPL with line editing, or native file and
+          socket functions (then write a tiny HTTP server in your own language).
+        done_when: |-
+          Each of your three features has its own tests, the original Lox tests still
+          pass, and you've written a non-trivial example program (200+ lines) in the
+          extended language.
       - id: interpreters-11
         title: "Writing a C Compiler (Sandler) — C subset → x86-64"
         kind: project
@@ -772,14 +1237,19 @@ sections:
         optional: true
         url: "https://nostarch.com/writing-c-compiler"
         detail: |-
-          Has a full test suite. Targets x86-64: on the Mac it runs under Rosetta
-          (the book covers macOS), or do it on the desktop.
+          The book builds a real compiler from a C subset to x86-64 assembly, chapter
+          by chapter, with an official test suite. Its output is x86-64: on the Mac it
+          runs under Rosetta (the book covers macOS), or do it on the desktop.
+        done_when: |-
+          The book's test suite passes for every chapter you've finished, and your
+          compiler builds a small multi-function program that runs correctly.
 
   - id: kernel
     title: "10 · Kernels & Bare Metal"
     summary: |-
       Read and hack a real teaching OS (xv6 on RISC-V), then boot your own x86-64
-      kernel in QEMU and grow it until it runs user programs.
+      kernel in QEMU and grow it until it runs user programs. Each 6.1810 lab comes
+      with `make grade`, which runs its automated tests.
     resources:
       - title: "MIT 6.1810 Operating System Engineering"
         url: "https://pdos.csail.mit.edu/6.1810/"
@@ -799,76 +1269,143 @@ sections:
         kind: setup
         hours: 2
         url: "https://pdos.csail.mit.edu/6.1810/"
-        detail: "Follow the course's Tools page on both machines (Homebrew / pacman)."
+        detail: |-
+          Follow the course's "Tools" page on both machines, clone the labs repo, and
+          run `make qemu`.
+        done_when: |-
+          xv6 boots to its shell in QEMU on both machines, `ls` works inside it, and
+          you can quit QEMU (ctrl-a x).
       - id: kernel-2
         title: "xv6 book ch.1–2 + Lab util (sleep, pingpong, primes, find, xargs)"
         kind: lab
         hours: 8
+        detail: |-
+          Read the first two chapters of the xv6 book, then write the lab's user
+          programs using xv6's system calls. Watch the matching lecture videos if you
+          get stuck.
+        done_when: |-
+          `make grade` passes every test for the util lab.
       - id: kernel-3
-        title: "Lab syscall (system call tracing, sysinfo)"
+        title: "Lab syscall"
         kind: lab
         hours: 6
+        detail: |-
+          Add new system calls to the xv6 kernel, which means following a call all
+          the way from user space through the trap into the kernel and back. Read the
+          xv6 book sections the lab page points to first.
+        done_when: |-
+          `make grade` passes every test for the syscall lab.
       - id: kernel-4
         title: "xv6 book ch.3 + Lab page tables"
         kind: lab
         hours: 10
+        detail: |-
+          Read how xv6 sets up RISC-V page tables, then do the lab's page-table changes
+          (printing, sharing and modifying page tables).
+        done_when: |-
+          `make grade` passes every test for the page tables lab.
       - id: kernel-5
         title: "xv6 book ch.4 + Lab traps (backtrace, alarm)"
         kind: lab
         hours: 8
+        detail: |-
+          Read how traps, interrupts and system calls enter the kernel, then implement
+          a kernel backtrace and a user-level alarm handler.
+        done_when: |-
+          `make grade` passes every test for the traps lab.
       - id: kernel-6
         title: "Lab copy-on-write fork"
         kind: lab
         hours: 8
+        detail: |-
+          Change fork() so parent and child share pages until one of them writes,
+          handling the resulting page faults. Needs the page tables and traps chapters.
+        done_when: |-
+          `make grade` passes every test for the cow lab, including usertests.
       - id: kernel-7
         title: "Labs lock, fs, mmap, net"
         kind: lab
         hours: 30
         optional: true
+        detail: |-
+          The remaining labs: lock contention, a bigger file system, mmap, and a
+          network card driver. Do whichever interest you.
+        done_when: |-
+          `make grade` passes for each lab you choose to do.
       - id: kernel-8
         title: "little book about OS development ch.1–6"
         kind: read
         hours: 6
         url: "https://littleosbook.github.io/"
         detail: |-
-          Booting, getting to C, output, segmentation, interrupts. Read for concepts;
-          the capstone uses x86-64 + Limine rather than the book's 32-bit GRUB setup.
+          Booting, getting to C, output, segmentation, and interrupts on x86. Read it
+          for concepts; the capstone uses x86-64 and the Limine bootloader instead of
+          the book's 32-bit GRUB setup.
+        done_when: |-
+          You can explain what the bootloader does before your kernel runs, and what
+          the GDT and IDT are for.
       - id: kernel-9
         title: "Capstone M1 — boot: kernel prints to serial + framebuffer in QEMU"
         kind: capstone
         hours: 6
         url: "https://wiki.osdev.org/Limine_Bare_Bones"
         detail: |-
-          Limine bare bones. clang -target x86_64-elf works as a cross compiler on
-          both machines (or brew install x86_64-elf-gcc). Add a kprintf.
+          Follow OSDev's Limine Bare Bones. `clang -target x86_64-elf` works as a cross
+          compiler on both machines (or `brew install x86_64-elf-gcc`). Then add a
+          serial port driver and your own kprintf with %d, %x, %s and %p.
+        done_when: |-
+          `make run` boots your kernel in QEMU, and it prints formatted text to both
+          the screen and the serial console (QEMU -serial stdio).
       - id: kernel-10
         title: "Capstone M2 — GDT, IDT, exceptions, timer + keyboard interrupts"
         kind: capstone
         hours: 10
+        detail: |-
+          Your own GDT and IDT, handlers for CPU exceptions that print the registers,
+          then the timer and keyboard interrupts (legacy PIC first; the APIC is
+          optional).
+        done_when: |-
+          A deliberate divide by zero prints a register dump instead of rebooting,
+          the timer counts ticks on screen, and keys you type are echoed.
       - id: kernel-11
         title: "Capstone M3 — physical frame allocator, paging, kernel heap"
         kind: capstone
         hours: 12
-        detail: "Port your phase-05 malloc as the kernel heap."
+        detail: |-
+          Read the memory map Limine gives you, build a physical page-frame allocator
+          (a bitmap or free list), set up your own page tables, and port your phase-05
+          malloc as the kernel heap.
+        done_when: |-
+          kmalloc/kfree pass a stress test inside the kernel, and touching an unmapped
+          address prints a page-fault report naming the faulting address.
       - id: kernel-12
         title: "Capstone M4 — processes: context switch, scheduler, user mode, syscalls"
         kind: capstone
         hours: 20
         detail: |-
-          Preemptive round-robin scheduler, ring 3 with syscall/sysret, load a user
-          program from a Limine module (initrd).
-          Done when: a user-mode program prints via your write() syscall.
+          Kernel threads with context switching, a preemptive round-robin scheduler
+          driven by the timer, then user mode (ring 3) with a syscall entry point, and
+          a user program loaded from a Limine module.
+        done_when: |-
+          Two user-mode programs run at the same time, take turns under your scheduler,
+          and print through your own write() system call.
       - id: kernel-13
         title: "Capstone stretch — ELF loader, tiny filesystem, port your shell"
         kind: capstone
         hours: 25
         optional: true
+        detail: |-
+          Load user programs as ELF files (reusing your mini readelf), add a simple
+          filesystem (a RAM disk or read-only FAT), and port your shell to run on it.
+        done_when: |-
+          Your shell runs as a user program on your kernel and can start other
+          programs loaded from the filesystem.
 
   - id: zig
     title: "11 · Zig"
     summary: |-
       Carry everything over to Zig: explicit allocators, comptime, error unions and
-      seamless C interop. Zig changes quickly — match docs to your installed version.
+      seamless C interop. Zig changes quickly, so match docs to your installed version.
     resources:
       - title: "Ziglings"
         url: "https://codeberg.org/ziglings/exercises"
@@ -881,28 +1418,56 @@ sections:
         title: "Install Zig on both machines"
         kind: setup
         hours: 0.5
-        detail: "brew install zig / sudo pacman -S zig — keep the versions in sync."
+        detail: |-
+          brew install zig on the Mac, sudo pacman -S zig on the desktop. Ziglings
+          needs a recent Zig version, so check its README for which one.
+        done_when: |-
+          `zig version` prints the same version on both machines, and `zig run` on a
+          hello-world file works.
       - id: zig-2
         title: "Ziglings — all exercises"
         kind: exercise
         hours: 15
         url: "https://codeberg.org/ziglings/exercises"
+        detail: |-
+          Small broken programs you fix one at a time; `zig build` checks each and moves
+          on to the next. It covers the whole language, comptime and allocators included.
+        done_when: |-
+          `zig build` reports that every exercise is complete.
       - id: zig-3
         title: "Language reference — comptime, allocators, errors, optionals"
         kind: read
         hours: 5
         url: "https://ziglang.org/documentation/master/"
+        detail: |-
+          Read the reference sections on comptime, memory and allocators, errors and
+          optionals, plus zig.guide's articles on the same topics.
+        done_when: |-
+          You've written a small generic data structure (e.g. your phase-01 vector)
+          using comptime types and an allocator passed in as a parameter.
       - id: zig-4
         title: "C interop — @cImport your C hash table; build C with zig cc / build.zig"
         kind: exercise
         hours: 3
+        detail: |-
+          Call your phase-01 C hash table from Zig with @cImport, compile the C code from
+          build.zig, and try `zig cc` as a drop-in C compiler (including cross-compiling
+          for the other machine's OS and CPU).
+        done_when: |-
+          A Zig program uses your C hash table, `zig build` builds both languages
+          together, and you've cross-compiled a C program from one machine that runs
+          on the other.
       - id: zig-5
         title: "Capstone — port the KV store or HTTP server to Zig"
         kind: capstone
         hours: 25
         detail: |-
-          Use explicit allocators throughout. Compare code size, bugs the compiler
-          caught, and performance against the C version.
+          Rewrite one of your C capstones in Zig, passing allocators explicitly
+          everywhere. Keep the same tests or protocol so the two versions are directly
+          comparable.
+        done_when: |-
+          The Zig version passes the same tests (or crash harness), and your note
+          compares the two on code size, bugs the compiler caught, and performance.
 
   - id: side
     title: "Side Quests"
@@ -919,60 +1484,117 @@ sections:
         kind: project
         hours: 10
         url: "https://gbdev.io/pandocs/"
-        detail: "CHIP-8 is a weekend. The Game Boy (Pan Docs) is a multi-week project."
+        detail: |-
+          CHIP-8 is a tiny virtual machine with 35 instructions, a weekend project
+          (draw with SDL2 or in the terminal). The Game Boy is a multi-week project:
+          a real CPU, timers, a graphics unit and memory banking (see Pan Docs).
+        done_when: |-
+          CHIP-8: a standard test ROM passes every check and public-domain ROMs play.
+          Game Boy: Blargg's cpu_instrs test ROM passes.
       - id: side-regex
         title: "Regex engine — Thompson NFA [after 01]"
         kind: project
         hours: 8
         url: "https://swtch.com/~rsc/regexp/regexp1.html"
-        detail: "Russ Cox's article series. Then add a lazy DFA."
+        detail: |-
+          Russ Cox's article series: compile a regex (concatenation, |, *, +, ?,
+          character classes) to an NFA and simulate it, then add a lazily built DFA
+          for speed.
+        done_when: |-
+          Your engine agrees with grep -E on a test file of patterns and inputs, and
+          matches (a?){30}a{30} against a{30} instantly, where backtracking engines hang.
       - id: side-debugger
         title: "Debugger with ptrace [after 04]"
         kind: project
         hours: 20
         platform: linux
         detail: |-
-          int3 breakpoints, single-step, registers and memory, symbol lookup using your
-          mini readelf, then DWARF line tables for source-level breakpoints.
+          Start a program under ptrace, set breakpoints by writing an int3 instruction,
+          single-step, read and write registers and memory, and look up function names
+          with your mini readelf. Then read DWARF line tables for source-line
+          breakpoints.
+        done_when: |-
+          You can break at a function by name, step through it line by line showing
+          the source, print registers, and continue to the end.
       - id: side-container
         title: "Container runtime from scratch [after 05]"
         kind: project
         hours: 12
         platform: linux
-        detail: "Namespaces, cgroups v2, pivot_root, seccomp. See Liz Rice's 'Containers from scratch' talk."
+        detail: |-
+          Run a program in its own namespaces (PID, mount, UTS, network), switch its
+          root filesystem with pivot_root to an extracted Alpine image, limit memory
+          and CPU with cgroups v2, and filter syscalls with seccomp. Liz Rice's
+          "Containers from scratch" talk is a good start.
+        done_when: |-
+          `./mycontainer /bin/sh` gives a shell where `ps` shows only its own processes,
+          the hostname is different, and a memory-hungry program gets killed at your limit.
       - id: side-lockfree
         title: "Lock-free queues — SPSC ring buffer, then Vyukov MPMC [after 06]"
         kind: project
         hours: 8
-        detail: "Verify with TSan and long stress runs on both architectures (arm64 is weakly ordered)."
+        detail: |-
+          A single-producer single-consumer ring buffer with C11 atomics and correct
+          memory ordering, then Dmitry Vyukov's bounded multi-producer multi-consumer
+          queue. Test on both machines: arm64 reorders memory more aggressively than
+          x86, so it catches ordering bugs x86 hides.
+        done_when: |-
+          Both queues pass long stress tests on both machines and under TSan, and you
+          can justify every memory_order you used.
       - id: side-tcpip
         title: "TCP/IP stack on a TUN/TAP device [after 07]"
         kind: project
         hours: 30
         platform: linux
         url: "https://www.saminiir.com/lets-code-tcp-ip-stack-1-ethernet-arp/"
-        detail: "Ethernet, ARP, IPv4, ICMP (ping your stack), then a minimal TCP."
+        detail: |-
+          A user-space network stack talking to the kernel through a TAP device:
+          Ethernet, ARP, IPv4 and ICMP first, then a minimal TCP (handshake, sending,
+          receiving, closing).
+        done_when: |-
+          You can ping your stack from the host, and `curl` fetches a page from a tiny
+          HTTP responder running on your TCP.
       - id: side-git
         title: "Write yourself a Git [after 08]"
         kind: project
         hours: 15
         url: "https://wyag.thb.lt/"
-        detail: "Objects, trees, commits, refs, index. Do it in C rather than Python."
+        detail: |-
+          Git's object model from scratch: blobs, trees, commits, refs and the index.
+          The tutorial uses Python; write yours in C.
+        done_when: |-
+          Your tool can init, add, commit and log in a repo, and real `git log` and
+          `git fsck` accept the repo it creates.
       - id: side-fuse
         title: "FUSE filesystem [after 08]"
         kind: project
         hours: 15
         platform: linux
-        detail: "An in-memory FS first, then one backed by your KV store."
+        detail: |-
+          A filesystem in user space with libfuse: an in-memory one first, then one that
+          stores its files in your KV store.
+        done_when: |-
+          You can mount it, then cp, ls, edit files with nvim, and rm in it, and with the
+          KV-store version the files survive unmounting and remounting.
       - id: side-sync
         title: "Self-host sysroad sync [after 07 + 08]"
         kind: project
         hours: 10
         detail: |-
-          Replace sysroad's git sync with your own HTTP server + KV store holding the
-          event log. The tracker you're reading becomes a client of your own systems.
+          Replace sysroad's git-based sync with your own HTTP server and KV store
+          holding the event log, so the tracker becomes a client of systems you built.
+        done_when: |-
+          Both of your machines sync sysroad progress through your server for a week
+          without losing an event.
       - id: side-nand2tetris
         title: "Nand2Tetris — a computer from NAND gates up [anytime]"
         kind: project
         hours: 40
         url: "https://www.nand2tetris.org/"
+        detail: |-
+          Build logic gates, an ALU, memory and a CPU in a simple hardware language,
+          then an assembler, a virtual machine and a compiler for it. All 12 projects
+          come with test scripts.
+        done_when: |-
+          All 12 projects pass their supplied tests, and Tetris (or your own program)
+          runs on the computer you built.

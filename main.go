@@ -14,6 +14,7 @@ import (
 
 	"github.com/KayraBulbul/sysroad/internal/app"
 	"github.com/KayraBulbul/sysroad/internal/gitsync"
+	"github.com/KayraBulbul/sysroad/internal/roadmap"
 	"github.com/KayraBulbul/sysroad/internal/store"
 	"github.com/KayraBulbul/sysroad/internal/tui"
 )
@@ -28,6 +29,9 @@ Usage:
   sysroad sync            commit, pull and push progress now
   sysroad init [-remote URL | -clone URL]
                           create the data repo (first machine), or clone it (others)
+  sysroad upgrade-roadmap [-apply]
+                          copy improved descriptions from this version's built-in
+                          roadmap into yours (matched by ID; dry run unless -apply)
   sysroad where           print the data directory
 
 Data lives in $SYSROAD_DIR (default ~/.local/share/sysroad).
@@ -54,6 +58,8 @@ func main() {
 		err = runSync(dir)
 	case "init":
 		err = runInit(dir, args)
+	case "upgrade-roadmap":
+		err = runUpgrade(dir, args)
 	case "where":
 		fmt.Println(dir)
 	case "help", "-h", "--help":
@@ -228,6 +234,42 @@ No remote yet. To sync between machines, create a private repo and push, e.g.:
   gh repo create sysroad-data --private --source "` + dir + `" --push
 Then on the other machine:
   sysroad init -clone <repo-url>`)
+	}
+	return nil
+}
+
+func runUpgrade(dir string, args []string) error {
+	fs := flag.NewFlagSet("upgrade-roadmap", flag.ExitOnError)
+	apply := fs.Bool("apply", false, "write the changes (default: only list them)")
+	fs.Parse(args)
+
+	a, err := app.Open(dir)
+	if err != nil {
+		return err
+	}
+	builtin, err := roadmap.Parse(roadmap.DefaultYAML)
+	if err != nil {
+		return err
+	}
+	changes := a.Roadmap.Upgrade(builtin, *apply)
+	if len(changes) == 0 {
+		fmt.Println("your roadmap already matches this version's built-in descriptions")
+		return nil
+	}
+	for _, c := range changes {
+		fmt.Printf("  %-18s %s  (%s)\n", c.ID, short(c.Title, 50), strings.Join(c.Fields, ", "))
+	}
+	if !*apply {
+		fmt.Printf("\n%d items would change. Your order, added steps, notes and progress are kept.\n"+
+			"Any hand edits to the fields listed above would be replaced. Run with -apply to write.\n", len(changes))
+		return nil
+	}
+	if err := a.SaveRoadmap(); err != nil {
+		return err
+	}
+	fmt.Printf("\nupdated %d items\n", len(changes))
+	if gitsync.IsRepo(dir) {
+		return syncWithRetry(dir, time.Minute)
 	}
 	return nil
 }

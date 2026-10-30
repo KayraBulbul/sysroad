@@ -203,9 +203,18 @@ func (m *Side) renderFocus(r app.Ref, w int, line func(string), block func(strin
 		line("  " + sWarn.Render("◷ "+clock(t.Elapsed(time.Now()))+" running"))
 	}
 	if st.Detail != "" {
-		b := clip(wrap(reflow(st.Detail), w-2), 8)
-		for _, l := range strings.Split(b, "\n") {
+		lines := strings.Split(wrap(reflow(st.Detail), w-2), "\n")
+		if len(lines) > 6 {
+			lines = append(lines[:5], "… (full text: enter in `sysroad`)")
+		}
+		for _, l := range lines {
 			line("  " + sDim.Render(l))
+		}
+	}
+	if st.DoneWhen != "" {
+		line("  " + sGood.Bold(true).Render("Done when"))
+		for _, l := range strings.Split(clip(wrap(reflow(st.DoneWhen), w-2), 5), "\n") {
+			line("  " + l)
 		}
 	}
 	if note := p.Notes[st.ID]; note != "" {

@@ -662,6 +662,9 @@ func (m *Full) stepDetail(sec *roadmap.Section, st *roadmap.Step, w int, full bo
 	if st.Detail != "" {
 		b.WriteString("\n" + wrap(reflow(st.Detail), w) + "\n")
 	}
+	if st.DoneWhen != "" {
+		b.WriteString("\n" + sGood.Bold(true).Render("Done when") + "\n" + wrap(reflow(st.DoneWhen), w) + "\n")
+	}
 	if note := p.Notes[st.ID]; note != "" {
 		b.WriteString("\n" + sHeading.Render("Notes") + "\n" + wrap(note, w) + "\n")
 	} else {

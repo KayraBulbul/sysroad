@@ -61,6 +61,7 @@ type Step struct {
 	Platform string  `yaml:"platform,omitempty"`
 	URL      string  `yaml:"url,omitempty"`
 	Detail   string  `yaml:"detail,omitempty"`
+	DoneWhen string  `yaml:"done_when,omitempty"`
 }
 
 func Parse(data []byte) (*Roadmap, error) {
@@ -213,4 +214,88 @@ func Remove[T any](s []T, i int) []T {
 		return s
 	}
 	return append(s[:i], s[i+1:]...)
+}
+
+// Change describes one item an upgrade would modify.
+type Change struct {
+	ID, Title string
+	Fields    []string
+}
+
+// Upgrade copies descriptive fields from a newer built-in roadmap onto r,
+// matching sections and steps by ID. It never adds, removes or reorders
+// items, so the user's own structure is kept. With apply false it only
+// reports what would change.
+func (r *Roadmap) Upgrade(from *Roadmap, apply bool) []Change {
+	var changes []Change
+	note := func(id, title string, fields []string) {
+		if len(fields) > 0 {
+			changes = append(changes, Change{id, title, fields})
+		}
+	}
+	for _, s := range r.Sections {
+		src := from.Section(s.ID)
+		if src == nil {
+			continue
+		}
+		var f []string
+		set(&f, "title", &s.Title, src.Title, apply)
+		set(&f, "summary", &s.Summary, src.Summary, apply)
+		if !resourcesEqual(s.Resources, src.Resources) {
+			f = append(f, "resources")
+			if apply {
+				s.Resources = append([]Resource(nil), src.Resources...)
+			}
+		}
+		note(s.ID, s.Title, f)
+		for _, st := range s.Steps {
+			_, srcSt := from.Find(st.ID)
+			if srcSt == nil {
+				continue
+			}
+			var f []string
+			set(&f, "title", &st.Title, srcSt.Title, apply)
+			set(&f, "kind", &st.Kind, srcSt.Kind, apply)
+			set(&f, "platform", &st.Platform, srcSt.Platform, apply)
+			set(&f, "url", &st.URL, srcSt.URL, apply)
+			set(&f, "detail", &st.Detail, srcSt.Detail, apply)
+			set(&f, "done_when", &st.DoneWhen, srcSt.DoneWhen, apply)
+			if st.Hours != srcSt.Hours {
+				f = append(f, "hours")
+				if apply {
+					st.Hours = srcSt.Hours
+				}
+			}
+			if st.Optional != srcSt.Optional {
+				f = append(f, "optional")
+				if apply {
+					st.Optional = srcSt.Optional
+				}
+			}
+			note(st.ID, st.Title, f)
+		}
+	}
+	return changes
+}
+
+func set(fields *[]string, name string, dst *string, src string, apply bool) {
+	if *dst == src {
+		return
+	}
+	*fields = append(*fields, name)
+	if apply {
+		*dst = src
+	}
+}
+
+func resourcesEqual(a, b []Resource) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
