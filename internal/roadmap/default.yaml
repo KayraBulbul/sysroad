@@ -24,7 +24,9 @@ sections:
         url: "https://missing.csail.mit.edu/"
         detail: |-
           Skim what you already know. Pay attention to the "Debugging and Profiling"
-          and "Metaprogramming" (build systems) lectures.
+          and "Code Quality" (testing, CI, command runners) lectures. The 2026 edition
+          dropped "Metaprogramming"; for build systems and make, read the 2020 lecture:
+          https://missing.csail.mit.edu/2020/metaprogramming/
       - id: setup-2
         title: "Install the toolchain on both machines"
         kind: setup
