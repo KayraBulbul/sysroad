@@ -10,6 +10,7 @@ import (
 
 	"github.com/KayraBulbul/sysroad/internal/app"
 	"github.com/KayraBulbul/sysroad/internal/gitsync"
+	"github.com/KayraBulbul/sysroad/internal/roadmap"
 	"github.com/KayraBulbul/sysroad/internal/store"
 )
 
@@ -46,17 +47,21 @@ func TestTwoMachineSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Offline on both: progress events plus a roadmap edit on each side
-	// in different places.
-	mac.LogTime("c-1", 30)
-	mac.SetStatus("c-1", store.Done)
-	mac.Roadmap.Sections[0].Title = "00 · Setup (edited on mac)"
+	// Offline on both: progress events on each side, a section of your own
+	// added on the mac, and lesson code written on the desktop.
+	mac.LogTime("cpp-01-echo", 30)
+	mac.SetStatus("cpp-01-echo", store.Done)
+	mac.Roadmap.Sections = append(mac.Roadmap.Sections, &roadmap.Section{ID: "mine", Title: "Mine (from mac)"})
 	mac.SaveRoadmap()
-	desk.LogTime("c-2", 20)
-	desk.SetNote("c", "section note from desktop")
-	last := desk.Roadmap.Sections[len(desk.Roadmap.Sections)-1]
-	last.Title = "Side Quests (edited on desktop)"
-	desk.SaveRoadmap()
+	desk.LogTime("cpp-02-words", 20)
+	desk.SetNote("cpp-coreutils-wc", "chapter note from desktop")
+	work, err := desk.Touch(desk.Lesson("cpp-02-words"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(work, "words.cpp"), []byte("// written on the desktop\n"), 0o644)
+	os.MkdirAll(filepath.Join(work, "build"), 0o755)
+	os.WriteFile(filepath.Join(work, "build", "junk.o"), []byte("x"), 0o644)
 
 	for _, dir := range []string{macDir, deskDir, macDir} {
 		if err := gitsync.Sync(ctx, dir); err != nil {
@@ -66,13 +71,19 @@ func TestTwoMachineSync(t *testing.T) {
 	for _, a := range []*app.App{mac, desk} {
 		a.Reload(true)
 		p := a.Progress
-		if p.Minutes["c-1"] != 30 || p.Minutes["c-2"] != 20 || p.StatusOf("c-1") != store.Done || p.Notes["c"] == "" {
+		if p.Minutes["cpp-01-echo"] != 30 || p.Minutes["cpp-02-words"] != 20 || p.StatusOf("cpp-01-echo") != store.Done || p.Notes["cpp-coreutils-wc"] == "" {
 			t.Errorf("%s missing merged progress: %+v %+v", filepath.Base(a.Dir), p.Minutes, p.Notes)
 		}
-		if a.Roadmap.Sections[0].Title != "00 · Setup (edited on mac)" ||
-			a.Roadmap.Sections[len(a.Roadmap.Sections)-1].Title != "Side Quests (edited on desktop)" {
-			t.Errorf("%s missing merged roadmap edits", filepath.Base(a.Dir))
+		if a.Roadmap.Sections[len(a.Roadmap.Sections)-1].Title != "Mine (from mac)" {
+			t.Errorf("%s missing the section added on the mac", filepath.Base(a.Dir))
 		}
+	}
+	code, err := os.ReadFile(filepath.Join(macDir, "work", "cpp-02-words", "words.cpp"))
+	if err != nil || string(code) != "// written on the desktop\n" {
+		t.Errorf("lesson code didn't sync to the mac: %q %v", code, err)
+	}
+	if _, err := os.Stat(filepath.Join(macDir, "work", "cpp-02-words", "build")); err == nil {
+		t.Error("build output should be gitignored")
 	}
 	if _, err := os.Stat(filepath.Join(macDir, ".git", "sysroad-sync.lock")); err == nil {
 		t.Error("sync lock left behind")

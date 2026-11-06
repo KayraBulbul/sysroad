@@ -1,0 +1,24 @@
+# Vigil — generated from ~/.config/omarchy/themes/vigil by Omarchy's ghostty template.
+# Copy to ~/.config/ghostty/themes/vigil on the Mac, then add 'theme = vigil' to ~/.config/ghostty/config.
+background = #19191D
+foreground = #C5BDB6
+cursor-color = #DDD3C9
+selection-background = #48342F
+selection-foreground = #DDD3C9
+
+palette = 0=#19191D
+palette = 1=#B77779
+palette = 2=#8E9989
+palette = 3=#B99369
+palette = 4=#8D94AA
+palette = 5=#A28A9C
+palette = 6=#8D9FA0
+palette = 7=#C5BDB6
+palette = 8=#898181
+palette = 9=#CA8D8D
+palette = 10=#A3AD9D
+palette = 11=#CCAA81
+palette = 12=#A5ABC0
+palette = 13=#BBA1B3
+palette = 14=#A5B6B5
+palette = 15=#DDD3C9

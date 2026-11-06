@@ -1,0 +1,14 @@
+- name: one line from stdin
+  stdin: "hello world\n"
+  stdout: "      1       2      12\n"
+- name: empty stdin
+  stdin: ""
+  stdout: "      0       0       0\n"
+- name: several lines
+  stdin: "the quick brown fox\njumps over\nthe lazy dog\n"
+  stdout: "      3       9      44\n"
+  hidden: true
+- name: no trailing newline
+  stdin: "abc def"
+  stdout: "      0       2       7\n"
+  hidden: true

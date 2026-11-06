@@ -13,28 +13,37 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/KayraBulbul/sysroad/internal/app"
+	"github.com/KayraBulbul/sysroad/internal/course"
 	"github.com/KayraBulbul/sysroad/internal/gitsync"
-	"github.com/KayraBulbul/sysroad/internal/roadmap"
 	"github.com/KayraBulbul/sysroad/internal/store"
 	"github.com/KayraBulbul/sysroad/internal/tui"
 )
 
-const usage = `sysroad — systems engineering roadmap tracker
+const usage = `sysroad — a boot.dev-style systems programming course in C++
 
 Usage:
-  sysroad                 full-screen browser/editor
-  sysroad side            compact view for a terminal split
+  sysroad                 full-screen browser
+  sysroad side            lesson panel for a terminal split next to your editor
   sysroad status          one-line summary (tmux status bar, prompts)
+
+Lessons (act on the lesson whose folder you're in, else the current one):
+  sysroad run [id]        build, run the visible tests, stop at the first failure
+  sysroad submit [id]     run every test; a pass completes the lesson
+  sysroad hint [id]       show the next hint
+  sysroad solution [id]   print the solution
+  sysroad reset [id]      put the starter code back (your files are kept)
+  sysroad lesson [id]     print the lesson text
+  sysroad path [id]       print the lesson's folder (cd "$(sysroad path)")
+  sysroad edit [id]       open the lesson's file in $EDITOR
+
+Progress:
   sysroad log <dur> [id]  log time, e.g. 45m or 1h30m (default: current step)
-  sysroad sync            commit, pull and push progress now
+  sysroad sync            commit, pull and push progress and code now
   sysroad init [-remote URL | -clone URL]
                           create the data repo (first machine), or clone it (others)
-  sysroad upgrade-roadmap [-apply]
-                          copy improved descriptions from this version's built-in
-                          roadmap into yours (matched by ID; dry run unless -apply)
   sysroad where           print the data directory
 
-Data lives in $SYSROAD_DIR (default ~/.local/share/sysroad).
+Data and your code live in $SYSROAD_DIR (default ~/.local/share/sysroad).
 `
 
 func main() {
@@ -58,8 +67,22 @@ func main() {
 		err = runSync(dir)
 	case "init":
 		err = runInit(dir, args)
-	case "upgrade-roadmap":
-		err = runUpgrade(dir, args)
+	case "run":
+		err = runLesson(dir, args, course.ModeRun)
+	case "submit":
+		err = runLesson(dir, args, course.ModeSubmit)
+	case "hint":
+		err = runHint(dir, args)
+	case "solution":
+		err = runSolution(dir, args)
+	case "reset":
+		err = runReset(dir, args)
+	case "lesson":
+		err = runShowLesson(dir, args)
+	case "path":
+		err = runPath(dir, args)
+	case "edit":
+		err = runEdit(dir, args)
 	case "where":
 		fmt.Println(dir)
 	case "help", "-h", "--help":
@@ -68,11 +91,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n%s", cmd, usage)
 		os.Exit(2)
 	}
+	if errors.Is(err, errFailed) {
+		os.Exit(1)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sysroad:", err)
 		os.Exit(1)
 	}
 }
+
+// errFailed means a run or submit failed; the output already says why.
+var errFailed = errors.New("failed")
 
 type syncer interface{ Dirty() bool }
 
@@ -148,7 +177,8 @@ func runStatus(dir string, args []string) error {
 	}
 	now := time.Now()
 	streak, _ := a.Progress.Streak(now)
-	parts := []string{fmt.Sprintf("streak %dd", streak), store.FormatMinutes(a.TodayMinutes(now))}
+	lvl, _, _ := course.Level(a.XP())
+	parts := []string{fmt.Sprintf("Lv %d", lvl), fmt.Sprintf("streak %dd", streak), store.FormatMinutes(a.TodayMinutes(now))}
 	if t := a.Timer; t != nil {
 		parts = append(parts, "◷ "+short(a.Roadmap.TitleOf(t.ID), *width)+" "+store.FormatMinutes(int(t.Elapsed(now)/time.Minute)))
 	} else if cur, ok := a.Current(); ok {
@@ -234,42 +264,6 @@ No remote yet. To sync between machines, create a private repo and push, e.g.:
   gh repo create sysroad-data --private --source "` + dir + `" --push
 Then on the other machine:
   sysroad init -clone <repo-url>`)
-	}
-	return nil
-}
-
-func runUpgrade(dir string, args []string) error {
-	fs := flag.NewFlagSet("upgrade-roadmap", flag.ExitOnError)
-	apply := fs.Bool("apply", false, "write the changes (default: only list them)")
-	fs.Parse(args)
-
-	a, err := app.Open(dir)
-	if err != nil {
-		return err
-	}
-	builtin, err := roadmap.Parse(roadmap.DefaultYAML)
-	if err != nil {
-		return err
-	}
-	changes := a.Roadmap.Upgrade(builtin, *apply)
-	if len(changes) == 0 {
-		fmt.Println("your roadmap already matches this version's built-in descriptions")
-		return nil
-	}
-	for _, c := range changes {
-		fmt.Printf("  %-18s %s  (%s)\n", c.ID, short(c.Title, 50), strings.Join(c.Fields, ", "))
-	}
-	if !*apply {
-		fmt.Printf("\n%d items would change. Your order, added steps, notes and progress are kept.\n"+
-			"Any hand edits to the fields listed above would be replaced. Run with -apply to write.\n", len(changes))
-		return nil
-	}
-	if err := a.SaveRoadmap(); err != nil {
-		return err
-	}
-	fmt.Printf("\nupdated %d items\n", len(changes))
-	if gitsync.IsRepo(dir) {
-		return syncWithRetry(dir, time.Minute)
 	}
 	return nil
 }

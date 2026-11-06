@@ -8,18 +8,98 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/KayraBulbul/sysroad/internal/app"
+	"github.com/KayraBulbul/sysroad/internal/course"
 	"github.com/KayraBulbul/sysroad/internal/store"
 )
 
 // Side is the narrow view meant for a terminal split: the current step in
 // detail, then what's in progress, up next and recently done.
+//
+// When the step in focus is a course lesson, it shows the lesson panel
+// instead: the lesson, then the output of the latest Run or Submit.
 type Side struct {
 	core
 	sel   int // index into selectable()
 	nextN int // upcoming steps that fit on screen, set by View
+
+	lv     lessonView
+	pinned string    // lesson shown instead of the current step ("" = follow current)
+	latest time.Time // newest run result seen
 }
 
-func NewSide(a *app.App) *Side { return &Side{core: newCore(a), nextN: 5} }
+func NewSide(a *app.App) *Side {
+	m := &Side{core: newCore(a), nextN: 5}
+	m.lv.app = a
+	_, m.latest = a.Engine.Latest()
+	return m
+}
+
+// shownLesson is the course lesson the panel shows, if any.
+func (m *Side) shownLesson() *course.Lesson {
+	if m.pinned != "" {
+		if l := m.app.Lesson(m.pinned); l != nil {
+			return l
+		}
+		m.pinned = ""
+	}
+	if cur, ok := m.app.Current(); ok && m.sel == 0 {
+		return m.app.Lesson(cur.Step.ID)
+	}
+	return nil
+}
+
+// browse moves the panel to the next or previous course lesson.
+func (m *Side) browse(from string, d int) {
+	ls := m.app.Course.Lessons()
+	for i, l := range ls {
+		if l.ID == from {
+			j := min(max(i+d, 0), len(ls)-1)
+			m.pinned = ls[j].ID
+			if cur, ok := m.app.Current(); ok && cur.Step.ID == m.pinned {
+				m.pinned = ""
+			}
+			return
+		}
+	}
+}
+
+func (m *Side) updateLesson(l *course.Lesson, key tea.KeyMsg) tea.Cmd {
+	k := key.String()
+	if m.lv.confirm == "" {
+		switch k {
+		case "q", "ctrl+c":
+			return tea.Quit
+		case "]", "l", "right":
+			m.browse(l.ID, 1)
+			return nil
+		case "[", "left":
+			m.browse(l.ID, -1)
+			return nil
+		case "c", "esc":
+			m.pinned = ""
+			return nil
+		case " ":
+			if l.Graded() {
+				m.say("Submit (s) completes a lesson")
+			} else {
+				m.toggleStatus(l.ID, store.Done)
+			}
+			return nil
+		case "x":
+			m.toggleStatus(l.ID, store.Skipped)
+			return nil
+		case "t":
+			m.toggleTimer(l.ID)
+			return nil
+		case "n":
+			return m.editNote(l.ID)
+		case "S":
+			return m.syncNow()
+		}
+	}
+	cmd, _ := m.lv.key(&m.core, k, m.h-4)
+	return cmd
+}
 
 func (m *Side) Init() tea.Cmd { return m.core.init() }
 
@@ -44,12 +124,39 @@ func (m *Side) selected() (app.Ref, bool) {
 }
 
 func (m *Side) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tickMsg:
+		// Follow a run started elsewhere (e.g. `sysroad run` in the editor).
+		if id, at := m.app.Engine.Latest(); at.After(m.latest) {
+			m.latest = at
+			if l := m.shownLesson(); l == nil || l.ID != id {
+				if m.app.Lesson(id) != nil {
+					m.pinned, m.sel = id, 0
+				}
+			}
+		}
+		m.lv.loadResult()
+	case lessonRunMsg:
+		cmd := m.lv.finish(&m.core, msg)
+		_, m.latest = m.app.Engine.Latest()
+		if m.app.Progress.StatusOf(msg.id) == store.Done {
+			m.pinned = msg.id // stay on it so Under the hood is one key away
+		}
+		return m, cmd
+	case lessonEditDoneMsg:
+		m.fail(msg.err)
+		return m, nil
+	}
 	if cmd, handled := m.core.update(msg); handled {
 		return m, cmd
 	}
 	key, ok := msg.(tea.KeyMsg)
 	if !ok {
 		return m, nil
+	}
+	if l := m.shownLesson(); l != nil {
+		m.lv.set(l.ID)
+		return m, m.updateLesson(l, key)
 	}
 	ref, hasSel := m.selected()
 	switch key.String() {
@@ -86,10 +193,37 @@ func (m *Side) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.fail(openURL(url))
 		}
-	case "s":
+	case "s", "S":
 		return m, m.syncNow()
 	}
 	return m, nil
+}
+
+func (m *Side) viewLesson(l *course.Lesson, w int) string {
+	m.lv.set(l.ID)
+	now := time.Now()
+	head := spread(sAccent.Render("sysroad"), m.streakText()+sDim.Render(" · ")+store.FormatMinutes(m.app.TodayMinutes(now)), w)
+	lines := []string{" " + head, " " + levelLine(m.app, w)}
+	if m.pinned != "" {
+		lines = append(lines, " "+sDim.Render(trunc("viewing — c: back to current", w)))
+	} else {
+		lines = append(lines, "")
+	}
+	for _, l := range m.lv.screen(w, m.h-4) {
+		lines = append(lines, " "+trunc(l, w))
+	}
+	for len(lines) < m.h-1 {
+		lines = append(lines, "")
+	}
+	footer := m.lv.hints(&m.core)
+	if m.flash != "" && m.lv.confirm == "" {
+		st := sGood
+		if m.flashErr {
+			st = sErr
+		}
+		footer = " " + st.Render(m.flash)
+	}
+	return strings.Join(lines[:m.h-1], "\n") + "\n" + trunc(footer, w+1)
 }
 
 func (m *Side) View() string {
@@ -97,6 +231,9 @@ func (m *Side) View() string {
 		return ""
 	}
 	w := m.w - 2 // one column of margin each side
+	if l := m.shownLesson(); l != nil {
+		return m.viewLesson(l, w)
+	}
 	var top, bottom []string
 	out := &top
 	line := func(s string) { *out = append(*out, " "+trunc(s, w)) }
@@ -189,7 +326,7 @@ func (m *Side) renderFocus(r app.Ref, w int, line func(string), block func(strin
 	block(statusIcon(p.StatusOf(st.ID))+" "+sBold.Render(st.Title), 0)
 	meta := []string{kindTag(st.Kind)}
 	if st.Hours > 0 {
-		meta = append(meta, fmt.Sprintf("~%gh", st.Hours))
+		meta = append(meta, "~"+fmtHours(st.Hours))
 	}
 	if mins := p.Minutes[st.ID]; mins > 0 {
 		meta = append(meta, sWarn.Render(store.FormatMinutes(mins)+" logged"))
