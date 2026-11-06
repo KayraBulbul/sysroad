@@ -682,7 +682,14 @@ func (e *Engine) checkToolchain(ctx context.Context) (*Result, error) {
 	switch {
 	case r.OK && fallback != "":
 		r.Stage, r.Summary = "done", "✓ ready, using "+fallback+" on this machine"
-		b.WriteString("\n" + dim("Lessons still work. Paste this output to Claude so the AddressSanitizer problem can be fixed.") + "\n")
+		if runtime.GOOS == "darwin" {
+			b.WriteString("\n" + dim("Lessons still work, without memory-bug detection. This is a known bug: AddressSanitizer\n"+
+				"from Xcode 26.3 or older deadlocks at startup on macOS 26.4+. Update the Command Line Tools to\n"+
+				"26.4 or later (System Settings → General → Software Update, or `softwareupdate --list`), then\n"+
+				"submit this check again. sysroad re-tests on its own when the compiler version changes.") + "\n")
+		} else {
+			b.WriteString("\n" + dim("Lessons still work, without AddressSanitizer. Submit this check again after updating clang.") + "\n")
+		}
 	case r.OK:
 		r.Stage, r.Summary = "done", fmt.Sprintf("✓ toolchain ready (%d/%d)", r.Passed, r.Total)
 	default:
