@@ -129,3 +129,25 @@ func TestLevelSpans(t *testing.T) {
 		}
 	}
 }
+
+// A hung program that also left a child running must still be killed on
+// time; with pipes, the child holding stdout open made Wait block.
+func TestExecTimeoutKillsTheWholeGroup(t *testing.T) {
+	e := &Engine{DataDir: t.TempDir(), CacheDir: t.TempDir()}
+	start := time.Now()
+	r := e.exec(context.Background(), "/bin/sh", []string{"-c", "sleep 30 & echo started; sleep 30"}, "", nil, time.Second)
+	if took := time.Since(start); took > 5*time.Second {
+		t.Fatalf("exec took %s after a 1s timeout", took)
+	}
+	if !r.timedOut || r.stdout != "started\n" {
+		t.Fatalf("timedOut=%v stdout=%q", r.timedOut, r.stdout)
+	}
+}
+
+func TestExecPassesStdinArgsAndFiles(t *testing.T) {
+	e := &Engine{DataDir: t.TempDir(), CacheDir: t.TempDir()}
+	r := e.exec(context.Background(), "/bin/sh", []string{"-c", `cat in.txt; cat; echo "$0"`, "arg0"}, "from stdin\n", map[string]string{"in.txt": "from file\n"}, 5*time.Second)
+	if r.code != 0 || r.stdout != "from file\nfrom stdin\narg0\n" {
+		t.Fatalf("code=%d stdout=%q stderr=%q", r.code, r.stdout, r.stderr)
+	}
+}

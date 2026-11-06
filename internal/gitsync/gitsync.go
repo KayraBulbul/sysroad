@@ -155,3 +155,21 @@ func Clone(ctx context.Context, remote, dir string) error {
 	}
 	return nil
 }
+
+// SyncWait syncs, waiting out a sync that another goroutine or process is
+// already running, for up to timeout.
+func SyncWait(dir string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	for {
+		err := Sync(ctx, dir)
+		if !errors.Is(err, ErrBusy) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
+}

@@ -63,11 +63,14 @@ type core struct {
 	flash    string
 	flashErr bool
 	flashAt  time.Time
+
+	lastRun time.Time // newest Run/Submit result seen
 }
 
 func newCore(a *app.App) core {
 	c := core{app: a, hasRepo: gitsync.IsRepo(a.Dir)}
 	c.hasRemote = c.hasRepo && gitsync.HasRemote(context.Background(), a.Dir)
+	_, c.lastRun = a.Engine.Latest()
 	return c
 }
 
@@ -124,6 +127,11 @@ func (c *core) update(msg tea.Msg) (tea.Cmd, bool) {
 			c.fail(err)
 		}
 		now := time.Time(msg)
+		// A run from the editor's shell means code changed: push it soon.
+		if _, at := c.app.Engine.Latest(); at.After(c.lastRun) {
+			c.lastRun = at
+			c.changed()
+		}
 		if c.flash != "" && now.Sub(c.flashAt) > 5*time.Second {
 			c.flash = ""
 		}

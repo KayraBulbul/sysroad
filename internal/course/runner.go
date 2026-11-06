@@ -1,7 +1,6 @@
 package course
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	_ "embed"
@@ -170,7 +169,8 @@ func (e *Engine) save(r *Result) {
 		return
 	}
 	data, _ := json.Marshal(r)
-	tmp := p + ".tmp"
+	// Per-process temp name: the sidebar and a shell run may save at once.
+	tmp := fmt.Sprintf("%s.%d.tmp", p, os.Getpid())
 	if os.WriteFile(tmp, data, 0o644) == nil {
 		os.Rename(tmp, p)
 	}
@@ -189,16 +189,6 @@ func Compiler() (string, error) {
 		}
 	}
 	return "", errors.New("no C++ compiler found — install clang (Omarchy: sudo pacman -S clang; Mac: xcode-select --install)")
-}
-
-// Flags used for every build: C++20, debug info, and sanitizers so memory
-// bugs and undefined behaviour fail loudly instead of "working".
-func Flags() []string {
-	return []string{
-		"-std=c++20", "-g", "-O0",
-		"-fsanitize=address,undefined", "-fno-sanitize-recover=undefined", "-fno-omit-frame-pointer",
-		"-fcolor-diagnostics",
-	}
 }
 
 var warnFlags = []string{"-Wall", "-Wextra"}
@@ -225,7 +215,8 @@ func (e *Engine) doctest(ctx context.Context, cxx string) (includeDir, mainObj s
 	h.Write(doctestPrelude)
 	h.Write([]byte(cxx))
 	h.Write(ver)
-	h.Write([]byte(strings.Join(Flags(), " ")))
+	flags, _ := e.flags(ctx, cxx)
+	h.Write([]byte(strings.Join(flags, " ")))
 	key := hex.EncodeToString(h.Sum(nil))[:16]
 	dir := filepath.Join(e.CacheDir, "doctest", key)
 	header := filepath.Join(dir, "doctest.h")
@@ -249,7 +240,7 @@ func (e *Engine) doctest(ctx context.Context, cxx string) (includeDir, mainObj s
 	}
 	// Unique per process: the sidebar and a shell `sysroad run` may race here.
 	tmp := fmt.Sprintf("%s.%d.tmp", obj, os.Getpid())
-	args := append(Flags(), "-w", "-c", src, "-o", tmp)
+	args := append(append([]string{}, flags...), "-w", "-c", src, "-o", tmp)
 	if out, err := exec.CommandContext(ctx, cxx, args...).CombinedOutput(); err != nil {
 		return "", "", fmt.Errorf("compiling doctest: %v\n%s", err, out)
 	}
@@ -333,6 +324,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		testFiles = append(testFiles, p)
 	}
 	needProg := len(checks) > 0 || l.Meta.Run != nil
+	flags, sanNote := e.flags(ctx, cxx)
 
 	cctx, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
@@ -346,7 +338,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		args := append(append(Flags(), warnFlags...), "-I", ".")
+		args := append(append(append([]string{}, flags...), warnFlags...), "-I", ".")
 		if needProg {
 			args = append(append(args, srcs...), "-o", prog)
 		} else {
@@ -365,7 +357,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 			}
 			// Your main() is renamed so doctest's main runs the tests. Warnings
 			// are off here; the program build above already reported them.
-			args := append(Flags(), "-w", "-Dmain=sysroad_student_main", "-I", ".", "-isystem", inc,
+			args := append(append([]string{}, flags...), "-w", "-Dmain=sysroad_student_main", "-I", ".", "-isystem", inc,
 				"-include", filepath.Join(inc, "sysroad_doctest.hpp"))
 			args = append(append(append(args, srcs...), testFiles...), obj, "-o", testBin)
 			testRes = compile(cctx, work, cxx, args)
@@ -374,8 +366,11 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	wg.Wait()
 
 	var out strings.Builder
+	if sanNote != "" {
+		out.WriteString(dim(sanNote) + "\n\n")
+	}
 	if progRes.err != nil {
-		return &Result{Stage: "compile", Summary: "✗ doesn't compile", Output: string(progRes.out)}, nil
+		return &Result{Stage: "compile", Summary: "✗ doesn't compile", Output: out.String() + string(progRes.out)}, nil
 	}
 	if testRes.err != nil {
 		msg := string(testRes.out)
@@ -521,68 +516,6 @@ func doctestCounts(s string) (passed, total int) {
 	return passed, total
 }
 
-type execResult struct {
-	stdout, stderr string
-	code           int
-	note           string // e.g. timed out
-}
-
-// exec runs a binary in a fresh temp dir holding the given files.
-func (e *Engine) exec(ctx context.Context, bin string, args []string, stdin string, files map[string]string, timeout time.Duration) execResult {
-	tmp, err := os.MkdirTemp("", "sysroad-run-*")
-	if err != nil {
-		return execResult{stderr: err.Error(), code: -1}
-	}
-	defer os.RemoveAll(tmp)
-	for name, data := range files {
-		p := filepath.Join(tmp, filepath.FromSlash(name))
-		os.MkdirAll(filepath.Dir(p), 0o755)
-		os.WriteFile(p, []byte(data), 0o644)
-	}
-	cctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	cmd := exec.CommandContext(cctx, bin, args...)
-	cmd.Dir = tmp
-	cmd.Env = sanitizerEnv()
-	cmd.Stdin = strings.NewReader(stdin)
-	var so, se limitedBuffer
-	cmd.Stdout, cmd.Stderr = &so, &se
-	err = cmd.Run()
-	r := execResult{stdout: so.String(), stderr: se.String()}
-	if so.cut || se.cut {
-		r.note = " (output cut off at 64 KiB)"
-	}
-	var ee *exec.ExitError
-	switch {
-	case cctx.Err() == context.DeadlineExceeded:
-		r.code, r.note = -1, fmt.Sprintf(" — killed after %s (infinite loop, or waiting for input?)", timeout)
-	case errors.As(err, &ee):
-		r.code = ee.ExitCode()
-		if r.code == -1 {
-			r.note = " (" + ee.String() + ")"
-		}
-	case err != nil:
-		r.code, r.stderr = -1, r.stderr+err.Error()
-	}
-	return r
-}
-
-type limitedBuffer struct {
-	bytes.Buffer
-	cut bool
-}
-
-func (b *limitedBuffer) Write(p []byte) (int, error) {
-	if room := outputLimit - b.Len(); room < len(p) {
-		b.cut = true
-		if room > 0 {
-			b.Buffer.Write(p[:room])
-		}
-		return len(p), nil
-	}
-	return b.Buffer.Write(p)
-}
-
 func (e *Engine) runChecks(ctx context.Context, l *Lesson, prog string, checks []Check, mode Mode) (ok bool, passed, total int, text string) {
 	var b strings.Builder
 	ok = true
@@ -695,13 +628,20 @@ func (e *Engine) builtinCheck(ctx context.Context, l *Lesson, mode Mode) (*Resul
 func (e *Engine) checkToolchain(ctx context.Context) (*Result, error) {
 	var b strings.Builder
 	r := &Result{OK: true}
-	item := func(ok bool, what, detail string) {
-		r.Total++
+	item := func(ok, required bool, what, detail string) {
 		mark := green("✓ ")
-		if ok {
-			r.Passed++
-		} else {
+		switch {
+		case ok:
+		case required:
 			mark, r.OK = red("✗ "), false
+		default:
+			mark = "\x1b[33m! \x1b[39m"
+		}
+		if required {
+			r.Total++
+			if ok {
+				r.Passed++
+			}
 		}
 		b.WriteString(mark + what)
 		if detail != "" {
@@ -710,51 +650,50 @@ func (e *Engine) checkToolchain(ctx context.Context) (*Result, error) {
 		b.WriteString("\n")
 	}
 	cxx, err := Compiler()
+	fallback := ""
 	if err != nil {
-		item(false, "C++ compiler", err.Error())
+		item(false, true, "C++ compiler", err.Error())
 	} else {
 		ver, _ := exec.CommandContext(ctx, cxx, "--version").Output()
 		first := strings.SplitN(string(ver), "\n", 2)[0]
-		item(strings.Contains(strings.ToLower(first), "clang"), "clang++", first)
+		item(strings.Contains(strings.ToLower(first), "clang"), true, "clang++", first)
 
-		tmp, err := os.MkdirTemp("", "sysroad-check-*")
-		if err != nil {
-			return nil, err
+		_, _, choice := e.sanitizers(ctx, cxx, true) // always re-probe here
+		for i, row := range choice.Rows {
+			// The full set is what lessons want; a weaker set is a fallback.
+			item(row.OK, i == len(choice.Rows)-1, "C++20 with "+row.Name, row.Detail)
 		}
-		defer os.RemoveAll(tmp)
-		src := filepath.Join(tmp, "hello.cpp")
-		os.WriteFile(src, []byte("#include <string>\n#include <iostream>\n#include <span>\n#include <vector>\nint main() {\n  std::vector<int> v{1, 2, 3};\n  std::span<int> s{v};\n  std::string msg = \"hello from C++20\";\n  std::cout << msg << ' ' << s.size() << '\\n';\n}\n"), 0o644)
-		bin := filepath.Join(tmp, "hello")
-		res := compile(ctx, tmp, cxx, append(Flags(), src, "-o", bin))
-		item(res.err == nil, "builds C++20 with AddressSanitizer + UBSan", firstLine(string(res.out)))
-		if res.err == nil {
-			run := e.exec(ctx, bin, nil, "", nil, checkTimeout)
-			item(run.code == 0 && strings.Contains(run.stdout, "hello from C++20 3"), "runs it", strings.TrimSpace(run.stdout+run.stderr))
+		if choice.Index > 0 {
+			fallback = sanitizerSets[choice.Index].Name
 		}
 		_, _, derr := e.doctest(ctx, cxx)
-		item(derr == nil, "test framework (doctest) builds", firstLine(errString(derr)))
+		item(derr == nil, true, "test framework (doctest) builds", firstLine(errString(derr)))
 	}
 	dbg := "gdb"
 	if runtime.GOOS == "darwin" {
 		dbg = "lldb"
 	}
 	if p, err := exec.LookPath(dbg); err == nil {
-		item(true, "debugger: "+dbg, p)
+		item(true, true, "debugger: "+dbg, p)
 	} else {
-		item(false, "debugger: "+dbg, "not found")
+		item(false, true, "debugger: "+dbg, "not found")
 	}
-	r.Output = b.String()
 	r.Stage = "check"
-	if r.OK {
+	switch {
+	case r.OK && fallback != "":
+		r.Stage, r.Summary = "done", "✓ ready, using "+fallback+" on this machine"
+		b.WriteString("\n" + dim("Lessons still work. Paste this output to Claude so the AddressSanitizer problem can be fixed.") + "\n")
+	case r.OK:
 		r.Stage, r.Summary = "done", fmt.Sprintf("✓ toolchain ready (%d/%d)", r.Passed, r.Total)
-	} else {
+	default:
 		r.Summary = fmt.Sprintf("✗ %d/%d checks passed", r.Passed, r.Total)
 		if runtime.GOOS == "darwin" {
-			r.Output += dim("\nMac: xcode-select --install gives you clang++ and lldb.") + "\n"
+			b.WriteString(dim("\nMac: xcode-select --install gives you clang++ and lldb.") + "\n")
 		} else {
-			r.Output += dim("\nOmarchy: sudo pacman -S clang gdb") + "\n"
+			b.WriteString(dim("\nOmarchy: sudo pacman -S clang gdb") + "\n")
 		}
 	}
+	r.Output = b.String()
 	return r, nil
 }
 

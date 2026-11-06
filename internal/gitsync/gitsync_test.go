@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/KayraBulbul/sysroad/internal/app"
@@ -87,6 +88,60 @@ func TestTwoMachineSync(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(macDir, ".git", "sysroad-sync.lock")); err == nil {
 		t.Error("sync lock left behind")
+	}
+}
+
+// Starting a lesson on one machine and opening it for the first time on
+// the other must pick up the pushed code instead of creating a starter copy
+// that conflicts on the next sync.
+func TestLessonStartedOnTheOtherMachine(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	t.Setenv("GIT_AUTHOR_NAME", "test")
+	t.Setenv("GIT_AUTHOR_EMAIL", "test@example.com")
+	t.Setenv("GIT_COMMITTER_NAME", "test")
+	t.Setenv("GIT_COMMITTER_EMAIL", "test@example.com")
+	ctx := context.Background()
+	root := t.TempDir()
+	remote := filepath.Join(root, "remote.git")
+	if out, err := exec.Command("git", "init", "-q", "--bare", remote).CombinedOutput(); err != nil {
+		t.Fatal(string(out))
+	}
+	macDir, deskDir := filepath.Join(root, "mac"), filepath.Join(root, "desk")
+	app.Seed(macDir)
+	if err := gitsync.Init(ctx, macDir, remote); err != nil {
+		t.Fatal(err)
+	}
+	if err := gitsync.Clone(ctx, remote, deskDir); err != nil {
+		t.Fatal(err)
+	}
+	mac, _ := app.Open(macDir)
+	desk, err := app.Open(deskDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	l := mac.Lesson("setup-lessons")
+	work, err := mac.Touch(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(work, "add.cpp"), []byte("int add(int a, int b) { return a + b; }\n"), 0o644)
+	if err := gitsync.Sync(ctx, macDir); err != nil {
+		t.Fatal(err)
+	}
+
+	deskWork, err := desk.Touch(desk.Lesson("setup-lessons"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(deskWork, "add.cpp"))
+	if !strings.Contains(string(got), "a + b") {
+		t.Fatalf("desktop got a fresh starter instead of the mac's code: %q", got)
+	}
+	if err := gitsync.Sync(ctx, deskDir); err != nil {
+		t.Fatalf("sync after opening the lesson: %v", err)
 	}
 }
 

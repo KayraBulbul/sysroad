@@ -133,19 +133,7 @@ func runTUI(dir string, side bool) error {
 
 // syncWithRetry waits out a sync still running in a background goroutine.
 func syncWithRetry(dir string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	for {
-		err := gitsync.Sync(ctx, dir)
-		if !errors.Is(err, gitsync.ErrBusy) {
-			return err
-		}
-		select {
-		case <-ctx.Done():
-			return err
-		case <-time.After(250 * time.Millisecond):
-		}
-	}
+	return gitsync.SyncWait(dir, timeout)
 }
 
 func runSync(dir string) error {

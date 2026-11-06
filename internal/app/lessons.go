@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/KayraBulbul/sysroad/internal/course"
+	"github.com/KayraBulbul/sysroad/internal/gitsync"
 	"github.com/KayraBulbul/sysroad/internal/store"
 )
 
@@ -53,18 +55,42 @@ func (a *App) ResolveLesson(arg, cwd string) (*course.Lesson, error) {
 	return nil, errors.New("no lesson to work on — pass a lesson id")
 }
 
+// PrepareWorkspace creates a lesson's folder from its starter files. The
+// first time this machine creates one, it pulls first, so a folder the other
+// machine already pushed is used rather than a fresh starter copy, which
+// would conflict on the next sync. It doesn't touch App state, so it's safe
+// to call from a background goroutine.
+func PrepareWorkspace(dir string, e *course.Engine, l *course.Lesson) (string, error) {
+	work := e.WorkDir(l)
+	if l.Graded() && l.Meta.Check == "" && !exists(work) && gitsync.IsRepo(dir) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		remote := gitsync.HasRemote(ctx, dir)
+		cancel()
+		if remote {
+			gitsync.SyncWait(dir, 15*time.Second) // best effort: offline is fine
+		}
+	}
+	return e.Ensure(l)
+}
+
+// Start marks a todo lesson in progress.
+func (a *App) Start(l *course.Lesson) error {
+	if a.Progress.StatusOf(l.ID) == store.Todo {
+		return a.SetStatus(l.ID, store.Doing)
+	}
+	return nil
+}
+
 // Touch creates the lesson's workspace and marks a todo lesson in progress.
 func (a *App) Touch(l *course.Lesson) (string, error) {
-	dir, err := a.Engine.Ensure(l)
+	dir, err := PrepareWorkspace(a.Dir, a.Engine, l)
 	if err != nil {
 		return "", err
 	}
-	if a.Progress.StatusOf(l.ID) == store.Todo {
-		if err := a.SetStatus(l.ID, store.Doing); err != nil {
-			return "", err
-		}
+	if _, err := a.Reload(false); err != nil { // the pull may have brought new events
+		return "", err
 	}
-	return dir, nil
+	return dir, a.Start(l)
 }
 
 // Outcome is what changed when a Run/Submit result was recorded.

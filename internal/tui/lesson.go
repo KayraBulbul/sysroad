@@ -28,10 +28,11 @@ type lessonView struct {
 	showUTH, showSol  bool
 	jump              string // scroll to the first line starting with this, on next render
 
-	running  course.Mode
-	runStart time.Time
-	result   *course.Result
-	resMod   time.Time
+	running   course.Mode // a Run/Submit in flight, for runningID
+	runningID string
+	runStart  time.Time
+	result    *course.Result
+	resMod    time.Time
 
 	confirm string
 	onYes   func() tea.Cmd
@@ -54,9 +55,6 @@ func (v *lessonView) set(id string) {
 	}
 	v.id, v.scroll, v.outScroll, v.showUTH, v.showSol, v.confirm = id, 0, 0, false, false, ""
 	v.result, v.resMod = nil, time.Time{}
-	if l := v.lesson(); l != nil && l.Written {
-		v.app.Engine.Ensure(l) // so the files are there to open
-	}
 	v.loadResult()
 }
 
@@ -77,7 +75,13 @@ func (v *lessonView) done() bool { return v.app.Progress.StatusOf(v.id) == store
 // start launches Run or Submit in the background.
 func (v *lessonView) start(c *core, mode course.Mode) tea.Cmd {
 	l := v.lesson()
-	if l == nil || v.running != "" {
+	if l == nil {
+		return nil
+	}
+	if v.running != "" {
+		if v.runningID != l.ID {
+			c.say("Still running %s — one at a time", v.app.Course.Lesson(v.runningID).Title)
+		}
 		return nil
 	}
 	if !l.Graded() {
@@ -88,16 +92,19 @@ func (v *lessonView) start(c *core, mode course.Mode) tea.Cmd {
 		}
 		return nil
 	}
-	if _, err := v.app.Touch(l); err != nil {
+	if err := v.app.Start(l); err != nil {
 		c.fail(err)
 		return nil
 	}
 	c.changed()
-	v.running, v.runStart = mode, time.Now()
-	engine := v.app.Engine
+	v.running, v.runningID, v.runStart = mode, l.ID, time.Now()
+	engine, dir := v.app.Engine, v.app.Dir
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
+		if _, err := app.PrepareWorkspace(dir, engine, l); err != nil {
+			return lessonRunMsg{id: l.ID, mode: mode, err: err}
+		}
 		res, err := engine.Run(ctx, l, mode)
 		return lessonRunMsg{id: l.ID, mode: mode, res: res, err: err}
 	}
@@ -106,8 +113,8 @@ func (v *lessonView) start(c *core, mode course.Mode) tea.Cmd {
 // finish records a finished run. It returns a command when the program
 // needs the terminal (interactive lessons).
 func (v *lessonView) finish(c *core, msg lessonRunMsg) tea.Cmd {
-	if msg.id == v.id {
-		v.running = ""
+	if msg.id == v.runningID {
+		v.running, v.runningID = "", ""
 	}
 	if msg.err != nil {
 		c.fail(msg.err)
@@ -427,7 +434,7 @@ func langOf(name string) string {
 }
 
 func (v *lessonView) outputLines(w int) []string {
-	if v.running != "" {
+	if v.running != "" && v.runningID == v.id {
 		verb := "Running"
 		if v.running == course.ModeSubmit {
 			verb = "Submitting"
