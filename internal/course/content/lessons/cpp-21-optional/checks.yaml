@@ -1,0 +1,8 @@
+- name: sizes
+  args: ["4K", "12", "1G"]
+  stdout: "4096\n12\n1073741824\n"
+- name: a bad one in the middle
+  args: ["1", "1.5M", "2"]
+  stdout: "1\n2\n"
+  exit: 1
+  hidden: true

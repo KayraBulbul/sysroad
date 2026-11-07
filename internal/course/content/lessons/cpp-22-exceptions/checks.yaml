@@ -1,0 +1,12 @@
+- name: a good file, printed in key order
+  args: ["app.conf"]
+  files:
+    app.conf: "port = 8080\nhost = localhost\n"
+  stdout: "host=localhost\nport=8080\n"
+- name: a bad line
+  args: ["app.conf"]
+  files:
+    app.conf: "port = 8080\nwhat\n"
+  stdout: ""
+  exit: 1
+  hidden: true

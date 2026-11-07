@@ -1,0 +1,11 @@
+- name: a folder
+  args: ["."]
+  files:
+    notes.txt: "short\n"
+    report.pdf: "pretend this is a much longer pdf file\n"
+    empty.log: ""
+  stdout: "      39  report.pdf\n       6  notes.txt\n3 files, 1 empty, 45 bytes, largest report.pdf\n"
+- name: an empty folder
+  args: ["."]
+  stdout: "0 files, 0 empty, 0 bytes\n"
+  hidden: true

@@ -1,0 +1,14 @@
+- name: -rn over src
+  args: ["-rn", "TODO", "src"]
+  files:
+    src/main.cpp: "int main() {\n    // TODO: flags\n}\n"
+    src/util/strings.cpp: "// helpers\n// TODO: unicode\n"
+    src/util/README: "nothing to do here\n"
+  stdout: "src/main.cpp:2:    // TODO: flags\nsrc/util/strings.cpp:2:// TODO: unicode\n"
+- name: -r with no files
+  args: ["-r", "needle"]
+  files:
+    a/b/c.txt: "needle\n"
+    top.txt: "hay\n"
+  stdout: "a/b/c.txt:needle\n"
+  hidden: true
