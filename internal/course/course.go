@@ -125,6 +125,10 @@ func (l *Lesson) Graded() bool {
 	return l.Written && (l.Meta.Check != "" || len(l.Meta.Files) > 0)
 }
 
+// HasCode reports whether the lesson has code you write in its work folder,
+// so editing, Reset and the solution apply (built-in checks have none).
+func (l *Lesson) HasCode() bool { return l.Graded() && l.Meta.Check == "" && len(l.Meta.Files) > 0 }
+
 func (l *Lesson) dir() string { return path.Join("content/lessons", l.ID) }
 
 func (l *Lesson) read(name string) (string, bool) {

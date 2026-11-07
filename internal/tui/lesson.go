@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -84,15 +85,14 @@ func (v *lessonView) start(c *core, mode course.Mode) tea.Cmd {
 		}
 		return nil
 	}
-	if !l.Graded() {
-		if l.Written || l.Detail != "" || l.URL != "" {
-			c.say("Nothing to run here — press space when you've done it")
-		} else {
-			c.say("This lesson isn't written yet")
-		}
+	switch err := v.app.BeginRun(l); {
+	case errors.Is(err, app.ErrManualStep):
+		c.say("Nothing to run here — press space when you've done it")
 		return nil
-	}
-	if err := v.app.Start(l); err != nil {
+	case errors.Is(err, app.ErrUnwritten):
+		c.say("This lesson isn't written yet")
+		return nil
+	case err != nil:
 		c.fail(err)
 		return nil
 	}
@@ -102,10 +102,7 @@ func (v *lessonView) start(c *core, mode course.Mode) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
-		if _, err := app.PrepareWorkspace(dir, engine, l); err != nil {
-			return lessonRunMsg{id: l.ID, mode: mode, err: err}
-		}
-		res, err := engine.Run(ctx, l, mode)
+		res, err := app.Execute(ctx, dir, engine, l, mode)
 		return lessonRunMsg{id: l.ID, mode: mode, res: res, err: err}
 	}
 }
@@ -197,7 +194,7 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 		}
 		return nil, true
 	case "v":
-		if !l.Graded() || l.Meta.Check != "" {
+		if !l.HasCode() {
 			return nil, true
 		}
 		if v.showSol {
@@ -208,7 +205,7 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 		v.onYes = func() tea.Cmd { v.showSol, v.jump = true, "Solution"; return nil }
 		return nil, true
 	case "R":
-		if !l.Graded() || l.Meta.Check != "" {
+		if !l.HasCode() {
 			return nil, true
 		}
 		v.confirm = "Reset to the starter code? Your files are moved to .local/reset-backup/ (y/N)"
@@ -224,7 +221,7 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 		}
 		return nil, true
 	case "e":
-		if !l.Graded() || l.Meta.Check != "" || len(l.Meta.Files) == 0 {
+		if !l.HasCode() {
 			return nil, true
 		}
 		dir, err := v.app.Touch(l)
@@ -335,7 +332,7 @@ func (v *lessonView) bodyLines(w int) []string {
 	if ch := l.Chapter; ch != nil {
 		add(trunc(sDim.Render(ch.Number+" "+ch.Title+" ")+chapterDots(v.app, ch, l.ID), w))
 	}
-	if l.Graded() && l.Meta.Check == "" {
+	if l.HasCode() {
 		add(trunc(sDim.Render("▸ "+tildePath(v.workPath())+"/"+strings.Join(l.Meta.Files, ", ")), w))
 	}
 	add("")
@@ -525,7 +522,7 @@ func (v *lessonView) hints(c *core) string {
 	if v.done() && l.UnderTheHood() != "" {
 		keys = append(keys, [2]string{"u", "hood"})
 	}
-	if l.Meta.Check == "" {
+	if l.HasCode() {
 		keys = append(keys, [2]string{"e", "edit"}, [2]string{"v", "solution"})
 	}
 	keys = append(keys, [2]string{"[/]", "prev/next"}, [2]string{"q", ""})

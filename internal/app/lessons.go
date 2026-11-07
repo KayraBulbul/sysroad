@@ -73,6 +73,59 @@ func PrepareWorkspace(dir string, e *course.Engine, l *course.Lesson) (string, e
 	return e.Ensure(l)
 }
 
+// Why a lesson can't be run: front ends word these for their own keys.
+var (
+	ErrManualStep = errors.New("nothing to run here — mark it done when you've done it")
+	ErrUnwritten  = errors.New("this lesson isn't written yet")
+)
+
+// Runnable reports whether Run/Submit applies to a lesson.
+func Runnable(l *course.Lesson) error {
+	switch {
+	case l.Graded():
+		return nil
+	case l.Written || l.Detail != "" || l.URL != "":
+		return ErrManualStep
+	default:
+		return ErrUnwritten
+	}
+}
+
+// BeginRun checks a lesson can be run and marks it in progress. Follow it
+// with Execute off the main thread, then Record.
+func (a *App) BeginRun(l *course.Lesson) error {
+	if err := Runnable(l); err != nil {
+		return err
+	}
+	return a.Start(l)
+}
+
+// Execute prepares the lesson's workspace and runs it. Like
+// PrepareWorkspace it doesn't touch App state, so it's safe to call from a
+// background goroutine while the front end keeps using the App.
+func Execute(ctx context.Context, dir string, e *course.Engine, l *course.Lesson, mode course.Mode) (*course.Result, error) {
+	if _, err := PrepareWorkspace(dir, e, l); err != nil {
+		return nil, err
+	}
+	return e.Run(ctx, l, mode)
+}
+
+// ToggleStatus sets a step's status, or puts it back to todo if it already
+// has it. Finishing a step stops its timer.
+func (a *App) ToggleStatus(id string, s store.Status) error {
+	if a.Progress.StatusOf(id) == s {
+		s = store.Todo
+	}
+	if s == store.Done {
+		if t := a.Timer; t != nil && t.ID == id {
+			if _, err := a.StopTimer(); err != nil {
+				return err
+			}
+		}
+	}
+	return a.SetStatus(id, s)
+}
+
 // Start marks a todo lesson in progress.
 func (a *App) Start(l *course.Lesson) error {
 	if a.Progress.StatusOf(l.ID) == store.Todo {
