@@ -224,3 +224,42 @@ export interface Theme {
     "mode": string;
     "colors": { [_ in string]?: string } | null;
 }
+
+/**
+ * UpdateInfo is the update state the top bar shows.
+ */
+export interface UpdateInfo {
+    /**
+     * installed with `make app`, so it can update itself
+     */
+    "managed": boolean;
+    "src": string;
+    "branch": string;
+
+    /**
+     * short commit this binary was built from
+     */
+    "running": string;
+
+    /**
+     * commits on the branch it doesn't have
+     */
+    "behind": number;
+
+    /**
+     * their subjects, newest first
+     */
+    "commits": string[] | null;
+    "checked": string;
+
+    /**
+     * idle, checking, building, ready, failed
+     */
+    "state": string;
+    "error": string;
+
+    /**
+     * the build's last lines
+     */
+    "log": string[] | null;
+}

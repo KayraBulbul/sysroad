@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=sysroad
+GenericName=Systems programming course
+Comment=Learn systems programming in C++, one lesson at a time
+Exec=sysroad-gui
+Icon=sysroad
+Terminal=false
+Categories=Education;ComputerScience;
+Keywords=c++;cpp;course;learn;systems;programming;
+StartupWMClass=sysroad
+StartupNotify=true

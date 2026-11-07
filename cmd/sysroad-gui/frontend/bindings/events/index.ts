@@ -28,3 +28,8 @@ export const Result = "result";
  */
 export const Theme = "theme";
 
+/**
+ * Name of the custom event "update".
+ */
+export const Update = "update";
+

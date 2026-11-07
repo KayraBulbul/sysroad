@@ -13,6 +13,7 @@ import type {
   PhaseDTO,
   ChapterDTO,
   LessonRow,
+  UpdateInfo,
 } from "../../bindings/github.com/KayraBulbul/sysroad/internal/gui/models";
 import type { Result } from "../../bindings/github.com/KayraBulbul/sysroad/internal/course/models";
 import { Mode } from "../../bindings/github.com/KayraBulbul/sysroad/internal/course/models";
@@ -30,6 +31,7 @@ export type {
   PhaseDTO,
   ChapterDTO,
   LessonRow,
+  UpdateInfo,
   Result,
 };
 

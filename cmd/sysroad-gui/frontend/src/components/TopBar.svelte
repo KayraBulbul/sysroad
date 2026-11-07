@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ui, go, where, phase } from "../lib/state.svelte";
   import { Service } from "../lib/api";
+  import UpdateButton from "./UpdateButton.svelte";
 
   const isMac = navigator.userAgent.includes("Mac");
 
@@ -60,6 +61,7 @@
   </nav>
 
   <div class="right">
+    <UpdateButton />
     {#if syncLabel.text}
       <button class="sync {syncLabel.cls}" title={ui.snap?.sync?.error || "Sync now"} onclick={() => Service.SyncNow()}>
         <span class="dot"></span>{syncLabel.text}

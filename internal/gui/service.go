@@ -44,6 +44,8 @@ type Service struct {
 	themeDir   string
 	theme      Theme
 	files      *fileWatcher
+	updates    *updater
+	quit       func()
 	stop       chan struct{}
 	stopOnce   sync.Once
 	syncStatus string // last sync error, for the UI
@@ -71,8 +73,14 @@ func New(a *app.App, emit func(string, any), openURL func(string) error) *Servic
 	s.latestID, s.latestAt = a.Engine.Latest()
 	s.theme = LoadTheme(s.themeDir)
 	s.files = newFileWatcher(a.Engine, func(ev FileEvent) { s.emit(EvFile, ev) })
+	s.updates = newUpdater(UpdateSrc(), func(i UpdateInfo) { s.emit(EvUpdate, i) })
+	s.quit = func() {}
 	return s
 }
+
+// OnQuit sets how RestartToUpdate quits the app. (A function, not a method,
+// so the frontend bindings don't include it.)
+func OnQuit(s *Service, quit func()) { s.quit = quit }
 
 // Start begins the background work: the first sync, the once-a-second
 // reload/sync tick and the theme watcher. Start and Stop are functions, not
@@ -93,6 +101,7 @@ func Start(s *Service) {
 		go s.runSync()
 	}
 	go s.loop()
+	go s.checkUpdatesLoop()
 }
 
 // Stop ends the background work. A sync in flight is left to finish.

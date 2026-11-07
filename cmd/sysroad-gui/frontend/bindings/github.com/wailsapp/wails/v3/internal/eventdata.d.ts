@@ -16,6 +16,7 @@ declare module "@wailsio/runtime" {
             "nav": number;
             "result": gui$0.ResultEvent;
             "theme": gui$0.Theme;
+            "update": gui$0.UpdateInfo;
         }
     }
 }
