@@ -97,8 +97,15 @@
     font-size: 12.5px;
     --wails-draggable: drag;
   }
+  /* --lights-y and --lights-x come from the Mac app (fitTitleBar): the
+     traffic lights' centre and right edge. Twice the centre centres them. */
   .bar.mac {
-    padding-left: 84px;
+    height: calc(2 * var(--lights-y, 20px));
+    padding-left: calc(var(--lights-x, 70px) + 16px);
+  }
+  :global(html.fullscreen) .bar.mac {
+    height: 40px;
+    padding-left: 14px;
   }
   .bar button,
   .bar .lvl {
