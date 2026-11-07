@@ -21,10 +21,11 @@ import (
 // content the editor started from, so a save can tell whether the file
 // changed underneath it (the other machine syncing, or an edit in nvim).
 type File struct {
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	Hash    string `json:"hash"`
-	OnDisk  bool   `json:"onDisk"` // false: starter code, the folder isn't made yet
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	Hash     string `json:"hash"`
+	OnDisk   bool   `json:"onDisk"`   // false: starter code, the folder isn't made yet
+	ReadOnly bool   `json:"readOnly"` // a file the lesson gives you, like its header
 }
 
 // FileEvent reports a lesson file that changed on disk.
@@ -57,7 +58,8 @@ func (s *Service) editable(id, name string) (*course.Lesson, error) {
 	return l, nil
 }
 
-// OpenFiles returns the files you edit in a lesson. A lesson you haven't
+// OpenFiles returns the files you edit in a lesson, then the starter's other
+// files (headers it shares with the tests) read-only. A lesson you haven't
 // started yet shows its starter code; the folder is made on the first save or
 // run, so browsing doesn't litter the data repo.
 func (s *Service) OpenFiles(id string) ([]File, error) {
@@ -76,9 +78,9 @@ func (s *Service) OpenFiles(id string) ([]File, error) {
 	}
 	work := s.app.Engine.WorkDir(l)
 	var out []File
-	for _, name := range l.Meta.Files {
-		f := File{Name: name}
-		if data, err := os.ReadFile(filepath.Join(work, name)); err == nil {
+	for _, name := range l.SortedNames(starter) {
+		f := File{Name: name, ReadOnly: !slices.Contains(l.Meta.Files, name)}
+		if data, err := os.ReadFile(filepath.Join(work, filepath.FromSlash(name))); err == nil {
 			f.Content, f.Hash, f.OnDisk = string(data), hashOf(data), true
 		} else {
 			f.Content, f.Hash = string(starter[name]), hashOf(starter[name])

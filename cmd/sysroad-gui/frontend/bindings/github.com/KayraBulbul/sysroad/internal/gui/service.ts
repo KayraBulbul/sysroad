@@ -58,7 +58,8 @@ export function Lesson(id: string): $CancellablePromise<$models.LessonDetail | n
 }
 
 /**
- * OpenFiles returns the files you edit in a lesson. A lesson you haven't
+ * OpenFiles returns the files you edit in a lesson, then the starter's other
+ * files (headers it shares with the tests) read-only. A lesson you haven't
  * started yet shows its starter code; the folder is made on the first save or
  * run, so browsing doesn't litter the data repo.
  */

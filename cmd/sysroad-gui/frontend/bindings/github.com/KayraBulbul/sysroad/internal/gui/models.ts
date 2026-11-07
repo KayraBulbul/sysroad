@@ -37,6 +37,11 @@ export interface File {
      * false: starter code, the folder isn't made yet
      */
     "onDisk": boolean;
+
+    /**
+     * a file the lesson gives you, like its header
+     */
+    "readOnly": boolean;
 }
 
 /**
@@ -52,6 +57,11 @@ export interface FileEvent {
      * false: starter code, the folder isn't made yet
      */
     "onDisk": boolean;
+
+    /**
+     * a file the lesson gives you, like its header
+     */
+    "readOnly": boolean;
 }
 
 /**
