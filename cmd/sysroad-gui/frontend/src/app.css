@@ -1,0 +1,230 @@
+@font-face {
+  font-family: "Obel Mono";
+  src: url("/fonts/ObelMono-wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Obel Mono";
+  src: url("/fonts/ObelMono-Italic-wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: block;
+}
+
+/*
+ * The palette comes from the Omarchy theme (colors.toml) as --c-<key>
+ * variables, set by theme.ts. Everything below derives from those, so a theme
+ * switch is one style recalculation. Keys a theme may lack fall back to ones
+ * every theme has.
+ */
+:root {
+  --bg: var(--c-background, #19191d);
+  --bg-dark: var(--c-dark_background, color-mix(in oklab, var(--bg) 82%, black));
+  --bg-darker: var(--c-darker_background, color-mix(in oklab, var(--bg) 70%, black));
+  --bg-light: var(--c-lighter_background, color-mix(in oklab, var(--bg) 88%, var(--fg)));
+  --fg: var(--c-foreground, #c5bdb6);
+  --fg-dim: var(--c-dark_foreground, color-mix(in oklab, var(--fg) 62%, var(--bg)));
+  --fg-soft: var(--c-light_foreground, color-mix(in oklab, var(--fg) 85%, var(--bg)));
+  --fg-bright: var(--c-bright_foreground, var(--fg));
+  --muted: var(--c-muted, var(--fg-dim));
+  --accent: var(--c-accent, var(--c-blue, #c65d2e));
+  --selection: var(--c-selection, color-mix(in oklab, var(--accent) 30%, var(--bg)));
+
+  --red: var(--c-red, #b77779);
+  --green: var(--c-green, #8e9989);
+  --yellow: var(--c-yellow, #b99369);
+  --blue: var(--c-blue, #8d94aa);
+  --magenta: var(--c-magenta, #a28a9c);
+  --cyan: var(--c-cyan, #8d9fa0);
+  --orange: var(--c-orange, var(--yellow));
+  --brown: var(--c-brown, var(--red));
+  --bright-red: var(--c-bright_red, var(--red));
+  --bright-green: var(--c-bright_green, var(--green));
+  --bright-yellow: var(--c-bright_yellow, var(--yellow));
+  --bright-blue: var(--c-bright_blue, var(--blue));
+  --bright-magenta: var(--c-bright_magenta, var(--magenta));
+  --bright-cyan: var(--c-bright_cyan, var(--cyan));
+
+  --line: color-mix(in oklab, var(--fg) 11%, var(--bg));
+  --line-strong: color-mix(in oklab, var(--fg) 20%, var(--bg));
+  --panel: color-mix(in oklab, var(--bg) 55%, var(--bg-dark));
+  --hover: color-mix(in oklab, var(--fg) 6%, transparent);
+  --accent-soft: color-mix(in oklab, var(--accent) 16%, transparent);
+  --accent-fg: var(--bg-darker);
+
+  --font: "Obel Mono", ui-monospace, monospace;
+  --radius: 6px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  color-scheme: dark;
+}
+:root[data-mode="light"] {
+  color-scheme: light;
+  --accent-fg: var(--bg);
+  --panel: color-mix(in oklab, var(--bg) 70%, var(--bg-dark));
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  font-variant-ligatures: none;
+}
+#app {
+  height: 100%;
+}
+::selection {
+  background: var(--selection);
+}
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+kbd {
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg-dim);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 16px;
+  display: inline-block;
+}
+
+/* Scrollbars: thin and quiet. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--fg) 14%, transparent);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--fg) 26%, transparent);
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Buttons used across views. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  color: var(--fg-soft);
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--fg-bright);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.btn.primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 88%, var(--fg-bright));
+  color: var(--accent-fg);
+}
+.btn.ghost {
+  border-color: transparent;
+}
+.btn .k {
+  font-size: 11px;
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+/* Syntax colours, shared by the editor and code in lessons. */
+.tok-keyword,
+.tok-modifier,
+.tok-controlKeyword {
+  color: var(--magenta);
+}
+.tok-typeName,
+.tok-className,
+.tok-namespace {
+  color: var(--yellow);
+}
+.tok-function {
+  color: var(--blue);
+}
+.tok-string,
+.tok-character {
+  color: var(--green);
+}
+.tok-string2,
+.tok-escape {
+  color: var(--bright-green);
+}
+.tok-number,
+.tok-bool,
+.tok-atom {
+  color: var(--orange);
+}
+.tok-comment {
+  color: var(--muted);
+  font-style: italic;
+}
+.tok-meta,
+.tok-macroName {
+  color: var(--red);
+}
+.tok-operator {
+  color: var(--cyan);
+}
+.tok-punctuation {
+  color: var(--fg-soft);
+}
+.tok-propertyName {
+  color: var(--fg-bright);
+}
+.tok-definition {
+  color: var(--bright-blue);
+}
+.tok-invalid {
+  color: var(--bright-red);
+}

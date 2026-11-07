@@ -96,8 +96,8 @@ type Meta struct {
 }
 
 type Link struct {
-	Title string `yaml:"title"`
-	URL   string `yaml:"url"`
+	Title string `yaml:"title" json:"title"`
+	URL   string `yaml:"url" json:"url"`
 }
 
 // Sample is how Run invokes your program to show what it prints.
@@ -124,6 +124,10 @@ type Check struct {
 func (l *Lesson) Graded() bool {
 	return l.Written && (l.Meta.Check != "" || len(l.Meta.Files) > 0)
 }
+
+// HasCode reports whether the lesson has code you write in its work folder,
+// so editing, Reset and the solution apply (built-in checks have none).
+func (l *Lesson) HasCode() bool { return l.Graded() && l.Meta.Check == "" && len(l.Meta.Files) > 0 }
 
 func (l *Lesson) dir() string { return path.Join("content/lessons", l.ID) }
 

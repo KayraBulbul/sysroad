@@ -275,7 +275,7 @@ func (m *Full) updateNormal(key tea.KeyMsg) tea.Cmd {
 		}
 		m.fail(openURL(url))
 	case "s":
-		if !m.hasRepo {
+		if !m.sync.HasRepo {
 			m.say("Data dir isn't a git repo — see `sysroad init --help`")
 		}
 		return m.syncNow()
@@ -646,8 +646,8 @@ func (m *Full) footer() string {
 			st = sErr
 		}
 		s = " " + st.Render(m.flash)
-	case m.syncErr != nil && m.flash == "":
-		s = " " + sErr.Render("sync: "+m.syncErr.Error())
+	case m.sync.Err != nil && m.flash == "":
+		s = " " + sErr.Render("sync: "+m.sync.Err.Error())
 	case m.detailLesson() != nil:
 		s = m.lv.hints(&m.core)
 	case m.mode == modeDetail:
