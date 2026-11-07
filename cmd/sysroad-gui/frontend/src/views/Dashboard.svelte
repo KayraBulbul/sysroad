@@ -95,7 +95,7 @@
                   {#if p.total > 0}
                     <span class="count">{p.done}/{p.total}</span>
                   {:else}
-                    <span class="count">{p.lessons} lessons · soon</span>
+                    <span class="count">{p.lessons ? `${p.lessons} lessons · soon` : "soon"}</span>
                   {/if}
                 </span>
                 {#if p.summary}<span class="sum">{p.summary}</span>{/if}

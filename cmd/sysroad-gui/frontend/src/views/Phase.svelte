@@ -34,7 +34,7 @@
         {#if p.summary}<p class="sum">{p.summary}</p>{/if}
         <div class="prog">
           <span class="track"><span class="fill" style="width:{frac * 100}%"></span></span>
-          <span class="meta">{p.total > 0 ? `${p.done}/${p.total}` : `${p.lessons} lessons · soon`}</span>
+          <span class="meta">{p.total > 0 ? `${p.done}/${p.total}` : p.lessons ? `${p.lessons} lessons · soon` : "soon"}</span>
         </div>
       </header>
 
