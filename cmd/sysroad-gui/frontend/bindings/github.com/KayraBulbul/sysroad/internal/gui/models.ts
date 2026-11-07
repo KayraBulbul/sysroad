@@ -100,6 +100,11 @@ export interface LessonDetail {
     "files": string[] | null;
     "workDir": string;
     "result": course$0.Result | null;
+
+    /**
+     * quiz lessons only
+     */
+    "quiz": app$0.Quiz | null;
     "prev": string;
     "next": string;
 }

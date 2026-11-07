@@ -6,5 +6,8 @@ export {
 } from "./models.js";
 
 export type {
-    Outcome
+    AnswerResult,
+    Outcome,
+    Quiz,
+    QuizItem
 } from "./models.js";

@@ -80,7 +80,7 @@ func (m *Side) updateLesson(l *course.Lesson, key tea.KeyMsg) tea.Cmd {
 			return nil
 		case " ":
 			if l.Graded() {
-				m.say("Submit (s) completes a lesson")
+				m.say("%s", completeHow(l))
 			} else {
 				m.toggleStatus(l.ID, store.Done)
 			}

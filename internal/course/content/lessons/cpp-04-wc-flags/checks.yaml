@@ -1,0 +1,23 @@
+- name: no flags
+  stdin: "hello world\n"
+  stdout: "      1       2      12\n"
+- name: -l
+  args: ["-l"]
+  stdin: "one two\nthree\n"
+  stdout: "      2\n"
+- name: bundled -lw
+  args: ["-lw"]
+  stdin: "one two\nthree\n"
+  stdout: "      2       3\n"
+  hidden: true
+- name: -c -w, any order
+  args: ["-c", "-w"]
+  stdin: "one two\nthree\n"
+  stdout: "      3      14\n"
+  hidden: true
+- name: a bad flag
+  args: ["-z"]
+  stdin: ""
+  stdout: ""
+  exit: 1
+  hidden: true

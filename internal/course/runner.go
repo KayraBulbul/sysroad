@@ -261,6 +261,9 @@ func (e *Engine) Run(ctx context.Context, l *Lesson, mode Mode) (*Result, error)
 	if !l.Written {
 		return nil, fmt.Errorf("%q isn't written yet", l.Title)
 	}
+	if l.IsQuiz() {
+		return nil, fmt.Errorf("%q is a quiz: answer its questions instead", l.Title)
+	}
 	var r *Result
 	var err error
 	if l.Meta.Check != "" {

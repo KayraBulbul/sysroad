@@ -198,7 +198,7 @@ func (m *Full) updateNormal(key tea.KeyMsg) tea.Cmd {
 	case " ":
 		if m.focus == paneSteps && m.step() != nil {
 			if l := m.app.Lesson(m.step().ID); l != nil && l.Graded() {
-				m.say("Submit completes a lesson — enter to open it, then s")
+				m.say("%s — enter to open it", completeHow(l))
 				return nil
 			}
 			m.toggleStatus(m.step().ID, store.Done)
@@ -468,7 +468,7 @@ func (m *Full) updateDetail(key tea.KeyMsg) tea.Cmd {
 				return nil
 			case " ":
 				if l.Graded() {
-					m.say("Submit (s) completes a lesson")
+					m.say("%s", completeHow(l))
 					return nil
 				}
 			}

@@ -51,7 +51,7 @@ func TestLessonsSolutionsPassStartersFail(t *testing.T) {
 	}
 	cache := t.TempDir()
 	for _, l := range c.Lessons() {
-		if !l.Graded() || l.Meta.Check != "" {
+		if !l.HasCode() {
 			continue
 		}
 		t.Run(l.ID, func(t *testing.T) {

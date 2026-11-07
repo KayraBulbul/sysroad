@@ -14,11 +14,21 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as app$0 from "../app/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as course$0 from "../course/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
+
+/**
+ * AnswerQuiz picks option `pick` (from 0) for quiz question `q` (from 0).
+ */
+export function AnswerQuiz(id: string, q: number, pick: number): $CancellablePromise<app$0.AnswerResult | null> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.AnswerQuiz", id, q, pick);
+}
 
 /**
  * CheckUpdates looks for new commits now.
@@ -70,6 +80,13 @@ export function Prefs(): $CancellablePromise<$models.Prefs> {
  */
 export function Reset(id: string): $CancellablePromise<[string, $models.File[] | null]> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.Reset", id);
+}
+
+/**
+ * ResetQuiz clears a quiz's answers so it can be taken again.
+ */
+export function ResetQuiz(id: string): $CancellablePromise<app$0.Quiz | null> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.ResetQuiz", id);
 }
 
 /**
