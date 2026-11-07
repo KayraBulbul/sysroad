@@ -74,6 +74,7 @@ func TestSaveFileNeverClobbersDiskChanges(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("OpenFiles: %v %v", files, err)
 	}
+	s.Watch(id)
 	if files[0].OnDisk {
 		t.Fatal("an unstarted lesson shouldn't have a folder yet")
 	}
@@ -153,5 +154,31 @@ func TestFormatKeepsCourseCode(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no lesson files checked")
+	}
+}
+
+// A run that fails (here: the work folder can't be made) must report why,
+// not "stopped", which the UI shows as a cancelled run and stays quiet about.
+func TestRunReportsFailures(t *testing.T) {
+	dir := t.TempDir()
+	if err := app.Seed(dir); err != nil {
+		t.Fatal(err)
+	}
+	a, err := app.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(a, func(string, any) {}, func(string) error { return nil })
+	defer Stop(s)
+	// work/ is a file, so the lesson folder can't be created.
+	if err := os.WriteFile(filepath.Join(dir, "work"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Run("cpp-01-echo", "run")
+	if err == nil {
+		t.Fatal("run succeeded without a work folder")
+	}
+	if err.Error() == "stopped" {
+		t.Fatal("a failed run was reported as stopped")
 	}
 }

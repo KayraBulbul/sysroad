@@ -176,6 +176,7 @@ export class Workspace {
   loading = $state(false);
 
   private bufs = new Map<string, Buffer>();
+  private openGen = 0; // bumps on every open(), so a superseded one gives up
   private vimConf = new Compartment();
   private actions: Actions | null = null;
   private onError: (msg: string) => void = () => {};
@@ -189,7 +190,14 @@ export class Workspace {
     this.onError = onError;
     this.vimMode = vimOn;
     this.view = new EditorView({ parent, state: EditorState.create({ doc: "", extensions: this.extensions(true) }) });
+    if (this.pending) {
+      const l = this.pending;
+      this.pending = "";
+      this.open(l);
+    }
   }
+
+  private pending = ""; // a lesson opened before the editor was mounted
 
   destroy() {
     this.view?.destroy();
@@ -297,8 +305,10 @@ export class Workspace {
     " ": "palette",
   };
 
-  // handleLeader takes a keydown in the editor; true means it was ours.
-  handleLeader(e: KeyboardEvent): boolean {
+  // handleLeader takes a keydown; true means it was ours. In the editor the
+  // leader only starts in vim's normal mode; outside it (inEditor false)
+  // Space always starts it.
+  handleLeader(e: KeyboardEvent, inEditor = true): boolean {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     if (this.leaderPending) {
       if (["Shift", "CapsLock"].includes(e.key)) return true;
@@ -314,7 +324,7 @@ export class Workspace {
       if (name) this.actions?.[name]();
       return true; // an unknown key after the leader is dropped, as in vim
     }
-    if (e.key !== " " || e.shiftKey || !this.vimIdle()) return false;
+    if (e.key !== " " || e.shiftKey || (inEditor && !this.vimIdle())) return false;
     this.leaderPending = true;
     this.leaderBuf = "";
     this.armLeader();
@@ -359,28 +369,32 @@ export class Workspace {
     return EditorState.create({ doc, extensions: this.extensions(readOnly, extra) });
   }
 
-  // open shows a lesson's files, fetching them from Go. Buffers you already
-  // had stay as they were (history and cursor included) unless the disk
-  // moved on while the buffer was clean.
+  // open shows a lesson's files. It switches at once: buffers you already
+  // had for the lesson show straight away (history and cursor included) and
+  // the old lesson's pending saves finish in the background. Then it fetches
+  // the files from Go and reconciles, unless another open() came after it,
+  // so quick <leader>n/p presses always end on the last lesson.
   async open(lesson: string) {
-    if (!this.view) return;
+    if (!this.view) {
+      this.pending = lesson;
+      return;
+    }
+    const gen = ++this.openGen;
     if (lesson !== this.lesson) {
-      await this.flush();
+      void this.flushLesson(this.lesson);
       this.lesson = lesson;
-      this.tabs = [];
-      this.active = 0;
-      this.view.setState(this.newState("", true));
+      this.showCached(lesson);
     }
     this.loading = true;
     let files: File[] = [];
     try {
       files = (await Service.OpenFiles(lesson)) ?? [];
     } catch (e) {
-      this.onError(errText(e));
-    } finally {
-      this.loading = false;
+      if (gen === this.openGen) this.onError(errText(e));
     }
-    if (this.lesson !== lesson) return; // moved on meanwhile
+    if (gen !== this.openGen) return; // moved on meanwhile
+    this.loading = false;
+    Service.Watch(lesson).catch(() => {});
     const tabs: Tab[] = [];
     for (const f of files) {
       const key = `${lesson}/${f.name}`;
@@ -397,6 +411,23 @@ export class Workspace {
     for (const t of this.tabs) if (t.kind !== "file" && this.bufs.has(t.key)) tabs.push(t);
     this.tabs = tabs;
     this.select(Math.min(this.active, Math.max(tabs.length - 1, 0)));
+  }
+
+  // showCached shows the buffers already open for a lesson, or an empty
+  // editor, without waiting for Go.
+  private showCached(lesson: string) {
+    const tabs: Tab[] = [];
+    for (const b of this.bufs.values()) {
+      if (b.lesson === lesson && !b.readOnly) tabs.push({ key: b.key, name: b.name, kind: "file", dirty: b.dirty, conflict: !!b.conflict });
+    }
+    this.tabs = tabs;
+    this.active = 0;
+    if (tabs.length) {
+      this.active = -1;
+      this.select(0);
+    } else {
+      this.view?.setState(this.newState("", true));
+    }
   }
 
   select(i: number) {
@@ -504,10 +535,14 @@ export class Workspace {
   }
 
   // flush saves every pending change in the open lesson (before a run).
-  async flush() {
+  flush() {
+    return this.flushLesson(this.lesson);
+  }
+
+  private async flushLesson(lesson: string) {
     const pending: Promise<void>[] = [];
     for (const b of this.bufs.values()) {
-      if (b.lesson === this.lesson && !b.readOnly && (b.dirty || b.saving)) pending.push(this.save(b));
+      if (b.lesson === lesson && !b.readOnly && (b.dirty || b.saving)) pending.push(this.save(b));
     }
     await Promise.all(pending);
   }

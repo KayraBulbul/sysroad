@@ -85,7 +85,8 @@
     }
     const t = e.target as HTMLElement;
     if (t.closest?.(".cm-editor, input, textarea")) return;
-    if (e.key === " " && !mod && !e.shiftKey) {
+    // In a lesson, Space is the leader and <space><space> the palette.
+    if (e.key === " " && !mod && !e.shiftKey && ui.route.view !== "lesson") {
       const now = performance.now();
       if (now - lastSpace < 450) {
         e.preventDefault();
@@ -94,7 +95,6 @@
         return;
       }
       lastSpace = now;
-      if (ui.route.view === "lesson") e.preventDefault();
       return;
     }
     if (e.key === "Escape" && ui.route.view !== "lesson") {

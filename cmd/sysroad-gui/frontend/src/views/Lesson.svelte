@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { Service, Mode, errText, type Result } from "../lib/api";
   import { ui, loadLesson, openLesson, refresh, toast, fail, ask, pref, savePref, up, where } from "../lib/state.svelte";
   import { workspace, type Actions } from "../lib/editor.svelte";
@@ -35,16 +35,23 @@
   const running = $derived(mine || (ui.snap?.running?.lesson === id ? (ui.snap.running.mode as string) : ""));
   const since = $derived(mine ? mineSince : ui.snap?.running ? new Date(ui.snap.running.since).getTime() : 0);
 
-  // Switching lessons: load the files and the latest result.
+  // Switching lessons: show its files at once, without waiting for the
+  // lesson text to load.
   let shown = "";
   $effect(() => {
-    const dd = d;
-    if (!dd || dd.id === shown) return;
-    shown = dd.id;
-    showUTH = false;
-    solDiff = false;
-    if (dd.hasCode) workspace.open(dd.id);
-    lessonEl?.scrollTo({ top: 0 });
+    const lid = id;
+    untrack(() => {
+      if (lid === shown) return;
+      shown = lid;
+      showUTH = false;
+      solDiff = false;
+      workspace.open(lid);
+      lessonEl?.scrollTo({ top: 0 });
+    });
+  });
+  // Load the neighbours ahead, so <leader>n/p and [ ] land on a ready page.
+  $effect(() => {
+    for (const n of [d?.next, d?.prev]) if (n && !ui.lessons[n]) untrack(() => loadLesson(n));
   });
   $effect(() => {
     // Keep the shown result in step with the lesson's saved one.
@@ -245,7 +252,9 @@
   // handled in the capture phase, before CodeMirror sees them.
   function keyCapture(e: KeyboardEvent) {
     if (!active || ui.palette || ui.confirm) return;
-    if (inEditor(e.target) && workspace.handleLeader(e)) {
+    const t = e.target as HTMLElement;
+    const typing = !!t.closest?.("input, textarea") && !inEditor(t);
+    if (!typing && workspace.handleLeader(e, inEditor(t))) {
       e.preventDefault();
       e.stopPropagation();
       return;

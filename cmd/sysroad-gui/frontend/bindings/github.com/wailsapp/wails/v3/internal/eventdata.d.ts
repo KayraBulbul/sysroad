@@ -13,6 +13,7 @@ declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
             "file": gui$0.FileEvent;
+            "nav": number;
             "result": gui$0.ResultEvent;
             "theme": gui$0.Theme;
         }
