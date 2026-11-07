@@ -200,6 +200,15 @@
     savePref("lessonCollapsed", collapsed);
   }
 
+  async function format() {
+    try {
+      const r = await workspace.format();
+      if (r === "unchanged") toast("Already formatted");
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   const actions: Actions = {
     run: () => run(Mode.ModeRun),
     submit: () => run(Mode.ModeSubmit),
@@ -207,6 +216,7 @@
     solution,
     reset,
     uth,
+    format,
     next,
     prev,
     focusLesson,
@@ -320,7 +330,7 @@
           <button class="tool" class:on={solDiff} onclick={() => openSolution(!solDiff)} title="Show the solution's changes against your code">diff</button>
           <button class="tool" onclick={() => workspace.hideSolution()} title="Close the solution">close solution</button>
         {/if}
-        {#if workspace.leaderPending}<span class="leader">␣ r run · s submit · h hint · v solution · n/p next/prev</span>{/if}
+        {#if workspace.leaderPending}<span class="leader">␣ r run · s submit · h hint · cf format · v solution · n/p next/prev</span>{/if}
         <button class="tool" class:on={workspace.vimMode} onclick={toggleVim} title="Vim mode">vim</button>
       </div>
       {#if workspace.tabs[workspace.active]?.conflict}

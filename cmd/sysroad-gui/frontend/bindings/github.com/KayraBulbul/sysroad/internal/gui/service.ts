@@ -21,6 +21,15 @@ import * as course$0 from "../course/models.js";
 import * as $models from "./models.js";
 
 /**
+ * Format runs clang-format over a lesson file's content (the editor's, which
+ * may not be saved yet) and returns the result. A .clang-format in the lesson
+ * folder or above it, e.g. in the data folder, wins over the course style.
+ */
+export function Format(id: string, name: string, content: string): $CancellablePromise<string> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.Format", id, name, content);
+}
+
+/**
  * LastResult is a lesson's newest saved result, from any process.
  */
 export function LastResult(id: string): $CancellablePromise<course$0.Result | null> {

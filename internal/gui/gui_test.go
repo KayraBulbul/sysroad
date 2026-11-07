@@ -2,6 +2,7 @@ package gui
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -111,5 +112,46 @@ func TestSaveFileNeverClobbersDiskChanges(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(path); string(b) != "// from nvim\n" {
 		t.Fatalf("file was overwritten: %q", b)
+	}
+}
+
+// <leader>cf on code written in the course's style must be a no-op, or every
+// format would churn the lesson files (and the synced work/ folder).
+func TestFormatKeepsCourseCode(t *testing.T) {
+	if _, err := exec.LookPath("clang-format"); err != nil {
+		t.Skip("clang-format not installed")
+	}
+	dir := t.TempDir()
+	if err := app.Seed(dir); err != nil {
+		t.Fatal(err)
+	}
+	a, err := app.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(a, func(string, any) {}, func(string) error { return nil })
+	defer Stop(s)
+	checked := 0
+	for _, l := range a.Course.Lessons() {
+		if !l.HasCode() {
+			continue
+		}
+		sol, err := l.Solution()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range l.Meta.Files {
+			got, err := s.Format(l.ID, name, string(sol[name]))
+			if err != nil {
+				t.Fatalf("%s/%s: %v", l.ID, name, err)
+			}
+			if got != string(sol[name]) {
+				t.Errorf("%s/%s changes when formatted", l.ID, name)
+			}
+			checked++
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no lesson files checked")
 	}
 }

@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { Service, on, type Theme, type FileEvent, type ResultEvent } from "./lib/api";
   import { applyTheme } from "./lib/theme";
-  import { ui, refresh, loadPrefs, loadLesson, go, up, pref, savePref } from "./lib/state.svelte";
+  import { ui, refresh, loadPrefs, loadLesson, go, up, back, forward, pref, savePref } from "./lib/state.svelte";
   import { workspace } from "./lib/editor.svelte";
   import TopBar from "./components/TopBar.svelte";
   import Palette from "./components/Palette.svelte";
@@ -51,6 +51,16 @@
 
   let lastSpace = 0;
 
+  // The mouse's back/forward side buttons (DOM buttons 3 and 4).
+  function mouse(e: MouseEvent) {
+    if (e.button !== 3 && e.button !== 4) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type !== "mouseup" || ui.palette || ui.confirm) return;
+    if (e.button === 3) back();
+    else forward();
+  }
+
   function key(e: KeyboardEvent) {
     if (ui.confirm) return;
     const mod = e.ctrlKey || e.metaKey;
@@ -61,6 +71,12 @@
       return;
     }
     if (ui.palette) return;
+    if (e.altKey && !mod && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      if (e.key === "ArrowLeft") back();
+      else forward();
+      return;
+    }
     const t = e.target as HTMLElement;
     if (t.closest?.(".cm-editor, input, textarea")) return;
     if (e.key === " " && !mod && !e.shiftKey) {
@@ -82,7 +98,7 @@
   }
 </script>
 
-<svelte:window onkeydowncapture={key} />
+<svelte:window onkeydowncapture={key} onmousedowncapture={mouse} onmouseupcapture={mouse} onauxclickcapture={mouse} />
 
 <div class="shell">
   <TopBar />

@@ -83,12 +83,39 @@ export async function loadLesson(id: string): Promise<LessonDetail | undefined> 
 
 // ---- navigation ----
 
-export function go(r: Route) {
+// Back/forward history, for the mouse's side buttons and Alt+←/→.
+const backStack: Route[] = [];
+const fwdStack: Route[] = [];
+
+function sameRoute(a: Route, b: Route) {
+  return a.view === b.view && ("id" in a ? a.id : "") === ("id" in b ? b.id : "");
+}
+
+export function go(r: Route, record = true) {
+  if (record && !sameRoute(ui.route, r)) {
+    backStack.push($state.snapshot(ui.route) as Route);
+    if (backStack.length > 100) backStack.shift();
+    fwdStack.length = 0;
+  }
   if (r.view === "lesson") {
     if (!ui.lessons[r.id]) loadLesson(r.id);
     savePref("lastLesson", r.id);
   }
   ui.route = r;
+}
+
+export function back() {
+  const r = backStack.pop();
+  if (!r) return;
+  fwdStack.push($state.snapshot(ui.route) as Route);
+  go(r, false);
+}
+
+export function forward() {
+  const r = fwdStack.pop();
+  if (!r) return;
+  backStack.push($state.snapshot(ui.route) as Route);
+  go(r, false);
 }
 
 export function openLesson(id: string) {

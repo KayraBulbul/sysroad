@@ -54,7 +54,7 @@ func main() {
 	})
 
 	bg := svc.Theme().Colors["background"]
-	wails.Window.NewWithOptions(application.WebviewWindowOptions{
+	win := wails.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "sysroad",
 		Width:            1440,
 		Height:           900,
@@ -66,6 +66,15 @@ func main() {
 			InvisibleTitleBarHeight: 38,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
+	})
+
+	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+		application.InvokeSync(func() {
+			n := instantScroll(win.NativeWindow())
+			if n == 0 {
+				log.Println("sysroad-gui: couldn't turn off smooth scrolling")
+			}
+		})
 	})
 
 	if err := wails.Run(); err != nil {

@@ -1,4 +1,4 @@
-import { Annotation, Compartment, EditorState, type Extension, type Transaction } from "@codemirror/state";
+import { Annotation, Compartment, EditorState, Prec, type Extension, type Transaction } from "@codemirror/state";
 import {
   EditorView,
   GutterMarker,
@@ -14,13 +14,22 @@ import {
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, indentOnInput, indentUnit, syntaxHighlighting } from "@codemirror/language";
-import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import {
+  acceptCompletion,
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  closeCompletion,
+  moveCompletionSelection,
+  startCompletion,
+} from "@codemirror/autocomplete";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { unifiedMergeView } from "@codemirror/merge";
+import { diff, unifiedMergeView } from "@codemirror/merge";
 import { cpp } from "@codemirror/lang-cpp";
 import { Vim, getCM, vim } from "@replit/codemirror-vim";
 import { Service, errText, type File, type FileEvent } from "./api";
 import { highlighter } from "./highlight";
+import { lessonCompletions } from "./complete";
 
 // ---- the editor workspace ----
 //
@@ -57,6 +66,7 @@ export type Actions = {
   solution: () => void;
   reset: () => void;
   uth: () => void;
+  format: () => void;
   next: () => void;
   prev: () => void;
   focusLesson: () => void;
@@ -121,7 +131,19 @@ const theme = EditorView.theme({
   ".cm-panels-bottom": { borderTop: "1px solid var(--line)" },
   ".cm-vim-panel": { padding: "3px 12px", fontFamily: "var(--font)", fontSize: "12.5px", minHeight: "24px" },
   ".cm-vim-panel input": { fontFamily: "var(--font)", color: "var(--fg-bright)", caretColor: "var(--accent)" },
-  ".cm-tooltip": { backgroundColor: "var(--bg-dark)", border: "1px solid var(--line-strong)", color: "var(--fg)" },
+  ".cm-tooltip": { backgroundColor: "var(--bg-dark)", border: "1px solid var(--line-strong)", color: "var(--fg)", borderRadius: "6px" },
+  ".cm-tooltip.cm-tooltip-autocomplete > ul": { fontFamily: "var(--font)", fontSize: "12.5px", maxHeight: "16em", padding: "3px" },
+  ".cm-tooltip.cm-tooltip-autocomplete > ul > li": { padding: "1px 8px 1px 4px", borderRadius: "4px", lineHeight: "1.6" },
+  ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": { background: "var(--accent-soft)", color: "var(--fg-bright)" },
+  ".cm-completionLabel": { color: "var(--fg)" },
+  ".cm-completionMatchedText": { textDecoration: "none", color: "var(--accent)", fontWeight: "600" },
+  ".cm-completionIcon": { width: "1.4em", opacity: "0.9", paddingRight: "0.5em", fontSize: "11px" },
+  ".cm-completionIcon-variable": { color: "var(--blue)" },
+  ".cm-completionIcon-function": { color: "var(--magenta)" },
+  ".cm-completionIcon-type": { color: "var(--yellow)" },
+  ".cm-completionIcon-namespace": { color: "var(--cyan)" },
+  ".cm-completionIcon-keyword": { color: "var(--red)" },
+  ".cm-completionIcon-property": { color: "var(--green)" },
   ".cm-changedLine": { backgroundColor: "color-mix(in oklab, var(--green) 9%, transparent) !important" },
   ".cm-changedText": { background: "color-mix(in oklab, var(--green) 28%, transparent) !important" },
   ".cm-deletedChunk": { backgroundColor: "color-mix(in oklab, var(--red) 10%, transparent) !important" },
@@ -194,6 +216,31 @@ export class Workspace {
       crosshairCursor(),
       highlightActiveLine(),
       highlightSelectionMatches(),
+      autocompletion({
+        override: [lessonCompletions(() => this.otherStates())],
+        defaultKeymap: false,
+        icons: true,
+        maxRenderedOptions: 40,
+        activateOnTypingDelay: 0,
+      }),
+      // blink.cmp-style keys, ahead of vim and the default keymap. Each one
+      // does nothing (returns false) when no completion is open.
+      Prec.highest(
+        keymap.of([
+          { key: "Ctrl-Space", run: startCompletion },
+          { key: "Ctrl-n", run: moveCompletionSelection(true) },
+          { key: "Ctrl-p", run: moveCompletionSelection(false) },
+          { key: "ArrowDown", run: moveCompletionSelection(true) },
+          { key: "ArrowUp", run: moveCompletionSelection(false) },
+          { key: "PageDown", run: moveCompletionSelection(true, "page") },
+          { key: "PageUp", run: moveCompletionSelection(false, "page") },
+          { key: "Enter", run: acceptCompletion },
+          { key: "Ctrl-y", run: acceptCompletion },
+          { key: "Tab", run: acceptCompletion },
+          // Close the menu and still let vim leave insert mode.
+          { key: "Escape", run: (v) => (closeCompletion(v), false) },
+        ]),
+      ),
       keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
       cpp(),
       theme,
@@ -234,9 +281,11 @@ export class Workspace {
   // nothing pending, Space waits for the next key. It's handled before vim
   // sees the keys, because vim's own Space motion would win over a mapping.
   leaderPending = $state(false);
+  private leaderBuf = "";
   private leaderTimer: ReturnType<typeof setTimeout> | undefined;
 
   static leaderKeys: Record<string, keyof Actions> = {
+    cf: "format",
     r: "run",
     s: "submit",
     h: "hint",
@@ -253,17 +302,34 @@ export class Workspace {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     if (this.leaderPending) {
       if (["Shift", "CapsLock"].includes(e.key)) return true;
-      this.leaderPending = false;
-      clearTimeout(this.leaderTimer);
-      const name = Workspace.leaderKeys[e.key];
+      const seq = this.leaderBuf + e.key;
+      const keys = Object.keys(Workspace.leaderKeys);
+      if (keys.some((k) => k !== seq && k.startsWith(seq))) {
+        this.leaderBuf = seq; // a longer sequence (cf) may follow
+        this.armLeader();
+        return true;
+      }
+      this.endLeader();
+      const name = Workspace.leaderKeys[seq];
       if (name) this.actions?.[name]();
       return true; // an unknown key after the leader is dropped, as in vim
     }
     if (e.key !== " " || e.shiftKey || !this.vimIdle()) return false;
     this.leaderPending = true;
-    clearTimeout(this.leaderTimer);
-    this.leaderTimer = setTimeout(() => (this.leaderPending = false), 1500);
+    this.leaderBuf = "";
+    this.armLeader();
     return true;
+  }
+
+  private armLeader() {
+    clearTimeout(this.leaderTimer);
+    this.leaderTimer = setTimeout(() => this.endLeader(), 1500);
+  }
+
+  private endLeader() {
+    clearTimeout(this.leaderTimer);
+    this.leaderPending = false;
+    this.leaderBuf = "";
   }
 
   // vimIdle: vim is on, in normal mode, with no operator or count pending.
@@ -401,6 +467,35 @@ export class Workspace {
       this.sync(buf);
     });
     return buf.saving;
+  }
+
+  // otherStates are the lesson's other files, for completion.
+  private otherStates(): EditorState[] {
+    const cur = this.current();
+    const out: EditorState[] = [];
+    for (const b of this.bufs.values()) {
+      if (b !== cur && b.lesson === this.lesson && !b.readOnly) out.push(b.state);
+    }
+    return out;
+  }
+
+  // format runs clang-format on the open file and applies the result as
+  // edits, so the cursor stays put and undo takes it back in one step.
+  async format(): Promise<"formatted" | "unchanged" | "skipped"> {
+    const buf = this.current();
+    if (!buf || buf.readOnly || !this.view) return "skipped";
+    const before = buf.state.doc.toString();
+    const after = await Service.Format(buf.lesson, buf.name, before);
+    if (buf.state.doc.toString() !== before) return "skipped"; // you typed meanwhile
+    if (after === before) return "unchanged";
+    const changes = diff(before, after).map((c) => ({ from: c.fromA, to: c.toA, insert: after.slice(c.fromB, c.toB) }));
+    if (this.current() === buf && this.view.state === buf.state) {
+      this.view.dispatch({ changes, userEvent: "input.format" });
+    } else {
+      buf.state = buf.state.update({ changes, userEvent: "input.format" }).state;
+      this.markDirty(buf);
+    }
+    return "formatted";
   }
 
   saveActive() {

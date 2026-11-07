@@ -32,7 +32,7 @@
 
   // Scroll to a newly revealed hint or the unlocked section.
   export function reveal(sel: string) {
-    queueMicrotask(() => el?.querySelector(sel)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    queueMicrotask(() => el?.querySelector(sel)?.scrollIntoView({ block: "start" }));
   }
 
   // The work dir, shortened to ~/… for display.

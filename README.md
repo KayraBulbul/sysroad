@@ -127,7 +127,10 @@ make gui        # needs bun; on Linux also webkitgtk-6.0 (or webkit2gtk-4.1)
   second after you stop typing, and always before a run. If a file changes on disk
   (an edit in nvim, a sync from the other machine), a clean buffer reloads; one with
   unsaved changes asks whether to reload or keep yours. A save never overwrites a file
-  that changed underneath it.
+  that changed underneath it. Completion suggests names from the lesson's files plus
+  C++ keywords and common `std` names (clangd comes later). `<space>cf` formats with
+  clang-format, in the course's style unless a `.clang-format` in the data folder
+  says otherwise (Mac: `brew install clang-format`).
 - **Interactive programs** (a lesson whose sample run needs a terminal) open in your
   terminal (`$TERMINAL`, `xdg-terminal-exec`, or Terminal.app on a Mac) for now.
 
@@ -137,11 +140,14 @@ make gui        # needs bun; on Linux also webkitgtk-6.0 (or webkit2gtk-4.1)
 | `Ctrl+Enter` / `Ctrl+Shift+Enter` | lesson | Run / Submit |
 | `Ctrl+.` | lesson | stop a run |
 | `<space>r s h v R u n p` | editor, vim normal mode | run, submit, hint, solution, reset, under the hood, next, previous |
+| `<space>cf` | editor, vim normal mode | format the file with clang-format |
+| `Ctrl+Space`, `Ctrl+N/P`, `Enter`/`Tab`/`Ctrl+Y` | editor | open, move through, accept completions |
 | `r s h v R u [ ] d` | lesson, outside the editor | the same, plus `d` for done on hand-checked steps |
 | `Ctrl+H` / `Ctrl+L` / `Ctrl+J` | lesson | focus the lesson, the editor, the output |
 | `Ctrl+B` | lesson | hide or show the lesson pane |
 | `j/k`, `g/G` | lesson, outside the editor | scroll the lesson |
 | `Esc` | outside the editor | up a level: lesson → phase → dashboard |
+| mouse back/forward, `Alt+←/→` | anywhere | back and forward through the pages you visited |
 | `:w`, `Ctrl+S` | editor | save now |
 
 Pane sizes, vim mode and the last open lesson are remembered per machine in
