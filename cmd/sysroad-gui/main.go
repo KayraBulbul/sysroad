@@ -103,12 +103,22 @@ func main() {
 		Linux:            application.LinuxWindow{Icon: icon},
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 38,
-			TitleBar:                application.MacTitleBarHiddenInset,
+			// The compact toolbar keeps the traffic lights' strip close to
+			// the top bar's height; fitTitleBar lines the bar up exactly.
+			TitleBar: application.MacTitleBar{
+				AppearsTransparent:   true,
+				HideTitle:            true,
+				FullSizeContent:      true,
+				UseToolbar:           true,
+				HideToolbarSeparator: true,
+				ToolbarStyle:         application.MacToolbarStyleUnifiedCompact,
+			},
 		},
 	})
 
 	mouseNav = func(dir int) { wails.Event.Emit(evNav, dir) }
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+		fitTitleBar(win)
 		application.InvokeSync(func() {
 			if tuneWebView(win.NativeWindow()) == 0 {
 				log.Println("sysroad-gui: couldn't find the web view to set up scrolling and mouse buttons")
