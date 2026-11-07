@@ -66,6 +66,7 @@ sysroad edit             # or open its file in $EDITOR directly
 | `v` | `sysroad solution` | peek at the solution (the sidebar asks first) |
 | `R` | `sysroad reset` | put the starter code back; your files move to `.local/reset-backup/` |
 | `e` | `sysroad edit` | open the lesson's file in `$EDITOR` |
+| `1`–`9` | `sysroad quiz` | answer a quiz (the next unanswered question) |
 
 The shell commands act on the lesson whose folder you're in, else the current one, or
 take a lesson ID. `sysroad run` exits non-zero on failure, so it works as an editor
@@ -188,7 +189,7 @@ The data repo contains:
 - `.gitattributes`: `events.jsonl merge=union`. If both machines added lines while
   offline, git keeps both sides, so there are never merge conflicts in the log.
 - `.local/`: machine-local state such as a running timer, build output, the latest
-  Run/Submit results and revealed hints. Gitignored, as are `*.o`, `a.out` and `build/`.
+  Run/Submit results, revealed hints and quiz answers. Gitignored, as are `*.o`, `a.out` and `build/`.
 
 On startup the TUI fetches and rebases. After a change it commits and pushes once things
 have been quiet for 15 s, pulls every 5 minutes, and syncs on quit. A passing
@@ -226,3 +227,8 @@ The course lives in `internal/course/content/` and is embedded in the binary:
 - `checks.yaml`: program-level tests (args, stdin, files → expected stdout and exit code);
   `hidden: true` ones run on Submit only.
 - `hints.md` (split on `---`) and `under_the_hood.md`.
+- Quizzes have `kind: quiz` and a `quiz.yaml` instead of code: a list of `q` (markdown),
+  optional `code`, `options`, `answer` (0-based) and `why`. Answering every question
+  right completes the lesson; a wrong pick is crossed out and costs nothing.
+- Sanitizer reports are trimmed to the learner's frames, with short paths and type
+  names (`internal/course/sanreport.go`).
