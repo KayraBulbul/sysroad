@@ -76,7 +76,8 @@ func (a *App) saveQuizPicks(m map[string][][]int) error {
 var errNotQuiz = errors.New("not a quiz")
 
 // QuizState is a quiz lesson's questions with your progress. A quiz that's
-// already done (perhaps on the other machine) shows every answer.
+// done but was never attempted here (it was finished on the other machine)
+// shows every answer; once you retake it, your new attempt shows instead.
 func (a *App) QuizState(l *course.Lesson) (Quiz, error) {
 	if !l.IsQuiz() {
 		return Quiz{}, errNotQuiz
@@ -85,11 +86,12 @@ func (a *App) QuizState(l *course.Lesson) (Quiz, error) {
 	if err != nil {
 		return Quiz{}, err
 	}
-	return a.quizView(l, qs, a.quizPicks()[l.ID]), nil
+	picks, attempted := a.quizPicks()[l.ID]
+	return a.quizView(l, qs, picks, attempted), nil
 }
 
-func (a *App) quizView(l *course.Lesson, qs []course.Question, picks [][]int) Quiz {
-	done := a.Progress.StatusOf(l.ID) == store.Done
+func (a *App) quizView(l *course.Lesson, qs []course.Question, picks [][]int, attempted bool) Quiz {
+	done := a.Progress.StatusOf(l.ID) == store.Done && !attempted
 	v := Quiz{Total: len(qs)}
 	for i, q := range qs {
 		it := QuizItem{Q: q.Q, Code: q.Code, Options: q.Options, Answer: -1}
@@ -139,7 +141,7 @@ func (a *App) AnswerQuiz(l *course.Lesson, q, pick int) (AnswerResult, error) {
 
 	before := a.XP()
 	res := AnswerResult{Correct: pick == qs[q].Answer}
-	res.Quiz = a.quizView(l, qs, picks)
+	res.Quiz = a.quizView(l, qs, picks, true)
 	if res.Quiz.Solved == res.Quiz.Total && a.Progress.StatusOf(l.ID) != store.Done {
 		if err := a.SetStatus(l.ID, store.Done); err != nil {
 			return res, err
@@ -150,14 +152,11 @@ func (a *App) AnswerQuiz(l *course.Lesson, q, pick int) (AnswerResult, error) {
 	return res, nil
 }
 
-// ResetQuiz forgets your picks, so you can take the quiz again. It doesn't
-// undo completing it.
+// ResetQuiz starts a fresh attempt: your picks are cleared and every answer
+// is hidden again. It doesn't undo completing the lesson.
 func (a *App) ResetQuiz(l *course.Lesson) error {
 	all := a.quizPicks()
-	if _, ok := all[l.ID]; !ok {
-		return nil
-	}
-	delete(all, l.ID)
+	all[l.ID] = [][]int{} // an empty attempt, not "never attempted"
 	return a.saveQuizPicks(all)
 }
 

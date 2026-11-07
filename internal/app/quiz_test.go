@@ -64,19 +64,38 @@ func TestQuizCompletesWhenEveryAnswerIsRight(t *testing.T) {
 		t.Fatalf("tried = %v", got)
 	}
 
-	// Retaking clears the picks but the lesson stays done; finishing again
-	// gives no more XP.
+	// Retaking starts a fresh attempt even though the lesson stays done, and
+	// finishing it again gives no more XP.
 	if err := a.ResetQuiz(l); err != nil {
 		t.Fatal(err)
 	}
-	a.Progress.Status[l.ID] = store.Doing // as if it was finished on the other machine…
 	q, _ := a.QuizState(l)
-	if q.Solved != 0 {
-		t.Fatalf("reset left %d solved", q.Solved)
+	if q.Solved != 0 || q.Items[0].Answer != -1 || q.Items[0].Why != "" {
+		t.Fatalf("a retake should hide the answers again, got %d/%d solved", q.Solved, q.Total)
 	}
-	a.Progress.Status[l.ID] = store.Done // …and done here: every answer shows
-	if q, _ = a.QuizState(l); q.Solved != q.Total {
-		t.Fatalf("a done quiz should show every answer, got %d/%d", q.Solved, q.Total)
+	if a.Progress.StatusOf(l.ID) != store.Done {
+		t.Fatal("retaking mustn't undo the lesson")
+	}
+	xp := a.XP()
+	for i, qq := range qs {
+		if res, err = a.AnswerQuiz(l, i, qq.Answer); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if res.Outcome.Completed || a.XP() != xp || res.Quiz.Solved != res.Quiz.Total {
+		t.Fatalf("second run: completed=%v xp %d→%d", res.Outcome.Completed, xp, a.XP())
+	}
+}
+
+// Done on the other machine, never attempted here: every answer shows.
+func TestQuizDoneElsewhereShowsAnswers(t *testing.T) {
+	a := open(t)
+	l := firstQuiz(t, a)
+	if err := a.SetStatus(l.ID, store.Done); err != nil {
+		t.Fatal(err)
+	}
+	if q, _ := a.QuizState(l); q.Solved != q.Total {
+		t.Fatalf("got %d/%d", q.Solved, q.Total)
 	}
 }
 
