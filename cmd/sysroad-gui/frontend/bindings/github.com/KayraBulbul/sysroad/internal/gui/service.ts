@@ -21,6 +21,13 @@ import * as course$0 from "../course/models.js";
 import * as $models from "./models.js";
 
 /**
+ * CheckUpdates looks for new commits now.
+ */
+export function CheckUpdates(): $CancellablePromise<$models.UpdateInfo> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.CheckUpdates");
+}
+
+/**
  * Format runs clang-format over a lesson file's content (the editor's, which
  * may not be saved yet) and returns the result. A .clang-format in the lesson
  * folder or above it, e.g. in the data folder, wins over the course style.
@@ -63,6 +70,13 @@ export function Prefs(): $CancellablePromise<$models.Prefs> {
  */
 export function Reset(id: string): $CancellablePromise<[string, $models.File[] | null]> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.Reset", id);
+}
+
+/**
+ * RestartToUpdate quits and starts the freshly installed app.
+ */
+export function RestartToUpdate(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.RestartToUpdate");
 }
 
 /**
@@ -126,6 +140,20 @@ export function Theme(): $CancellablePromise<$models.Theme> {
  */
 export function ToggleDone(id: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.ToggleDone", id);
+}
+
+/**
+ * Update rebuilds and reinstalls from the newest commit, in the background.
+ */
+export function Update(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.Update");
+}
+
+/**
+ * UpdateStatus is the current update state.
+ */
+export function UpdateStatus(): $CancellablePromise<$models.UpdateInfo> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.UpdateStatus");
 }
 
 /**

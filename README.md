@@ -121,15 +121,27 @@ make gui        # needs bun; on Linux also webkitgtk-6.0 (or webkit2gtk-4.1)
 ./bin/sysroad-gui
 ```
 
-To install it as an app:
+To install it as an app, once per machine, from any checkout:
 
-- **Arch / Omarchy:** `cd packaging/arch && makepkg -si`. It builds the checkout you're
-  in and installs `sysroad`, `sysroad-gui`, a launcher entry (Super+Space → sysroad) and
-  the icon. In Hyprland, `o.bind("SUPER + SHIFT + L", "sysroad", { launch = "sysroad-gui",
-  focus = "^sysroad$" })` opens it or brings it forward.
-- **macOS:** `make mac-app` builds `sysroad.app` into `~/Applications`, so it opens from
-  Spotlight and can stay in the Dock. It's ad-hoc signed and built locally, so Gatekeeper
-  doesn't quarantine it. It picks up your login shell's `PATH`, so Homebrew tools are found.
+```sh
+make app        # BRANCH=main to follow main; defaults to the branch you're on
+```
+
+That clones the repo into `~/.local/share/sysroad-src` (the app's own copy) and installs
+from it, per user, without sudo:
+
+- **Linux:** `sysroad` and `sysroad-gui` in `~/.local/bin`, plus a launcher entry
+  (Super+Space → sysroad) and the icon. In Hyprland, `o.bind("SUPER + SHIFT + L",
+  "sysroad", { launch = "sysroad-gui", focus = "^sysroad$" })` opens it or brings it
+  forward.
+- **macOS:** `sysroad.app` in `~/Applications` (Spotlight, the Dock), ad-hoc signed and
+  built locally so Gatekeeper doesn't quarantine it, and `sysroad` in `~/.local/bin`. It
+  picks up your login shell's `PATH`, so Homebrew tools are found.
+
+**Updates:** the app checks its branch for new commits on launch and every 6 hours. The ⟳
+button in the top bar gets a dot when there's an update; open it to see the new commits,
+press Update (it pulls and runs `make install-app` in the background, so new lessons come
+with it), then Restart. A failed build changes nothing and shows its output.
 
 Only one window runs at a time: launching it again brings the open one forward.
 

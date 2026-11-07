@@ -35,6 +35,7 @@ func init() {
 	application.RegisterEvent[gui.Theme](gui.EvTheme)
 	application.RegisterEvent[gui.FileEvent](gui.EvFile)
 	application.RegisterEvent[gui.ResultEvent](gui.EvResult)
+	application.RegisterEvent[gui.UpdateInfo](gui.EvUpdate)
 }
 
 func main() {
@@ -75,6 +76,7 @@ func main() {
 		Mac:        application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
 		OnShutdown: func() { gui.Stop(svc) },
 	})
+	gui.OnQuit(svc, func() { wails.Quit() })
 	wails.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		gui.Start(svc)
 	})

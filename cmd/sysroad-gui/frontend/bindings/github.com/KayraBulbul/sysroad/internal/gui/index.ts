@@ -20,5 +20,6 @@ export type {
     SaveResult,
     Snapshot,
     SyncDTO,
-    Theme
+    Theme,
+    UpdateInfo
 } from "./models.js";
