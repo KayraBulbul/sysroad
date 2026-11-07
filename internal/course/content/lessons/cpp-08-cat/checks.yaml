@@ -1,0 +1,16 @@
+- name: two files
+  args: ["a.txt", "b.txt"]
+  files:
+    a.txt: "first file\n"
+    b.txt: "second file\nline two\n"
+  stdout: "first file\nsecond file\nline two\n"
+- name: stdin
+  stdin: "piped in\n"
+  stdout: "piped in\n"
+- name: a missing file
+  args: ["a.txt", "nope.txt"]
+  files:
+    a.txt: "first file\n"
+  stdout: "first file\n"
+  exit: 1
+  hidden: true

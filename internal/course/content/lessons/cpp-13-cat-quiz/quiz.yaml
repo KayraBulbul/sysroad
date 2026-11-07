@@ -1,0 +1,90 @@
+- q: Why did the `getline` version of cat change some files?
+  code: |
+    while (std::getline(in, line)) {
+        out << line << '\n';
+    }
+  options:
+  - '`getline` skips empty lines'
+  - It turns tabs into spaces
+  - It stops at the first zero byte
+  - It adds a newline after the last line even when the file didn't end with one
+  answer: 3
+  why: |
+    `getline` removes the `'\n'` it stops at, and also succeeds on a final
+    line that has none. The loop can't tell the two apart, so it always adds
+    one back. Copying raw bytes with `read`/`write` has nothing to guess.
+
+- q: '`out << buf` versus `out.write(buf, n)` on a `char` buffer: what''s the difference?'
+  options:
+  - '`<<` treats `buf` as a C string: it stops at the first `''\0''` (or runs past
+    the end if there isn''t one)'
+  - None, they compile to the same thing
+  - '`write` adds a newline'
+  - '`<<` is binary-safe, `write` isn''t'
+  answer: 0
+  why: |
+    `operator<<(const char*)` looks for a terminating zero byte. Binary data
+    has zeros in the middle, and a buffer from `read` has no terminator at
+    all. `write` takes an explicit length and copies exactly that.
+
+- q: What can go wrong with `out << in.rdbuf();` when `in` is an empty file?
+  options:
+  - Nothing, it writes nothing
+  - It throws an exception
+  - It blocks waiting for input
+  - It sets `out`'s failbit, so every later write to `out` is silently dropped
+  answer: 3
+  why: |
+    Inserting a streambuf that yields no characters counts as a failed
+    insertion. Until someone calls `out.clear()`, the stream ignores writes,
+    so `cat empty.txt next.txt` would lose `next.txt`.
+
+- q: Why do the line number and the blank-line count live in a `CatState` passed
+    by reference?
+  options:
+  - Because `cat_stream` is called once per file, and numbering and squeezing carry
+    on across files
+  - So the compiler can optimise them into registers
+  - Structs are faster than local variables
+  - To make `cat_stream` thread-safe
+  answer: 0
+  why: |
+    Locals start fresh on every call. GNU cat numbers `cat -n a b` as one
+    stream, so the state has to outlive each call. `run_cat` owns it, and
+    every call borrows it through `CatState&`.
+
+- q: '`std::ifstream f("somedir");` on Linux: what happens?'
+  options:
+  - The constructor throws
+  - Opening fails and `!f` is true
+  - Opening succeeds, and reading fails
+  - It lists the directory's entries
+  answer: 2
+  why: |
+    `open(2)` on a directory with `O_RDONLY` is allowed, and `read(2)` then
+    fails with `EISDIR`. That's why cat checks `is_directory` itself to
+    print `Is a directory`.
+
+- q: What does `^M` stand for in `cat -A` output?
+  options:
+  - A Mac-style line ending
+  - 'Byte 13, the carriage return `\r`: `M` is 77, and 77 − 64 = 13'
+  - A byte with the high bit set
+  - The end of the line
+  answer: 1
+  why: |
+    Caret notation writes control byte *n* as `^` plus the character *n* + 64.
+    `\r` is 13, so `^M`. A Windows line ending `\r\n` shows as `^M$`. High
+    bytes are the ones that get `M-`.
+
+- q: What does `std::ios::binary` change on Linux and macOS?
+  options:
+  - It makes reads faster
+  - It turns off buffering
+  - Nothing. It only matters on Windows, where text mode converts line endings
+  - It allows reading zero bytes
+  answer: 2
+  why: |
+    POSIX systems have no text/binary distinction: a file is bytes. On
+    Windows, text mode turns `\r\n` into `\n` on input and back on output.
+    Saying `binary` still documents that the tool must not change anything.

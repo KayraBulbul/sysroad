@@ -1,0 +1,12 @@
+- name: -n
+  args: ["-n", "a.txt"]
+  files:
+    a.txt: "first\nsecond\n"
+  stdout: "     1\tfirst\n     2\tsecond\n"
+- name: -b across two files
+  args: ["-b", "a.txt", "b.txt"]
+  files:
+    a.txt: "x\n\n"
+    b.txt: "\ny\n"
+  stdout: "     1\tx\n\n\n     2\ty\n"
+  hidden: true

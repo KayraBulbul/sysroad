@@ -1,10 +1,10 @@
 - q: What does a `std::string_view` own?
   options:
-    - A copy of the characters
-    - Nothing. It's a pointer and a length into someone else's characters
-    - The characters, but read-only
-    - A reference count shared with the `std::string` it came from
-  answer: 1
+  - Nothing. It's a pointer and a length into someone else's characters
+  - A copy of the characters
+  - The characters, but read-only
+  - A reference count shared with the `std::string` it came from
+  answer: 0
   why: |
     A view never owns or copies anything. That makes it cheap to pass
     around (16 bytes on a 64-bit machine), and it's also why it can
@@ -18,11 +18,11 @@
         return s;
     }
   options:
-    - Nothing, `string_view` converts from `std::string`
-    - It copies the string twice
-    - The view points into `s`, which is destroyed when the function returns
-    - "`name` should be passed by value"
-  answer: 2
+  - Nothing, `string_view` converts from `std::string`
+  - The view points into `s`, which is destroyed when the function returns
+  - It copies the string twice
+  - '`name` should be passed by value'
+  answer: 1
   why: |
     `s` is a local, so its buffer is freed at the closing brace and the
     caller gets a view of freed memory. Under AddressSanitizer that's a
@@ -34,11 +34,11 @@
   code: |
     std::vector<std::string_view> args(argv + 1, argv + argc);
   options:
-    - "`argv[0]` is always empty"
-    - "`argv[0]` is the program's name, not an argument"
-    - Pointers into `argv` start counting at 1
-    - To skip the null pointer at the start of `argv`
-  answer: 1
+  - '`argv[0]` is always empty'
+  - Pointers into `argv` start counting at 1
+  - To skip the null pointer at the start of `argv`
+  - '`argv[0]` is the program''s name, not an argument'
+  answer: 3
   why: |
     By convention `argv[0]` is how the program was invoked (`./wc`), and the
     real arguments start at `argv[1]`. The null pointer is at the *end*:
@@ -48,11 +48,12 @@
   code: |
     bool space = std::isspace(static_cast<unsigned char>(ch));
   options:
-    - "`std::isspace` only accepts unsigned types, so it won't compile otherwise"
-    - It's faster
-    - "`char` may be signed, and passing a negative value (other than EOF) is undefined behaviour"
-    - To treat tabs as spaces
-  answer: 2
+  - '`char` may be signed, and passing a negative value (other than EOF) is undefined
+    behaviour'
+  - '`std::isspace` only accepts unsigned types, so it won''t compile otherwise'
+  - It's faster
+  - To treat tabs as spaces
+  answer: 0
   why: |
     On x86-64 Linux `char` is signed, so a UTF-8 byte like `0xC3` becomes
     -61. The `<cctype>` functions take an `int` that must be `EOF` or fit in
@@ -63,23 +64,25 @@
   code: |
     while (in.read(buf.data(), buf.size()) || in.gcount() > 0) { ... }
   options:
-    - "`read` returns the stream, which is false after a short final read, but those bytes still count"
-    - "`gcount` resets the stream's error state"
-    - It stops the loop from running forever on an empty input
-    - "`read` never fills the whole buffer"
-  answer: 0
+  - '`gcount` resets the stream''s error state'
+  - '`read` returns the stream, which is false after a short final read, but those
+    bytes still count'
+  - It stops the loop from running forever on an empty input
+  - '`read` never fills the whole buffer'
+  answer: 1
   why: |
     `read` asks for exactly 4096 bytes. If fewer are left, it reads them,
     sets `eofbit` and `failbit`, and the stream tests false. Without the
     `gcount()` check, a file's last partial chunk would never be counted.
 
-- q: "Where should `wc: nope.txt: No such file or directory` go, and why?"
+- q: 'Where should `wc: nope.txt: No such file or directory` go, and why?'
   options:
-    - stdout, so it appears in order with the counts
-    - stderr, so `wc *.txt > counts.txt` keeps errors out of the file and still shows them
-    - stderr, because stdout is buffered and stderr is faster
-    - Either works, the shell merges them anyway
-  answer: 1
+  - stdout, so it appears in order with the counts
+  - stderr, because stdout is buffered and stderr is faster
+  - stderr, so `wc *.txt > counts.txt` keeps errors out of the file and still shows
+    them
+  - Either works, the shell merges them anyway
+  answer: 2
   why: |
     stdout is the program's *result* and stderr is for messages to a human.
     Keeping them apart is what lets pipes and redirections work. You can
@@ -91,11 +94,11 @@
     std::string_view v = s;
     s += " but now much, much longer than before";
   options:
-    - "`v` now sees the longer string"
-    - "`v` still sees `\"short\"`"
-    - "`v` may be dangling, because growing `s` can move its characters to a new buffer"
-    - It doesn't compile
-  answer: 2
+  - '`v` now sees the longer string'
+  - '`v` still sees `"short"`'
+  - It doesn't compile
+  - '`v` may be dangling, because growing `s` can move its characters to a new buffer'
+  answer: 3
   why: |
     Appending can reallocate: the string allocates a bigger buffer, copies
     the characters over and frees the old one, and `v` still points at the

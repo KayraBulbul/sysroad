@@ -1,0 +1,16 @@
+- name: no newline at the end
+  args: ["note.txt"]
+  files:
+    note.txt: "no newline at the end"
+  stdout: "no newline at the end"
+- name: two files, the first without a newline
+  args: ["a.txt", "b.txt"]
+  files:
+    a.txt: "joined "
+    b.txt: "together\n"
+  stdout: "joined together\n"
+  hidden: true
+- name: stdin passes straight through
+  stdin: "x\r\ny"
+  stdout: "x\r\ny"
+  hidden: true

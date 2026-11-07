@@ -1,0 +1,15 @@
+- name: -A
+  args: ["-A", "a.txt"]
+  files:
+    a.txt: "tab\there\r\n"
+  stdout: "tab^Ihere^M$\n"
+- name: -v on high bytes
+  args: ["-v"]
+  stdin: "café\n"
+  stdout: "cafM-CM-)\n"
+  hidden: true
+- name: an unknown flag
+  args: ["-z"]
+  stdout: ""
+  exit: 1
+  hidden: true
