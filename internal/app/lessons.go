@@ -148,11 +148,13 @@ func (a *App) Touch(l *course.Lesson) (string, error) {
 
 // Outcome is what changed when a Run/Submit result was recorded.
 type Outcome struct {
-	Completed  bool // this submit completed the lesson
-	XPGained   int
-	LevelUp    bool
-	Level, XP  int
-	Into, Span int
+	Completed bool `json:"completed"` // this submit completed the lesson
+	XPGained  int  `json:"xpGained"`
+	LevelUp   bool `json:"levelUp"`
+	Level     int  `json:"level"`
+	XP        int  `json:"xp"`
+	Into      int  `json:"into"`
+	Span      int  `json:"span"`
 }
 
 // RunLesson runs or submits a lesson and records a passing Submit.

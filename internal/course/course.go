@@ -96,8 +96,8 @@ type Meta struct {
 }
 
 type Link struct {
-	Title string `yaml:"title"`
-	URL   string `yaml:"url"`
+	Title string `yaml:"title" json:"title"`
+	URL   string `yaml:"url" json:"url"`
 }
 
 // Sample is how Run invokes your program to show what it prints.

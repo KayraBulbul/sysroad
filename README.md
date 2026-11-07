@@ -16,7 +16,7 @@ interpreter, to xv6 kernel labs.
 
 ## Install
 
-Requires Go 1.24+, git and clang (Mac: `brew install go` and `xcode-select --install`;
+Requires Go 1.26+, git and clang (Mac: `brew install go` and `xcode-select --install`;
 Omarchy: `sudo pacman -S go clang gdb`).
 
 ```sh
@@ -109,6 +109,44 @@ terminal's 16-colour palette, so sysroad follows your Omarchy theme live. On a M
 set Ghostty and Neovim to a theme you like. [`extras/mac-vigil`](extras/mac-vigil)
 has Vigil.
 
+## Desktop app
+
+`sysroad-gui` is the same course in a window, laid out like boot.dev: the lesson on the
+left, an editor on your real `work/<lesson-id>/` files top right, and the Run/Submit
+output underneath. It shares the data folder, progress and sync with the TUI and CLI,
+and all three can run at once.
+
+```sh
+make gui        # needs bun; on Linux also webkitgtk-6.0 (or webkit2gtk-4.1)
+./bin/sysroad-gui
+```
+
+- **Theme:** on Omarchy it uses your current theme and follows `omarchy-theme-set`
+  live. On a Mac it's Vigil. The font is Obel Mono, bundled.
+- **Editor:** CodeMirror with vim mode (toggle it in the tab bar). Files save half a
+  second after you stop typing, and always before a run. If a file changes on disk
+  (an edit in nvim, a sync from the other machine), a clean buffer reloads; one with
+  unsaved changes asks whether to reload or keep yours. A save never overwrites a file
+  that changed underneath it.
+- **Interactive programs** (a lesson whose sample run needs a terminal) open in your
+  terminal (`$TERMINAL`, `xdg-terminal-exec`, or Terminal.app on a Mac) for now.
+
+| key | where | action |
+|---|---|---|
+| `Ctrl+K`, `space space` | anywhere | jump to any lesson or phase |
+| `Ctrl+Enter` / `Ctrl+Shift+Enter` | lesson | Run / Submit |
+| `Ctrl+.` | lesson | stop a run |
+| `<space>r s h v R u n p` | editor, vim normal mode | run, submit, hint, solution, reset, under the hood, next, previous |
+| `r s h v R u [ ] d` | lesson, outside the editor | the same, plus `d` for done on hand-checked steps |
+| `Ctrl+H` / `Ctrl+L` / `Ctrl+J` | lesson | focus the lesson, the editor, the output |
+| `Ctrl+B` | lesson | hide or show the lesson pane |
+| `j/k`, `g/G` | lesson, outside the editor | scroll the lesson |
+| `Esc` | outside the editor | up a level: lesson → phase → dashboard |
+| `:w`, `Ctrl+S` | editor | save now |
+
+Pane sizes, vim mode and the last open lesson are remembered per machine in
+`.local/gui.json`.
+
 ## How sync works
 
 The data repo contains:
@@ -138,6 +176,13 @@ to resolve it in the data repo by hand.
 make test     # includes building every lesson's starter and solution with clang++
 SYSROAD_DIR=/tmp/sysroad-dev go run . init && SYSROAD_DIR=/tmp/sysroad-dev go run .
 ```
+
+The desktop app is `cmd/sysroad-gui` (Wails v3, built with the `gui` tag so plain
+`go build ./...` and `go test ./...` don't need WebKit) with its Go side in
+`internal/gui`, which doesn't import Wails and is tested like the rest. The frontend
+is Svelte 5 + CodeMirror 6 in `cmd/sysroad-gui/frontend`. After changing
+`internal/gui`'s methods, run `make gui-bindings` (needs `wails3`:
+`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0`).
 
 The course lives in `internal/course/content/` and is embedded in the binary:
 
