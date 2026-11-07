@@ -376,7 +376,8 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		return &Result{Stage: "compile", Summary: "✗ doesn't compile", Output: out.String() + string(progRes.out)}, nil
 	}
 	if testRes.err != nil {
-		msg := string(testRes.out)
+		// The test files are copied into the build folder; show them as tests/….
+		msg := strings.ReplaceAll(string(testRes.out), filepath.Join(build, "tests")+string(filepath.Separator), "tests/")
 		if msg == "" {
 			msg = testRes.err.Error()
 		}

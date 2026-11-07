@@ -75,7 +75,7 @@ phases:
           - id: cpp-16-const
             title: const everywhere
           - id: cpp-17-raii
-            title: RAII — a File class that closes itself
+            title: RAII — a file descriptor that closes itself
           - id: cpp-18-hexdump
             title: hexdump -C, line by line
           - id: cpp-19-hexdump-skip

@@ -1,0 +1,10 @@
+- name: prints the file
+  args: ["note.txt"]
+  files:
+    note.txt: "read with open(2) and read(2)\n"
+  stdout: "read with open(2) and read(2)\n"
+- name: a missing file
+  args: ["nope.txt"]
+  stdout: ""
+  exit: 1
+  hidden: true

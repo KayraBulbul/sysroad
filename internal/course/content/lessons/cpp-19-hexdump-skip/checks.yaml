@@ -1,0 +1,11 @@
+- name: zeros squeeze
+  args: ["-C", "z.bin"]
+  files:
+    z.bin: "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+  stdout: "00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|\n*\n00000020\n"
+- name: -s and -n
+  args: ["-C", "-s", "6", "-n", "5", "a.txt"]
+  files:
+    a.txt: "Hello world\n"
+  stdout: "00000006  77 6f 72 6c 64                                    |world|\n0000000b\n"
+  hidden: true

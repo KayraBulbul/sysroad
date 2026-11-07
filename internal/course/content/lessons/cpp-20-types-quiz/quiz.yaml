@@ -1,0 +1,116 @@
+- q: When does `fd`'s destructor run?
+  code: |
+    std::string first_line(const char* path) {
+        Fd fd = open_read(path);
+        if (!fd.valid()) return "";
+        std::string all = read_all(fd);
+        return all.substr(0, all.find('\n'));
+    }
+  options:
+  - Only at the closing brace of the function
+  - On every way out of the function, including the early `return ""`
+  - When the garbage collector notices it's unused
+  - Never, you have to call it yourself
+  answer: 1
+  why: |
+    A local's destructor runs whenever its scope ends, by any route:
+    either `return`, falling off the end, or an exception passing through.
+    That's the whole point of RAII. The cleanup can't be forgotten on one
+    path.
+
+- q: Why does `Fd` delete its copy constructor?
+  options:
+  - Two `Fd` objects would own the same descriptor, and both destructors would close
+    it
+  - Copying an int is too slow
+  - The compiler can't generate one for classes with a destructor
+  - So it can be stored in a `std::vector`
+  answer: 0
+  why: |
+    A copy would duplicate the *number*, not the open file. The second
+    `close` either fails or closes a descriptor that has since been reused
+    for something else. Ownership of a unique resource can be moved (phase
+    2), but not copied.
+
+- q: You close fd 3 twice. Why can the second close hurt an unrelated part of the
+    program?
+  options:
+  - It can't, the second close just returns an error
+  - Closing twice corrupts the file on disk
+  - The kernel hands out the lowest free number, so a file opened in between probably
+    got 3
+  - It sends SIGPIPE to the process
+  answer: 2
+  why: |
+    After the first close, 3 is free, and the next `open`, `socket` or
+    `pipe` anywhere in the process gets it. The stray second close then
+    shuts *that* file, and the code that owns it fails much later in a
+    confusing way.
+
+- q: Inside a `const` member function, what can't you do?
+  options:
+  - Read the object's fields
+  - Change the object's fields, or call its non-`const` member functions
+  - Call other `const` member functions
+  - Declare local variables
+  answer: 1
+  why: |
+    In a const member function, `this` is a pointer to const, so every
+    field is read-only and only other const members can be called. Locals
+    and parameters are unaffected. (`mutable` fields are the deliberate
+    exception.)
+
+- q: Why doesn't `return items_[name];` compile inside `int count(const std::string&
+    name) const`?
+  options:
+  - '`std::map` has no `operator[]`'
+  - '`name` would need to be a `string_view`'
+  - Maps can't be used in const functions
+  - '`operator[]` inserts the key when it''s missing, so it isn''t `const`'
+  answer: 3
+  why: |
+    `m[key]` means "find it, or add a default-constructed value". That
+    changes the map, so there's no const version. `find` (or `contains`, or
+    `at`, which throws when the key is missing) only reads.
+
+- q: Why does `longest` return `const std::string*` instead of `const std::string&`?
+  options:
+  - An empty list has no longest word, and a pointer can say so with `nullptr`
+  - Pointers are faster than references
+  - References can't point into a vector
+  - '`const std::string&` would copy the string'
+  answer: 0
+  why: |
+    A reference must always refer to something. When "nothing" is a normal
+    answer, return a pointer, or `std::optional` for values, which is next
+    chapter.
+
+- q: What's the difference between these two loops?
+  code: |
+    for (std::string s : words) { ... }
+    for (const std::string& s : words) { ... }
+  options:
+  - None, the compiler optimises them to the same code
+  - The second can modify the strings
+  - The first copies every string, while the second refers to each one in place
+  - The first doesn't compile
+  answer: 2
+  why: |
+    The loop variable is initialised from each element, just like a
+    function parameter. A plain `std::string` makes a copy, which can mean
+    an allocation per element. `const std::string&` binds to the element
+    itself.
+
+- q: '`Dumper` holds `std::ostream& out_`. What must be true for it to be safe?'
+  options:
+  - The stream must outlive the `Dumper`
+  - The stream must be `std::cout`
+  - The `Dumper` must be const
+  - Nothing, references keep their object alive
+  answer: 0
+  why: |
+    A reference member doesn't own or extend anything. Destroy the stream
+    while the `Dumper` still exists, and its next write goes through a
+    dangling reference. C++ has no automatic lifetime extension for
+    members. You keep lifetimes straight by design: here `run_hexdump`
+    makes the stream and the Dumper in the right order.
