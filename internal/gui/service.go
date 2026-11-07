@@ -313,6 +313,7 @@ type LessonDetail struct {
 	Files      []string       `json:"files"`
 	WorkDir    string         `json:"workDir"`
 	Result     *course.Result `json:"result"`
+	Quiz       *app.Quiz      `json:"quiz"` // quiz lessons only
 	Prev       string         `json:"prev"`
 	Next       string         `json:"next"`
 }
@@ -364,6 +365,13 @@ func (s *Service) Lesson(id string) (*LessonDetail, error) {
 	if d.HasCode {
 		d.WorkDir = a.Engine.WorkDir(l)
 	}
+	if l.IsQuiz() {
+		q, err := a.QuizState(l)
+		if err != nil {
+			return nil, err
+		}
+		d.Quiz = &q
+	}
 	ls := a.Course.Lessons()
 	for i, x := range ls {
 		if x.ID == l.ID {
@@ -394,6 +402,38 @@ func (s *Service) RevealHint(id string) ([]string, error) {
 	return l.Hints()[:n], nil
 }
 
+// AnswerQuiz picks option `pick` (from 0) for quiz question `q` (from 0).
+func (s *Service) AnswerQuiz(id string, q, pick int) (*app.AnswerResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l, err := s.lesson(id)
+	if err != nil {
+		return nil, err
+	}
+	res, err := s.app.AnswerQuiz(l, q, pick)
+	if err != nil {
+		return nil, err
+	}
+	s.changed()
+	go s.emit(EvState, nil)
+	return &res, nil
+}
+
+// ResetQuiz clears a quiz's answers so it can be taken again.
+func (s *Service) ResetQuiz(id string) (*app.Quiz, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l, err := s.lesson(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.app.ResetQuiz(l); err != nil {
+		return nil, err
+	}
+	q, err := s.app.QuizState(l)
+	return &q, err
+}
+
 // ToggleDone ticks a hand-checked step off, or back to todo.
 func (s *Service) ToggleDone(id string) error {
 	s.mu.Lock()
@@ -401,6 +441,9 @@ func (s *Service) ToggleDone(id string) error {
 	l, err := s.lesson(id)
 	if err != nil {
 		return err
+	}
+	if l.IsQuiz() {
+		return errors.New("answering every question completes a quiz")
 	}
 	if l.Graded() {
 		return errors.New("Submit completes this lesson")

@@ -1,0 +1,11 @@
+- name: hello, world
+  stdin: "hello, world\n"
+  stdout: "most common: 0x6c (3 of 13)\n"
+- name: empty input
+  stdin: ""
+  stdout: "most common: 0x00 (0 of 0)\n"
+  hidden: true
+- name: a tie
+  stdin: "ba"
+  stdout: "most common: 0x61 (1 of 2)\n"
+  hidden: true

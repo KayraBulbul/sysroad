@@ -1,0 +1,10 @@
+- name: -s
+  args: ["-s", "a.txt"]
+  files:
+    a.txt: "one\n\n\n\ntwo\n"
+  stdout: "one\n\ntwo\n"
+- name: -sn
+  args: ["-sn"]
+  stdin: "\n\n\nx\n\n\n"
+  stdout: "     1\t\n     2\tx\n     3\t\n"
+  hidden: true

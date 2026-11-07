@@ -5,6 +5,8 @@
   import { workspace, type Actions } from "../lib/editor.svelte";
   import LessonPane from "../components/LessonPane.svelte";
   import OutputPane from "../components/OutputPane.svelte";
+  import QuizPane from "../components/QuizPane.svelte";
+  import type { Quiz, Outcome } from "../../bindings/github.com/KayraBulbul/sysroad/internal/app/models";
   import Splitter from "../components/Splitter.svelte";
 
   let { id, active }: { id: string; active: boolean } = $props();
@@ -29,6 +31,7 @@
   let lessonEl: HTMLDivElement | undefined = $state();
   let outEl: HTMLDivElement | undefined = $state();
   let paneRef: LessonPane | undefined = $state();
+  let quizRef: QuizPane | undefined = $state();
 
   // A run in flight anywhere in this app shows here; one from another window
   // (TUI, CLI) arrives as a new result.
@@ -67,6 +70,10 @@
 
   async function run(mode: Mode) {
     if (!d) return;
+    if (d.quiz) {
+      toast("This is a quiz — pick an answer for each question");
+      return;
+    }
     if (!d.graded) {
       toast(d.written || d.body ? "Nothing to run here — mark it done when you've done it" : "This lesson isn't written yet");
       return;
@@ -186,6 +193,41 @@
     }
   }
 
+  // ---- quizzes ----
+
+  async function answered(q: Quiz, o: Outcome | null) {
+    if (!d) return;
+    d.quiz = q;
+    if (o?.completed) {
+      toast(`✓ Quiz complete  +${o.xpGained} XP`, "xp", 5000);
+      if (o.levelUp) setTimeout(() => toast(`★ Level ${o.level}!`, "xp", 5000), 400);
+      await Promise.all([loadLesson(d.id), refresh()]);
+      if (ui.lessons[d.id]?.hasUth) {
+        showUTH = true;
+        paneRef?.reveal("#uth");
+      }
+    }
+  }
+
+  function retake() {
+    if (!d?.quiz) return;
+    const lessonID = d.id;
+    ask({
+      title: "Take the quiz again?",
+      detail: "Your answers are cleared. The lesson stays done.",
+      yes: "Retake",
+      onYes: async () => {
+        try {
+          const q = await Service.ResetQuiz(lessonID);
+          if (q && ui.lessons[lessonID]) ui.lessons[lessonID].quiz = q;
+          await loadLesson(lessonID);
+        } catch (e) {
+          fail(e);
+        }
+      },
+    });
+  }
+
   function next() {
     if (d?.next) openLesson(d.next);
   }
@@ -285,6 +327,16 @@
     if (inEditor(t) || t.closest("input, textarea")) return;
     const scroll = (dy: number) => lessonEl?.scrollBy({ top: dy });
     const h = lessonEl?.clientHeight ?? 400;
+    if (d?.quiz && e.key >= "1" && e.key <= "9") {
+      quizRef?.answerNext(Number(e.key) - 1);
+      e.preventDefault();
+      return;
+    }
+    if (d?.quiz && e.key === "R") {
+      retake();
+      e.preventDefault();
+      return;
+    }
     switch (e.key) {
       case "r": run(Mode.ModeRun); break;
       case "s": run(Mode.ModeSubmit); break;
@@ -358,7 +410,9 @@
 
     <div class="bottom" style="height:{hasCode ? outH * 100 : 100}%">
       <div class="actions">
-        {#if graded}
+        {#if d?.quiz}
+          <span class="quiz-label">{d.quiz.solved === d.quiz.total ? "Quiz complete" : "Pick an answer for each question"} <span class="k">1–9</span></span>
+        {:else if graded}
           <button class="btn" onclick={() => run(Mode.ModeRun)} disabled={!!running}>Run <span class="k">Ctrl ⏎</span></button>
           <button class="btn primary" onclick={() => run(Mode.ModeSubmit)} disabled={!!running}>Submit <span class="k">Ctrl ⇧ ⏎</span></button>
           {#if running}<button class="btn ghost" onclick={() => Service.StopRun()}>Stop <span class="k">Ctrl .</span></button>{/if}
@@ -369,13 +423,18 @@
         {#if d?.hintsTotal}
           <button class="btn ghost" onclick={hint} disabled={(d.hints?.length ?? 0) >= d.hintsTotal}>Hint <span class="k">h</span></button>
         {/if}
+        {#if d?.quiz}
+          <button class="btn ghost" onclick={retake} disabled={!d.quiz.solved}>Retake <span class="k">R</span></button>
+        {/if}
         {#if hasCode}
           <button class="btn ghost" onclick={solution}>{workspace.solutionOpen() ? "Hide solution" : "Solution"} <span class="k">v</span></button>
           <button class="btn ghost" onclick={reset}>Reset <span class="k">R</span></button>
         {/if}
       </div>
       <div class="output">
-        {#if !hasCode && d && !graded}
+        {#if d?.quiz}
+          <QuizPane bind:this={quizRef} bind:el={outEl} id={d.id} quiz={d.quiz} onanswered={answered} />
+        {:else if !hasCode && d && !graded}
           <div class="manual">
             {#if d.status === "done"}
               <p class="ok">✓ Done</p>
@@ -534,6 +593,14 @@
   .output {
     flex: 1;
     min-height: 0;
+  }
+  .quiz-label {
+    font-size: 12.5px;
+    color: var(--fg-dim);
+  }
+  .quiz-label .k {
+    margin-left: 6px;
+    opacity: 0.7;
   }
   .manual {
     height: 100%;

@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +75,9 @@ func runLesson(dir string, args []string, mode course.Mode) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	if l.IsQuiz() {
+		return fmt.Errorf("%s is a quiz — answer it with: sysroad quiz %s", l.ID, l.ID)
+	}
 	emit(lessonHeading(l, string(mode)))
 	r, out, err := a.RunLesson(ctx, l, mode)
 	if err != nil {
@@ -114,6 +119,77 @@ func runLesson(dir string, args []string, mode course.Mode) error {
 		return errFailed
 	}
 	return nil
+}
+
+// runQuiz asks a quiz's unanswered questions one at a time.
+func runQuiz(dir string, args []string) error {
+	a, l, err := openLesson(dir, args)
+	if err != nil {
+		return err
+	}
+	if !l.IsQuiz() {
+		return fmt.Errorf("%s isn't a quiz — try sysroad run", l.ID)
+	}
+	in := bufio.NewReader(os.Stdin)
+	emit(lessonHeading(l, "quiz"))
+	for {
+		q, err := a.QuizState(l)
+		if err != nil {
+			return err
+		}
+		n := q.Next()
+		if n < 0 {
+			emit(paint("32;1", fmt.Sprintf("✓ %d/%d — quiz complete", q.Solved, q.Total)) + "\n")
+			return nil
+		}
+		it := q.Items[n]
+		emit("\n" + paint("1", fmt.Sprintf("Q%d/%d", n+1, q.Total)) + "\n")
+		emit(tui.RenderMarkdown(it.Q, width()) + "\n")
+		if it.Code != "" {
+			emit(tui.RenderMarkdown("```cpp\n"+strings.TrimRight(it.Code, "\n")+"\n```", width()) + "\n")
+		}
+		for j, opt := range it.Options {
+			label := fmt.Sprintf("  %d) ", j+1)
+			if slices.Contains(it.Tried, j) {
+				label = paint("31", fmt.Sprintf("✗ %d) ", j+1))
+			}
+			emit(label + tui.RenderMarkdown(opt, width()-6) + "\n")
+		}
+		for {
+			emit(paint("90", fmt.Sprintf("answer 1–%d, q to stop: ", len(it.Options))))
+			line, err := in.ReadString('\n')
+			line = strings.TrimSpace(line)
+			if err != nil || line == "q" {
+				fmt.Println()
+				return nil
+			}
+			pick, perr := strconv.Atoi(line)
+			if perr != nil || pick < 1 || pick > len(it.Options) {
+				continue
+			}
+			res, err := a.AnswerQuiz(l, n, pick-1)
+			if err != nil {
+				return err
+			}
+			if !res.Correct {
+				emit(paint("31", "✗ Not that one — try again") + "\n")
+				continue
+			}
+			emit(paint("32", "✓ Right") + "\n")
+			if why := res.Quiz.Items[n].Why; why != "" {
+				emit(tui.RenderMarkdown(why, width()) + "\n")
+			}
+			if o := res.Outcome; o.Completed {
+				emit(paint("33", fmt.Sprintf("+%d XP · Lv %d (%d/%d)", o.XPGained, o.Level, o.Into, o.Span)) + "\n")
+				if gitsync.IsRepo(dir) {
+					if err := syncWithRetry(dir, 20*time.Second); err != nil {
+						emit(paint("90", "(not synced yet: "+err.Error()+")") + "\n")
+					}
+				}
+			}
+			break
+		}
+	}
 }
 
 func runHint(dir string, args []string) error {

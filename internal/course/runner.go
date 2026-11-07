@@ -261,6 +261,9 @@ func (e *Engine) Run(ctx context.Context, l *Lesson, mode Mode) (*Result, error)
 	if !l.Written {
 		return nil, fmt.Errorf("%q isn't written yet", l.Title)
 	}
+	if l.IsQuiz() {
+		return nil, fmt.Errorf("%q is a quiz: answer its questions instead", l.Title)
+	}
 	var r *Result
 	var err error
 	if l.Meta.Check != "" {
@@ -373,7 +376,8 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		return &Result{Stage: "compile", Summary: "✗ doesn't compile", Output: out.String() + string(progRes.out)}, nil
 	}
 	if testRes.err != nil {
-		msg := string(testRes.out)
+		// The test files are copied into the build folder; show them as tests/….
+		msg := strings.ReplaceAll(string(testRes.out), filepath.Join(build, "tests")+string(filepath.Separator), "tests/")
 		if msg == "" {
 			msg = testRes.err.Error()
 		}
@@ -401,7 +405,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 				out.WriteString(dim("⏎ (no newline at end)") + "\n")
 			}
 			if res.stderr != "" {
-				out.WriteString(red(res.stderr))
+				out.WriteString(red(tidySanitizer(res.stderr, work, filepath.Join(build, "tests"))))
 			}
 			out.WriteString(dim(fmt.Sprintf("exit %d%s", res.code, res.note)) + "\n\n")
 		}
@@ -420,7 +424,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		if res.code != 0 {
 			allOK = false
 			r.Stage = "tests"
-			out.WriteString(cleanDoctest(res.stdout+"\n"+res.stderr) + "\n")
+			out.WriteString(cleanDoctest(tidySanitizer(res.stdout+"\n"+res.stderr, work, filepath.Join(build, "tests"))) + "\n")
 			if res.note != "" {
 				out.WriteString(red(res.note) + "\n")
 			}
@@ -448,6 +452,8 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		r.Stage, r.Summary = "done", fmt.Sprintf("✓ all %d tests passed — lesson complete", r.Total)
 	case allOK:
 		r.Stage, r.Summary = "done", fmt.Sprintf("✓ %d visible tests pass — submit when ready", r.Total)
+	case r.Stage == "tests" && r.Total == 0:
+		r.Summary = "✗ the tests crashed — the report above says where"
 	default:
 		r.Summary = fmt.Sprintf("✗ %d/%d passed", r.Passed, r.Total)
 	}
@@ -557,7 +563,7 @@ func (e *Engine) runChecks(ctx context.Context, l *Lesson, prog string, checks [
 			if res.code != wantExit {
 				b.WriteString(fmt.Sprintf("  expected exit %d, got %d%s\n", wantExit, res.code, res.note))
 			}
-			if s := strings.TrimSpace(res.stderr); s != "" {
+			if s := strings.TrimSpace(tidySanitizer(res.stderr, e.WorkDir(l), filepath.Join(e.buildDir(l), "tests"))); s != "" {
 				b.WriteString(dim("  stderr:") + "\n" + indent(s, "    ") + "\n")
 			}
 		}

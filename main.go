@@ -29,6 +29,7 @@ Usage:
 Lessons (act on the lesson whose folder you're in, else the current one):
   sysroad run [id]        build, run the visible tests, stop at the first failure
   sysroad submit [id]     run every test; a pass completes the lesson
+  sysroad quiz [id]       answer a quiz's questions
   sysroad hint [id]       show the next hint
   sysroad solution [id]   print the solution
   sysroad reset [id]      put the starter code back (your files are kept)
@@ -71,6 +72,8 @@ func main() {
 		err = runLesson(dir, args, course.ModeRun)
 	case "submit":
 		err = runLesson(dir, args, course.ModeSubmit)
+	case "quiz":
+		err = runQuiz(dir, args)
 	case "hint":
 		err = runHint(dir, args)
 	case "solution":

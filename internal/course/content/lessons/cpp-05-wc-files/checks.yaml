@@ -1,0 +1,22 @@
+- name: one file
+  args: ["a.txt"]
+  files:
+    a.txt: "hello world\n"
+  stdout: "      1       2      12 a.txt\n"
+- name: two files and a total
+  args: ["a.txt", "b.txt"]
+  files:
+    a.txt: "hello world\n"
+    b.txt: "one\ntwo three\n"
+  stdout: "      1       2      12 a.txt\n      2       3      14 b.txt\n      3       5      26 total\n"
+- name: a missing file sets the exit status
+  args: ["a.txt", "nope.txt"]
+  files:
+    a.txt: "hello world\n"
+  stdout: "      1       2      12 a.txt\n      1       2      12 total\n"
+  exit: 1
+  hidden: true
+- name: stdin with no arguments
+  stdin: "one two\n"
+  stdout: "      1       2       8\n"
+  hidden: true

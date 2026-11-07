@@ -1,0 +1,27 @@
+- name: two files
+  args: ["a.txt", "b.txt"]
+  files:
+    a.txt: "hello world\n"
+    b.txt: "one\ntwo three\n"
+  stdout: " 1  2 12 a.txt\n 2  3 14 b.txt\n 3  5 26 total\n"
+- name: -l on one file
+  args: ["-l", "a.txt"]
+  files:
+    a.txt: "hello world\n"
+  stdout: "1 a.txt\n"
+- name: stdin
+  stdin: "hello world\n"
+  stdout: "      1       2      12\n"
+  hidden: true
+- name: -l on stdin
+  args: ["-l"]
+  stdin: "a\nb\nc\n"
+  stdout: "3\n"
+  hidden: true
+- name: a missing file doesn't widen the columns
+  args: ["nope.txt", "a.txt"]
+  files:
+    a.txt: "hello world\n"
+  stdout: " 1  2 12 a.txt\n 1  2 12 total\n"
+  exit: 1
+  hidden: true

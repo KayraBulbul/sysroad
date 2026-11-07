@@ -62,7 +62,7 @@ func (a *App) ResolveLesson(arg, cwd string) (*course.Lesson, error) {
 // to call from a background goroutine.
 func PrepareWorkspace(dir string, e *course.Engine, l *course.Lesson) (string, error) {
 	work := e.WorkDir(l)
-	if l.Graded() && l.Meta.Check == "" && !exists(work) && gitsync.IsRepo(dir) {
+	if l.HasCode() && !exists(work) && gitsync.IsRepo(dir) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		remote := gitsync.HasRemote(ctx, dir)
 		cancel()
@@ -77,11 +77,14 @@ func PrepareWorkspace(dir string, e *course.Engine, l *course.Lesson) (string, e
 var (
 	ErrManualStep = errors.New("nothing to run here — mark it done when you've done it")
 	ErrUnwritten  = errors.New("this lesson isn't written yet")
+	ErrQuiz       = errors.New("this is a quiz — pick an answer for each question")
 )
 
 // Runnable reports whether Run/Submit applies to a lesson.
 func Runnable(l *course.Lesson) error {
 	switch {
+	case l.IsQuiz():
+		return ErrQuiz
 	case l.Graded():
 		return nil
 	case l.Written || l.Detail != "" || l.URL != "":
@@ -173,19 +176,24 @@ func (a *App) RunLesson(ctx context.Context, l *course.Lesson, mode course.Mode)
 // Record marks the lesson done if the result is a passing Submit.
 func (a *App) Record(l *course.Lesson, r *course.Result) (Outcome, error) {
 	before := a.XP()
-	beforeLvl, _, _ := course.Level(before)
-	var o Outcome
+	completed := false
 	if r.OK && r.Mode == course.ModeSubmit && a.Progress.StatusOf(l.ID) != store.Done {
 		if err := a.SetStatus(l.ID, store.Done); err != nil {
-			return o, err
+			return Outcome{}, err
 		}
-		o.Completed = true
+		completed = true
 	}
-	o.XP = a.XP()
+	return a.outcome(before, completed), nil
+}
+
+// outcome describes the XP change since `before`.
+func (a *App) outcome(before int, completed bool) Outcome {
+	beforeLvl, _, _ := course.Level(before)
+	o := Outcome{Completed: completed, XP: a.XP()}
 	o.XPGained = o.XP - before
 	o.Level, o.Into, o.Span = course.Level(o.XP)
 	o.LevelUp = o.Level > beforeLvl
-	return o, nil
+	return o
 }
 
 // ---- hints (machine-local: .local/hints.json) ----

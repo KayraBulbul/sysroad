@@ -1,0 +1,17 @@
+- name: -in
+  args: ["-in", "todo", "main.cpp"]
+  files:
+    main.cpp: "int main() {\n    // TODO: parse args\n    // todo: clean up\n}\n"
+  stdout: "2:    // TODO: parse args\n3:    // todo: clean up\n"
+- name: -c on two files
+  args: ["-c", "x", "a.txt", "b.txt"]
+  files:
+    a.txt: "x\nx\n"
+    b.txt: "y\n"
+  stdout: "a.txt:2\nb.txt:0\n"
+  hidden: true
+- name: -v
+  args: ["-v", "#"]
+  stdin: "# a\nb\n"
+  stdout: "b\n"
+  hidden: true

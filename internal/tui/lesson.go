@@ -128,19 +128,32 @@ func (v *lessonView) finish(c *core, msg lessonRunMsg) tea.Cmd {
 	}
 	if out.Completed {
 		c.changed()
-		msgText := fmt.Sprintf("✓ Lesson complete  +%d XP", out.XPGained)
-		if out.LevelUp {
-			msgText += fmt.Sprintf("  ★ Level %d!", out.Level)
-		}
-		if l.UnderTheHood() != "" {
-			msgText += "  · u: under the hood"
-		}
-		c.say("%s  · ]: next lesson", msgText)
+		c.say("%s", completedText(l, out))
 	}
 	if msg.res.Interactive != nil {
 		return tea.ExecProcess(msg.res.Interactive, func(err error) tea.Msg { return lessonEditDoneMsg{err} })
 	}
 	return nil
+}
+
+// completedText is the status line for finishing a lesson.
+func completedText(l *course.Lesson, out app.Outcome) string {
+	s := fmt.Sprintf("✓ Lesson complete  +%d XP", out.XPGained)
+	if out.LevelUp {
+		s += fmt.Sprintf("  ★ Level %d!", out.Level)
+	}
+	if l.UnderTheHood() != "" {
+		s += "  · u: under the hood"
+	}
+	return s + "  · ]: next lesson"
+}
+
+// completeHow says how a graded lesson gets completed.
+func completeHow(l *course.Lesson) string {
+	if l.IsQuiz() {
+		return "Answer every question to complete a quiz"
+	}
+	return "Submit (s) completes a lesson"
 }
 
 func (v *lessonView) workPath() string {
@@ -164,6 +177,11 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 	l := v.lesson()
 	if l == nil {
 		return nil, false
+	}
+	if l.IsQuiz() {
+		if cmd, ok := v.quizKey(c, l, k); ok {
+			return cmd, true
+		}
 	}
 	switch k {
 	case "r":
@@ -349,6 +367,9 @@ func (v *lessonView) bodyLines(w int) []string {
 		add("")
 		add(hyperlink(l.URL, sLink.Render(trunc(l.URL, w))) + sDim.Render("  o: open"))
 	}
+	if l.IsQuiz() {
+		out = append(out, v.quizLines(l, w)...)
+	}
 
 	if hints := l.Hints(); len(hints) > 0 {
 		shown := min(v.app.HintsShown(l.ID), len(hints))
@@ -366,6 +387,8 @@ func (v *lessonView) bodyLines(w int) []string {
 	if uth := l.UnderTheHood(); uth != "" {
 		add("")
 		switch {
+		case status != store.Done && l.IsQuiz():
+			add(sDim.Render("🔒 Under the hood unlocks when you finish the quiz"))
 		case status != store.Done:
 			add(sDim.Render("🔒 Under the hood unlocks when you pass Submit"))
 		case v.showUTH:
@@ -437,6 +460,9 @@ func (v *lessonView) outputLines(w int) []string {
 			verb = "Submitting"
 		}
 		return []string{sWarn.Render(fmt.Sprintf("⟳ %s… %.0fs", verb, time.Since(v.runStart).Seconds()))}
+	}
+	if l := v.lesson(); l != nil && l.IsQuiz() {
+		return nil // the questions are the whole lesson
 	}
 	r := v.result
 	if r == nil {
@@ -517,6 +543,13 @@ func (v *lessonView) hints(c *core) string {
 	}
 	if !l.Graded() {
 		return keyHints([][2]string{{"spc", "done"}, {"o", "open"}, {"[/]", "prev/next"}, {"n", "note"}, {"q", ""}})
+	}
+	if l.IsQuiz() {
+		keys := [][2]string{{"1-9", "answer"}, {"R", "retake"}}
+		if v.done() && l.UnderTheHood() != "" {
+			keys = append(keys, [2]string{"u", "hood"})
+		}
+		return keyHints(append(keys, [2]string{"[/]", "prev/next"}, [2]string{"q", ""}))
 	}
 	keys := [][2]string{{"r", "run"}, {"s", "submit"}, {"h", "hint"}}
 	if v.done() && l.UnderTheHood() != "" {

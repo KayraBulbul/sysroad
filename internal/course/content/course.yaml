@@ -75,7 +75,7 @@ phases:
           - id: cpp-16-const
             title: const everywhere
           - id: cpp-17-raii
-            title: RAII — a File class that closes itself
+            title: RAII — a file descriptor that closes itself
           - id: cpp-18-hexdump
             title: hexdump -C, line by line
           - id: cpp-19-hexdump-skip
@@ -110,17 +110,83 @@ phases:
     chapters:
       - id: mem-layout
         title: Layout, sizeof & alignment
-        lessons: []
+        lessons:
+          - id: mem-01-bytes
+            title: Objects are bytes
+          - id: mem-02-alignment
+            title: Alignment and padding
+          - id: mem-03-struct-order
+            title: Reordering fields to shrink a struct
+          - id: mem-04-endianness
+            title: Endianness and reading binary headers
+          - id: mem-05-arrays-decay
+            title: "Arrays, pointers and decay"
+          - id: mem-06-span
+            title: "Pointer arithmetic and std::span"
+          - id: mem-07-layout-quiz
+            title: "Check: layout"
+            kind: quiz
+          - id: mem-08-bmp
+            title: Read a BMP image header by hand
+            kind: project
       - id: mem-heap
         title: Stack, heap, new/delete & smart pointers
-        lessons: []
+        lessons:
+          - id: mem-09-stack-frames
+            title: "The stack, frame by frame"
+          - id: mem-10-new-delete
+            title: "new, delete and what they cost"
+          - id: mem-11-leaks
+            title: "Leaks, double frees and how ASan finds them"
+          - id: mem-12-unique-ptr
+            title: "std::unique_ptr: one owner"
+          - id: mem-13-shared-ptr
+            title: "std::shared_ptr and weak_ptr"
+          - id: mem-14-linked-list
+            title: A linked list with unique_ptr
+          - id: mem-15-heap-quiz
+            title: "Check: who frees this?"
+            kind: quiz
       - id: mem-move
         title: Copies, moves & the rule of five
-        lessons: []
+        lessons:
+          - id: mem-16-copy
+            title: Copy constructors and copy assignment
+          - id: mem-17-rvalues
+            title: "lvalues, rvalues and std::move"
+          - id: mem-18-move
+            title: "Move constructors: Fd learns to move"
+          - id: mem-19-rule-of-five
+            title: "The rules of zero, three and five"
+          - id: mem-20-noexcept-move
+            title: noexcept moves and vector growth
+          - id: mem-21-ub-tour
+            title: A tour of undefined behaviour
+          - id: mem-22-move-quiz
+            title: "Check: copies and moves"
+            kind: quiz
       - id: mem-rebuild
         title: "Rebuild: String, Vector, HashMap"
         project: your containers, swapped into your coreutils
-        lessons: []
+        lessons:
+          - id: mem-23-string
+            title: "String, with the small-string optimisation"
+            kind: project
+          - id: mem-24-vector
+            title: "Vector<T>: growth, placement new, destruction"
+            kind: project
+          - id: mem-25-vector-iter
+            title: Vector iterators and invalidation
+          - id: mem-26-hashmap
+            title: "HashMap: open addressing"
+            kind: project
+          - id: mem-27-hashmap-grow
+            title: "HashMap: deletion and rehashing"
+          - id: mem-28-swap-in
+            title: "Swap your containers into wc, cat and grep"
+            kind: project
+          - id: mem-29-bench
+            title: Benchmark yours against the standard library
 
   - id: p3
     title: CMake & the text editor
@@ -128,11 +194,56 @@ phases:
     chapters:
       - id: cmake
         title: CMake in one sitting
-        lessons: []
+        lessons:
+          - id: cmake-01-why
+            title: Why build systems exist
+          - id: cmake-02-first
+            title: A first CMakeLists.txt
+          - id: cmake-03-targets
+            title: "Targets, libraries and include paths"
+          - id: cmake-04-options
+            title: "Build types, warnings and sanitizers"
+          - id: cmake-05-tests
+            title: Tests with CTest and doctest
+          - id: cmake-06-deps
+            title: Dependencies with FetchContent
+          - id: cmake-07-coreutils
+            title: Your coreutils as one CMake project
+            kind: project
+          - id: cmake-08-quiz
+            title: "Check: CMake"
+            kind: quiz
       - id: editor
         title: "Capstone: text editor"
         project: raw-mode terminal, rendering, file I/O, search, syntax highlighting
-        lessons: []
+        lessons:
+          - id: editor-01-raw
+            title: Raw mode and reading keys
+            kind: capstone
+          - id: editor-02-screen
+            title: Drawing the screen with escape codes
+            kind: capstone
+          - id: editor-03-cursor
+            title: Moving the cursor
+            kind: capstone
+          - id: editor-04-open
+            title: Opening files and scrolling
+            kind: capstone
+          - id: editor-05-insert
+            title: Inserting and deleting text
+            kind: capstone
+          - id: editor-06-save
+            title: "Saving, and the unsaved-changes flag"
+            kind: capstone
+          - id: editor-07-search
+            title: Incremental search
+            kind: capstone
+          - id: editor-08-highlight
+            title: Syntax highlighting for C++
+            kind: capstone
+          - id: editor-09-undo
+            title: Undo and redo
+            kind: capstone
 
   - id: p4
     title: Data & machine code
@@ -140,116 +251,517 @@ phases:
     chapters:
       - id: data-bits
         title: Bits, integers & floats
-        lessons: []
+        lessons:
+          - id: bits-01-binary
+            title: "Binary, hex and bitwise operators"
+          - id: bits-02-masks
+            title: "Masks, shifts and bit fields"
+          - id: bits-03-twos
+            title: "Two's complement and overflow"
+          - id: bits-04-conversions
+            title: Integer promotions and conversions
+          - id: bits-05-floats
+            title: IEEE 754 floats by hand
+          - id: bits-06-float-traps
+            title: Floats that surprise you
+          - id: bits-07-bitset
+            title: A Bitset class
+            kind: project
+          - id: bits-08-quiz
+            title: "Check: bits and numbers"
+            kind: quiz
       - id: data-asm
         title: Reading assembly
-        lessons: []
+        lessons:
+          - id: asm-01-registers
+            title: Registers and your first instructions
+          - id: asm-02-reading
+            title: "Reading clang's output"
+          - id: asm-03-control
+            title: Branches and loops
+          - id: asm-04-calls
+            title: Calling conventions and the stack
+          - id: asm-05-data
+            title: "Arrays, structs and pointers in assembly"
+          - id: asm-06-optimised
+            title: What -O2 does to your code
+          - id: asm-07-gdb
+            title: Stepping through assembly in a debugger
+          - id: asm-08-quiz
+            title: "Check: assembly"
+            kind: quiz
       - id: data-labs
         title: Data, Bomb & Attack Labs
-        lessons: []
+        lessons:
+          - id: lab-data
+            title: "CS:APP Data Lab"
+            kind: lab
+          - id: lab-bomb
+            title: "CS:APP Bomb Lab"
+            kind: lab
+          - id: lab-attack
+            title: "CS:APP Attack Lab"
+            kind: lab
 
   - id: p5
     title: Performance, caches & linking
     chapters:
       - id: perf-caches
         title: Caches & the memory mountain
-        lessons: []
+        lessons:
+          - id: perf-01-measure
+            title: Measuring time properly
+          - id: perf-02-hierarchy
+            title: The memory hierarchy
+          - id: perf-03-mountain
+            title: Build the memory mountain
+            kind: project
+          - id: perf-04-locality
+            title: "Locality: rows vs columns"
+          - id: perf-05-profilers
+            title: "perf on Linux, Instruments on the Mac"
+          - id: perf-06-soa
+            title: Struct of arrays vs array of structs
+          - id: perf-07-quiz
+            title: "Check: caches"
+            kind: quiz
       - id: perf-optimise
         title: Making loops fast
-        lessons: []
+        lessons:
+          - id: opt-01-flags
+            title: What -O2 and -O3 change
+          - id: opt-02-blockers
+            title: Aliasing and other optimisation blockers
+          - id: opt-03-chains
+            title: Loop unrolling and dependency chains
+          - id: opt-04-simd
+            title: Auto-vectorisation and SIMD
+          - id: opt-05-branches
+            title: Branch prediction
+          - id: opt-06-fast-wc
+            title: "Make your wc as fast as GNU's"
+            kind: project
       - id: perf-linking
         title: Linking, ELF & shared libraries
         project: mini readelf
-        lessons: []
+        lessons:
+          - id: link-01-stages
+            title: "Preprocess, compile, assemble, link"
+          - id: link-02-symbols
+            title: "Symbols, nm and the one-definition rule"
+          - id: link-03-static
+            title: Static libraries
+          - id: link-04-shared
+            title: Shared libraries and the dynamic loader
+          - id: link-05-elf
+            title: The ELF format
+          - id: link-06-readelf-header
+            title: "mini readelf: the header"
+            kind: project
+          - id: link-07-readelf-sections
+            title: "mini readelf: sections and symbols"
+            kind: project
+          - id: link-08-macho
+            title: Mach-O on the Mac
+          - id: link-09-quiz
+            title: "Check: linking"
+            kind: quiz
 
   - id: p6
     title: Processes & the shell
     chapters:
       - id: proc-basics
         title: fork, exec, wait & pipes
-        lessons: []
+        lessons:
+          - id: proc-01-processes
+            title: What a process is
+          - id: proc-02-fork
+            title: fork
+          - id: proc-03-exec
+            title: exec and the environment
+          - id: proc-04-wait
+            title: wait and exit statuses
+          - id: proc-05-dup2
+            title: "File descriptors, dup2 and redirection"
+          - id: proc-06-pipes
+            title: Pipes
+          - id: proc-07-pipeline
+            title: Run a pipeline yourself
+            kind: project
+          - id: proc-08-quiz
+            title: "Check: processes"
+            kind: quiz
       - id: proc-signals
         title: Signals & job control
-        lessons: []
+        lessons:
+          - id: sig-01-handlers
+            title: Signals and handlers
+          - id: sig-02-safety
+            title: Async-signal safety
+          - id: sig-03-masks
+            title: Blocking signals and sigsuspend
+          - id: sig-04-sigchld
+            title: Reaping children with SIGCHLD
+          - id: sig-05-groups
+            title: Process groups and sessions
+          - id: sig-06-terminal
+            title: The terminal and job control
+          - id: sig-07-quiz
+            title: "Check: signals"
+            kind: quiz
       - id: shell
         title: "Capstone: your shell"
-        lessons: []
+        lessons:
+          - id: shell-01-repl
+            title: "Read, parse, run"
+            kind: capstone
+          - id: shell-02-builtins
+            title: "cd, exit and other builtins"
+            kind: capstone
+          - id: shell-03-redirect
+            title: Redirections
+            kind: capstone
+          - id: shell-04-pipes
+            title: Pipelines
+            kind: capstone
+          - id: shell-05-background
+            title: Background jobs
+            kind: capstone
+          - id: shell-06-jobs
+            title: "fg, bg and Ctrl-Z"
+            kind: capstone
+          - id: shell-07-expand
+            title: Variables and quoting
+            kind: capstone
+          - id: shell-08-history
+            title: History and line editing
+            kind: capstone
 
   - id: p7
     title: Virtual memory & allocators
     chapters:
       - id: vm
         title: mmap, paging & the TLB
-        lessons: []
+        lessons:
+          - id: vm-01-spaces
+            title: Virtual address spaces
+          - id: vm-02-paging
+            title: Pages and page tables
+          - id: vm-03-tlb
+            title: The TLB and huge pages
+          - id: vm-04-mmap
+            title: mmap
+          - id: vm-05-cow
+            title: Copy-on-write and fork
+          - id: vm-06-maps
+            title: Map your own address space
+            kind: project
+          - id: vm-07-quiz
+            title: "Check: virtual memory"
+            kind: quiz
       - id: alloc-cpp
         title: C++ allocators & pmr
-        lessons: []
+        lessons:
+          - id: alloc-01-operator-new
+            title: Replacing operator new
+          - id: alloc-02-interface
+            title: The Allocator interface
+          - id: alloc-03-arena
+            title: An arena allocator
+          - id: alloc-04-pmr
+            title: "std::pmr"
+          - id: alloc-05-pool
+            title: A fixed-size pool allocator
+            kind: project
       - id: malloc
         title: "Capstone: your malloc"
         project: plugged into your containers
-        lessons: []
+        lessons:
+          - id: malloc-01-bump
+            title: A bump allocator on mmap
+            kind: capstone
+          - id: malloc-02-implicit
+            title: Implicit free lists
+            kind: capstone
+          - id: malloc-03-coalesce
+            title: Coalescing with boundary tags
+            kind: capstone
+          - id: malloc-04-explicit
+            title: Explicit free lists
+            kind: capstone
+          - id: malloc-05-segregated
+            title: Segregated fits
+            kind: capstone
+          - id: malloc-06-realloc
+            title: realloc and calloc
+            kind: capstone
+          - id: malloc-07-plug
+            title: Plug it into your containers
+            kind: capstone
+          - id: malloc-08-bench
+            title: Benchmark against the system malloc
+            kind: capstone
 
   - id: p8
     title: Concurrency
     chapters:
       - id: conc-threads
         title: Threads, atomics & memory order
-        lessons: []
+        lessons:
+          - id: thr-01-threads
+            title: "std::thread and joining"
+          - id: thr-02-races
+            title: Data races and ThreadSanitizer
+          - id: thr-03-atomics
+            title: "std::atomic"
+          - id: thr-04-ordering
+            title: Memory ordering
+          - id: thr-05-false-sharing
+            title: False sharing
+          - id: thr-06-spsc
+            title: A lock-free single-producer queue
+            kind: project
+          - id: thr-07-quiz
+            title: "Check: atomics"
+            kind: quiz
       - id: conc-sync
         title: Mutexes on a futex, condition variables
-        lessons: []
+        lessons:
+          - id: sync-01-spinlock
+            title: A spinlock
+          - id: sync-02-futex
+            title: A real mutex on a futex
+          - id: sync-03-condvar
+            title: Condition variables
+          - id: sync-04-deadlock
+            title: Deadlock and lock ordering
+          - id: sync-05-rwlock
+            title: Reader-writer locks
+          - id: sync-06-queue
+            title: A bounded blocking queue
+            kind: project
       - id: conc-pool
         title: Thread pool & user-level threads
-        lessons: []
+        lessons:
+          - id: pool-01-pool
+            title: A thread pool
+            kind: project
+          - id: pool-02-futures
+            title: Futures and promises
+          - id: pool-03-stealing
+            title: Work stealing
+          - id: pool-04-ucontext
+            title: ucontext and user-level threads
+          - id: pool-05-green
+            title: A green-thread scheduler
+            kind: project
 
   - id: p9
     title: Networking
     chapters:
       - id: net-sockets
         title: Sockets & echo servers
-        lessons: []
+        lessons:
+          - id: net-01-model
+            title: "Addresses, ports and TCP"
+          - id: net-02-client
+            title: A TCP client
+          - id: net-03-echo
+            title: An echo server
+          - id: net-04-framing
+            title: Reading a whole message
+          - id: net-05-udp
+            title: UDP
+          - id: net-06-quiz
+            title: "Check: sockets"
+            kind: quiz
       - id: net-events
         title: poll, epoll & kqueue
-        lessons: []
+        lessons:
+          - id: ev-01-threads
+            title: "Why a thread per client doesn't scale"
+          - id: ev-02-nonblocking
+            title: Non-blocking sockets
+          - id: ev-03-poll
+            title: poll
+          - id: ev-04-epoll
+            title: "epoll on Linux, kqueue on the Mac"
+          - id: ev-05-loop
+            title: An event loop class
+            kind: project
       - id: http
         title: "Capstone: HTTP/1.1 server"
-        lessons: []
+        lessons:
+          - id: http-01-parse
+            title: Parsing requests
+            kind: capstone
+          - id: http-02-files
+            title: Serving files
+            kind: capstone
+          - id: http-03-keepalive
+            title: Keep-alive
+            kind: capstone
+          - id: http-04-clients
+            title: Many clients on your event loop
+            kind: capstone
+          - id: http-05-limits
+            title: "Errors, limits and timeouts"
+            kind: capstone
+          - id: http-06-load
+            title: Load testing with wrk
+            kind: capstone
 
   - id: p10
     title: Storage
     chapters:
       - id: store-files
         title: Files, fsync & crash consistency
-        lessons: []
+        lessons:
+          - id: fs-01-inodes
+            title: "Inodes, directories and links"
+          - id: fs-02-cache
+            title: The page cache and buffering
+          - id: fs-03-fsync
+            title: "fsync and what \"saved\" means"
+          - id: fs-04-rename
+            title: Atomic rename and safe saves
+          - id: fs-05-crash
+            title: Crash-consistency tests
+            kind: project
       - id: kv
         title: "Capstone: KV store with a write-ahead log"
-        lessons: []
+        lessons:
+          - id: kv-01-table
+            title: An in-memory table and a protocol
+            kind: capstone
+          - id: kv-02-wal
+            title: The write-ahead log
+            kind: capstone
+          - id: kv-03-recover
+            title: Recovering after a crash
+            kind: capstone
+          - id: kv-04-checksums
+            title: Checksums and torn writes
+            kind: capstone
+          - id: kv-05-compact
+            title: Snapshots and log compaction
+            kind: capstone
+          - id: kv-06-serve
+            title: Serve it over your HTTP server
+            kind: capstone
       - id: kv-engine
         title: LSM tree or B+tree
-        lessons: []
+        lessons:
+          - id: eng-01-sstable
+            title: Sorted string tables
+          - id: eng-02-lsm
+            title: An LSM tree
+            kind: project
+          - id: eng-03-bloom
+            title: Bloom filters
+          - id: eng-04-btree
+            title: A B+tree on pages
+            kind: project
+          - id: eng-05-bench
+            title: Benchmark your engine
 
   - id: p11
     title: Interpreters
     chapters:
       - id: interp-tree
         title: A tree-walking interpreter
-        lessons: []
+        lessons:
+          - id: tree-01-lexer
+            title: A lexer
+          - id: tree-02-ast
+            title: "An AST with std::variant"
+          - id: tree-03-parser
+            title: Recursive descent parsing
+          - id: tree-04-eval
+            title: Evaluating expressions
+          - id: tree-05-scopes
+            title: Variables and scopes
+          - id: tree-06-control
+            title: "if, while and functions"
+          - id: tree-07-closures
+            title: Closures
       - id: interp-vm
         title: A bytecode VM
-        lessons: []
+        lessons:
+          - id: bc-01-stack
+            title: Bytecode and a stack machine
+          - id: bc-02-compile
+            title: Compiling the AST to bytecode
+          - id: bc-03-dispatch
+            title: Dispatch loops
+          - id: bc-04-gc
+            title: A mark-and-sweep garbage collector
+          - id: bc-05-strings
+            title: Interning strings
+          - id: bc-06-bench
+            title: Tree-walker vs VM
       - id: interp-lang
         title: "Capstone: your own language"
-        lessons: []
+        lessons:
+          - id: lang-01-design
+            title: Design your language
+            kind: capstone
+          - id: lang-02-stdlib
+            title: A standard library
+            kind: capstone
+          - id: lang-03-errors
+            title: Error messages with line and column
+            kind: capstone
+          - id: lang-04-repl
+            title: A REPL
+            kind: capstone
+          - id: lang-05-programs
+            title: Write real programs in it
+            kind: capstone
 
   - id: p12
     title: C & kernels
     chapters:
       - id: c-for-cpp
         title: C for C++ programmers
-        lessons: []
+        lessons:
+          - id: c-01-missing
+            title: "What C doesn't have"
+          - id: c-02-strings
+            title: C strings and string.h
+          - id: c-03-cleanup
+            title: Error handling with goto cleanup
+          - id: c-04-macros
+            title: The preprocessor and macros
+          - id: c-05-generic
+            title: "Generic code with void* and macros"
+          - id: c-06-port
+            title: Port your wc to C
+            kind: project
       - id: xv6
         title: xv6 labs
-        lessons: []
+        lessons:
+          - id: xv6-01-util
+            title: "xv6 lab: Unix utilities"
+            kind: lab
+          - id: xv6-02-syscall
+            title: "xv6 lab: system calls"
+            kind: lab
+          - id: xv6-03-pgtbl
+            title: "xv6 lab: page tables"
+            kind: lab
+          - id: xv6-04-traps
+            title: "xv6 lab: traps"
+            kind: lab
+          - id: xv6-05-cow
+            title: "xv6 lab: copy-on-write fork"
+            kind: lab
+          - id: xv6-06-locks
+            title: "xv6 lab: locks"
+            kind: lab
+          - id: xv6-07-fs
+            title: "xv6 lab: file system"
+            kind: lab
 
   - id: side
     title: Side quests

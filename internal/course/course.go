@@ -121,8 +121,9 @@ type Check struct {
 }
 
 // Graded reports whether Submit (rather than a manual tick) completes it.
+// Quizzes count: answering every question right completes them.
 func (l *Lesson) Graded() bool {
-	return l.Written && (l.Meta.Check != "" || len(l.Meta.Files) > 0)
+	return l.Written && (l.Meta.Check != "" || len(l.Meta.Files) > 0 || l.IsQuiz())
 }
 
 // HasCode reports whether the lesson has code you write in its work folder,
@@ -432,6 +433,10 @@ func (c *Course) Validate() error {
 	var errs []string
 	for _, l := range c.Lessons() {
 		if !l.Written {
+			continue
+		}
+		if l.Kind == KindQuiz {
+			errs = append(errs, l.validateQuiz()...)
 			continue
 		}
 		if l.Meta.Check != "" {

@@ -1,0 +1,10 @@
+- name: hello world
+  args: ["-C"]
+  stdin: "Hello world\n"
+  stdout: "00000000  48 65 6c 6c 6f 20 77 6f  72 6c 64 0a              |Hello world.|\n0000000c\n"
+- name: two lines from a file
+  args: ["-C", "a.txt"]
+  files:
+    a.txt: "The quick brown fox jumps\n"
+  stdout: "00000000  54 68 65 20 71 75 69 63  6b 20 62 72 6f 77 6e 20  |The quick brown |\n00000010  66 6f 78 20 6a 75 6d 70  73 0a                    |fox jumps.|\n0000001a\n"
+  hidden: true

@@ -1,0 +1,18 @@
+- name: two files
+  args: ["error", "app.log", "worker.log"]
+  files:
+    app.log: "start\nerror: disk full\nretrying\n"
+    worker.log: "error: crashed\nok\n"
+  stdout: "app.log:error: disk full\nworker.log:error: crashed\n"
+- name: no match
+  args: ["zzz"]
+  stdin: "abc\n"
+  stdout: ""
+  exit: 1
+- name: a missing file
+  args: ["a", "x.txt", "nope.txt"]
+  files:
+    x.txt: "a\n"
+  stdout: "x.txt:a\n"
+  exit: 2
+  hidden: true
