@@ -29,6 +29,12 @@
         if (lessonID) loadLesson(lessonID);
       }),
       on<FileEvent>("file", (ev) => workspace.onFileEvent(ev)),
+      // The mouse's side buttons on Linux, caught by the Go side.
+      on<number>("nav", (dir) => {
+        if (ui.palette || ui.confirm) return;
+        if (dir < 0) back();
+        else forward();
+      }),
       on<ResultEvent>("result", (ev) => {
         if (ui.lessons[ev.lesson]) loadLesson(ev.lesson);
       }),

@@ -22,7 +22,12 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// evNav carries the mouse's back (-1) and forward (+1) side buttons on
+// Linux, where the web view doesn't see them.
+const evNav = "nav"
+
 func init() {
+	application.RegisterEvent[int](evNav)
 	application.RegisterEvent[gui.Theme](gui.EvTheme)
 	application.RegisterEvent[gui.FileEvent](gui.EvFile)
 	application.RegisterEvent[gui.ResultEvent](gui.EvResult)
@@ -68,11 +73,11 @@ func main() {
 		},
 	})
 
+	mouseNav = func(dir int) { wails.Event.Emit(evNav, dir) }
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
 		application.InvokeSync(func() {
-			n := instantScroll(win.NativeWindow())
-			if n == 0 {
-				log.Println("sysroad-gui: couldn't turn off smooth scrolling")
+			if tuneWebView(win.NativeWindow()) == 0 {
+				log.Println("sysroad-gui: couldn't find the web view to set up scrolling and mouse buttons")
 			}
 		})
 	})

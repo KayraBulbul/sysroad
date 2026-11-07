@@ -139,7 +139,7 @@ const theme = EditorView.theme({
   ".cm-completionMatchedText": { textDecoration: "none", color: "var(--accent)", fontWeight: "600" },
   ".cm-completionIcon": { width: "1.4em", opacity: "0.9", paddingRight: "0.5em", fontSize: "11px" },
   ".cm-completionIcon-variable": { color: "var(--blue)" },
-  ".cm-completionIcon-function": { color: "var(--magenta)" },
+  ".cm-completionIcon-function, .cm-completionIcon-method": { color: "var(--magenta)" },
   ".cm-completionIcon-type": { color: "var(--yellow)" },
   ".cm-completionIcon-namespace": { color: "var(--cyan)" },
   ".cm-completionIcon-keyword": { color: "var(--red)" },

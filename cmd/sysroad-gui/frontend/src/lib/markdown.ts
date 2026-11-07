@@ -14,7 +14,8 @@ md.use({
       return `<pre class="code">${label}<code>${body}</code></pre>`;
     },
     codespan({ text }: Tokens.Codespan) {
-      return `<code class="inline">${text}</code>`;
+      // marked hands over the raw text: `<cctype>` must not become a tag.
+      return `<code class="inline">${escape(text)}</code>`;
     },
     link({ href, title, tokens }: Tokens.Link) {
       const inner = this.parser.parseInline(tokens);
