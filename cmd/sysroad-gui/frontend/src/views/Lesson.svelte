@@ -380,8 +380,8 @@
     <div class="editor-area" style="height:{hasCode ? (1 - outH) * 100 : 0}%" class:hidden={!hasCode}>
       <div class="tabs">
         {#each workspace.tabs as t, i (t.key)}
-          <button class="tab" class:on={i === workspace.active} class:ro={t.kind !== "file"} onclick={() => { workspace.select(i); workspace.focus(); }}>
-            {#if t.kind === "solution"}<span class="badge">solution</span>{:else if t.kind === "diff"}<span class="badge">diff</span>{/if}
+          <button class="tab" class:on={i === workspace.active} class:ro={t.readOnly} onclick={() => { workspace.select(i); workspace.focus(); }}>
+            {#if t.kind === "solution"}<span class="badge">solution</span>{:else if t.kind === "diff"}<span class="badge">diff</span>{:else if t.readOnly}<span class="badge ro" title="Shared with the tests. You don't edit this file">read-only</span>{/if}
             {t.name}
             {#if t.conflict}<span class="mark bad" title="Changed on disk">!</span>{:else if t.dirty}<span class="mark" title="Unsaved">●</span>{/if}
           </button>
@@ -513,6 +513,9 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--yellow);
+  }
+  .badge.ro {
+    color: var(--fg-dim);
   }
   .mark {
     color: var(--fg-dim);

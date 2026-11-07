@@ -35,9 +35,43 @@ The catch is that a word can be split across two chunks. Calling last
 lesson's `count_words` on each chunk counts `"fo" | "x"` as two words.
 Keep the in-word state *across* chunks instead.
 
-`Counts` is declared in `wc.hpp`, so your code and the tests agree on it.
-Headers are how C++ shares declarations between files. Chapter 1.3 covers
-them properly.
+**What you return.** `count_stream` returns a `Counts`, a struct with
+three numbers that start at zero:
+
+```cpp
+struct Counts {
+    std::size_t lines = 0;
+    std::size_t words = 0;
+    std::size_t bytes = 0;
+};
+```
+
+It lives in `wc.hpp`, the read-only tab next to `wc.cpp`, so your code and
+the tests agree on it. `#include "wc.hpp"` at the top of `wc.cpp` pulls it
+in. Headers are how C++ shares declarations between files. Chapter 1.3
+covers them properly.
+
+**Formatting output.** `std::format` from `<format>` builds a
+`std::string`. Each `{}` is filled in with the next argument, much like Go's
+`fmt.Sprintf`:
+
+```cpp
+std::string s = std::format("{} has {} legs", "spider", 8);
+// "spider has 8 legs"
+```
+
+Put a spec after a colon to control the layout. `{:>5}` means "right-align
+(`>`) in a field 5 characters wide", padding with spaces on the left:
+
+```cpp
+std::cout << std::format("[{:>5}]\n", 42);     // [   42]
+std::cout << std::format("[{:>5}]\n", 12345);  // [12345]
+std::cout << std::format("[{:<5}]\n", 42);     // [42   ]  (< aligns left)
+```
+
+A value wider than the field is never cut off. It just pushes the line
+wider. Right-aligning every number to the same width is what lines up
+wc's columns.
 
 **The spec**
 
@@ -45,9 +79,9 @@ them properly.
   counted, same as GNU.
 - `words` follows last lesson's rule, across the whole stream.
 - `bytes` is the total number of bytes read.
-- `main` counts `std::cin` and prints each number right-aligned in a
-  7-wide column, separated by single spaces, then `'\n'`.
-  `std::format("{:>7}", n)` right-aligns.
+- `main` counts `std::cin` and prints lines, words and bytes, each
+  right-aligned in a 7-wide column, separated by single spaces, then
+  `'\n'`.
 
 ## Assignment
 

@@ -51,13 +51,14 @@ export type Buffer = {
   onDisk: boolean;
   dirty: boolean;
   conflict: File | null; // disk content that differs from ours
-  readOnly: boolean;
+  readOnly: boolean; // a solution, or a file the lesson gives you (its header)
+  solution: boolean;
   timer?: ReturnType<typeof setTimeout>;
   saving?: Promise<void> | null;
   again?: boolean;
 };
 
-export type Tab = { key: string; name: string; kind: "file" | "solution" | "diff"; dirty: boolean; conflict: boolean };
+export type Tab = { key: string; name: string; kind: "file" | "solution" | "diff"; readOnly: boolean; dirty: boolean; conflict: boolean };
 
 export type Actions = {
   run: () => void;
@@ -369,6 +370,11 @@ export class Workspace {
     return EditorState.create({ doc, extensions: this.extensions(readOnly, extra) });
   }
 
+  private fileBuffer(lesson: string, f: File): Buffer {
+    const readOnly = !!f.readOnly;
+    return { key: `${lesson}/${f.name}`, lesson, name: f.name, state: this.newState(f.content, readOnly), base: f.hash, saved: f.content, onDisk: f.onDisk, dirty: false, conflict: null, readOnly, solution: false };
+  }
+
   // open shows a lesson's files. It switches at once: buffers you already
   // had for the lesson show straight away (history and cursor included) and
   // the old lesson's pending saves finish in the background. Then it fetches
@@ -400,12 +406,12 @@ export class Workspace {
       const key = `${lesson}/${f.name}`;
       let buf = this.bufs.get(key);
       if (!buf) {
-        buf = { key, lesson, name: f.name, state: this.newState(f.content, false), base: f.hash, saved: f.content, onDisk: f.onDisk, dirty: false, conflict: null, readOnly: false };
+        buf = this.fileBuffer(lesson, f);
         this.bufs.set(key, buf);
       } else if (f.hash !== buf.base) {
         this.diskChanged(buf, f);
       }
-      tabs.push({ key, name: f.name, kind: "file", dirty: buf.dirty, conflict: !!buf.conflict });
+      tabs.push({ key, name: f.name, kind: "file", readOnly: buf.readOnly, dirty: buf.dirty, conflict: !!buf.conflict });
     }
     // Keep a solution tab that was open.
     for (const t of this.tabs) if (t.kind !== "file" && this.bufs.has(t.key)) tabs.push(t);
@@ -418,7 +424,7 @@ export class Workspace {
   private showCached(lesson: string) {
     const tabs: Tab[] = [];
     for (const b of this.bufs.values()) {
-      if (b.lesson === lesson && !b.readOnly) tabs.push({ key: b.key, name: b.name, kind: "file", dirty: b.dirty, conflict: !!b.conflict });
+      if (b.lesson === lesson && !b.solution) tabs.push({ key: b.key, name: b.name, kind: "file", readOnly: b.readOnly, dirty: b.dirty, conflict: !!b.conflict });
     }
     this.tabs = tabs;
     this.active = 0;
@@ -500,12 +506,12 @@ export class Workspace {
     return buf.saving;
   }
 
-  // otherStates are the lesson's other files, for completion.
+  // otherStates are the lesson's other files (headers included), for completion.
   private otherStates(): EditorState[] {
     const cur = this.current();
     const out: EditorState[] = [];
     for (const b of this.bufs.values()) {
-      if (b !== cur && b.lesson === this.lesson && !b.readOnly) out.push(b.state);
+      if (b !== cur && b.lesson === this.lesson && !b.solution) out.push(b.state);
     }
     return out;
   }
@@ -614,7 +620,7 @@ export class Workspace {
       const key = `${lesson}/${f.name}`;
       const old = this.bufs.get(key);
       if (old) clearTimeout(old.timer);
-      this.bufs.set(key, { key, lesson, name: f.name, state: this.newState(f.content, false), base: f.hash, saved: f.content, onDisk: f.onDisk, dirty: false, conflict: null, readOnly: false });
+      this.bufs.set(key, this.fileBuffer(lesson, f));
     }
     if (lesson === this.lesson) {
       this.tabs = this.tabs.filter((t) => t.kind === "file");
@@ -642,8 +648,8 @@ export class Workspace {
       } else {
         state = this.newState(f.content, true);
       }
-      this.bufs.set(key, { key, lesson: this.lesson, name: f.name, state, base: f.hash, saved: f.content, onDisk: false, dirty: false, conflict: null, readOnly: true });
-      tabs.push({ key, name: f.name, kind: diff ? "diff" : "solution", dirty: false, conflict: false });
+      this.bufs.set(key, { key, lesson: this.lesson, name: f.name, state, base: f.hash, saved: f.content, onDisk: false, dirty: false, conflict: null, readOnly: true, solution: true });
+      tabs.push({ key, name: f.name, kind: diff ? "diff" : "solution", readOnly: true, dirty: false, conflict: false });
     }
     this.tabs = tabs;
     const first = tabs.findIndex((t) => t.kind !== "file");
