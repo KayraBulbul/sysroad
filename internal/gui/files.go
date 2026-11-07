@@ -57,9 +57,9 @@ func (s *Service) editable(id, name string) (*course.Lesson, error) {
 	return l, nil
 }
 
-// OpenFiles returns the files you edit in a lesson and starts watching them.
-// A lesson you haven't started yet shows its starter code; the folder is made
-// on the first save or run, so browsing doesn't litter the data repo.
+// OpenFiles returns the files you edit in a lesson. A lesson you haven't
+// started yet shows its starter code; the folder is made on the first save or
+// run, so browsing doesn't litter the data repo.
 func (s *Service) OpenFiles(id string) ([]File, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -68,7 +68,6 @@ func (s *Service) OpenFiles(id string) ([]File, error) {
 		return nil, err
 	}
 	if !l.HasCode() {
-		s.files.watch(nil)
 		return nil, nil
 	}
 	starter, err := l.Starter()
@@ -86,8 +85,20 @@ func (s *Service) OpenFiles(id string) ([]File, error) {
 		}
 		out = append(out, f)
 	}
-	s.files.watch(l)
 	return out, nil
+}
+
+// Watch follows a lesson's files on disk (FileEvent), or none for "". It's a
+// separate call from OpenFiles so that quick lesson switches, whose
+// OpenFiles calls can finish in any order, only watch the one that won.
+func (s *Service) Watch(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l := s.app.Lesson(id)
+	if l != nil && !l.HasCode() {
+		l = nil
+	}
+	s.files.watch(l)
 }
 
 // SaveResult is what a save did. On a conflict nothing was written and Disk

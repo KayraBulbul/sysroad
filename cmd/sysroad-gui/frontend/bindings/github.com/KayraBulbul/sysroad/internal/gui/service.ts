@@ -41,9 +41,9 @@ export function Lesson(id: string): $CancellablePromise<$models.LessonDetail | n
 }
 
 /**
- * OpenFiles returns the files you edit in a lesson and starts watching them.
- * A lesson you haven't started yet shows its starter code; the folder is made
- * on the first save or run, so browsing doesn't litter the data repo.
+ * OpenFiles returns the files you edit in a lesson. A lesson you haven't
+ * started yet shows its starter code; the folder is made on the first save or
+ * run, so browsing doesn't litter the data repo.
  */
 export function OpenFiles(id: string): $CancellablePromise<$models.File[] | null> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.OpenFiles", id);
@@ -126,4 +126,13 @@ export function Theme(): $CancellablePromise<$models.Theme> {
  */
 export function ToggleDone(id: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.ToggleDone", id);
+}
+
+/**
+ * Watch follows a lesson's files on disk (FileEvent), or none for "". It's a
+ * separate call from OpenFiles so that quick lesson switches, whose
+ * OpenFiles calls can finish in any order, only watch the one that won.
+ */
+export function Watch(id: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.Watch", id);
 }

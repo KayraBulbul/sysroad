@@ -14,6 +14,11 @@ import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 export const File = "file";
 
 /**
+ * Name of the custom event "nav".
+ */
+export const Nav = "nav";
+
+/**
  * Name of the custom event "result".
  */
 export const Result = "result";

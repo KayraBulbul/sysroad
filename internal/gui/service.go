@@ -440,6 +440,7 @@ func (s *Service) Run(id string, mode course.Mode) (*RunOutcome, error) {
 	s.emit(EvState, nil)
 
 	res, err := app.Execute(ctx, dir, engine, l, mode)
+	ended := ctx.Err() // before cancel(), which would make every run look stopped
 	cancel()
 
 	s.mu.Lock()
@@ -454,8 +455,11 @@ func (s *Service) Run(id string, mode course.Mode) (*RunOutcome, error) {
 	s.mu.Unlock()
 	s.emit(EvState, nil)
 	if err != nil {
-		if ctx.Err() == context.Canceled {
+		switch {
+		case errors.Is(ended, context.Canceled):
 			return nil, errors.New("stopped")
+		case errors.Is(ended, context.DeadlineExceeded):
+			return nil, errors.New("the run took over 3 minutes and was stopped")
 		}
 		return nil, err
 	}
