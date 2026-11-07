@@ -1,0 +1,60 @@
+# Builds sysroad (the TUI and CLI) and sysroad-gui (the desktop app) from the
+# checkout this file is in, and installs them with a launcher entry:
+#
+#   cd packaging/arch && makepkg -si
+#
+# Go and bun aren't listed as makedepends because they usually come from
+# mise or similar rather than pacman; build() checks for them instead.
+
+pkgname=sysroad
+pkgver=r12.8cdc3df
+pkgrel=1
+pkgdesc="A boot.dev-style systems programming course in C++: TUI, CLI and desktop app"
+arch=(x86_64 aarch64)
+url="https://github.com/KayraBulbul/sysroad"
+license=(LicenseRef-sysroad OFL-1.1)
+options=(!debug !lto)
+
+# Wails uses GTK4 + WebKitGTK 6.0, or GTK3 + WebKitGTK 4.1 with the gtk3 tag;
+# build against whichever is installed, as `make gui` does.
+if pkg-config --exists webkitgtk-6.0 2>/dev/null; then
+  _gtk=(gtk4 webkitgtk-6.0)
+  _tags=gui
+else
+  _gtk=(gtk3 webkit2gtk-4.1)
+  _tags=gui,gtk3
+fi
+depends=(git clang "${_gtk[@]}")
+optdepends=(
+  'gdb: the debugger lessons'
+  'xdg-terminal-exec: interactive programs open in your terminal'
+)
+
+_root() { cd "$startdir/../.." && pwd; }
+
+pkgver() {
+  cd "$(_root)"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  command -v go >/dev/null || { error "go isn't on your PATH"; return 1; }
+  command -v bun >/dev/null || { error "bun isn't on your PATH"; return 1; }
+  cd "$(_root)"
+  export CGO_CPPFLAGS="$CPPFLAGS" CGO_CFLAGS="$CFLAGS" CGO_CXXFLAGS="$CXXFLAGS" CGO_LDFLAGS="$LDFLAGS"
+  export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+  make gui-frontend
+  go build -o "$srcdir/sysroad" .
+  go build -tags "$_tags" -o "$srcdir/sysroad-gui" ./cmd/sysroad-gui
+}
+
+package() {
+  local root
+  root="$(_root)"
+  install -Dm755 "$srcdir/sysroad" "$pkgdir/usr/bin/sysroad"
+  install -Dm755 "$srcdir/sysroad-gui" "$pkgdir/usr/bin/sysroad-gui"
+  install -Dm644 "$startdir/sysroad.desktop" "$pkgdir/usr/share/applications/sysroad.desktop"
+  install -Dm644 "$root/cmd/sysroad-gui/build/sysroad.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/sysroad.svg"
+  install -Dm644 "$root/cmd/sysroad-gui/build/sysroad-512.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/sysroad.png"
+  install -Dm644 "$root/cmd/sysroad-gui/frontend/public/fonts/OFL.txt" "$pkgdir/usr/share/licenses/$pkgname/OFL-ObelMono.txt"
+}

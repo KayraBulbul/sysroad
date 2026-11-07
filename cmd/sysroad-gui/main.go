@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -21,6 +22,9 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+//go:embed build/appicon.png
+var icon []byte
 
 // evNav carries the mouse's back (-1) and forward (+1) side buttons on
 // Linux, where the web view doesn't see them.
@@ -34,6 +38,7 @@ func init() {
 }
 
 func main() {
+	gui.UseLoginPath()
 	a, err := app.Open(app.DefaultDir())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sysroad-gui:", err)
@@ -41,6 +46,7 @@ func main() {
 	}
 
 	var wails *application.App
+	var win *application.WebviewWindow
 	svc := gui.New(a,
 		func(name string, data any) { wails.Event.Emit(name, data) },
 		func(url string) error { return wails.Browser.OpenURL(url) },
@@ -48,18 +54,43 @@ func main() {
 	wails = application.New(application.Options{
 		Name:        "sysroad",
 		Description: "A boot.dev-style systems programming course in C++",
-		Services:    []application.Service{application.NewService(svc)},
-		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
-		Linux:       application.LinuxOptions{ProgramName: "sysroad"},
-		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
-		OnShutdown:  func() { gui.Stop(svc) },
+		Icon:        icon,
+		// One window: launching it again (the keybind, the Dock) brings
+		// the open one forward.
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: "dev.kayrabulbul.sysroad",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+				if win != nil {
+					application.InvokeSync(func() {
+						win.Show()
+						win.UnMinimise()
+						win.Focus()
+					})
+				}
+			},
+		},
+		Services:   []application.Service{application.NewService(svc)},
+		Assets:     application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
+		Linux:      application.LinuxOptions{ProgramName: "sysroad"},
+		Mac:        application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
+		OnShutdown: func() { gui.Stop(svc) },
 	})
 	wails.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		gui.Start(svc)
 	})
 
 	bg := svc.Theme().Colors["background"]
-	win := wails.Window.NewWithOptions(application.WebviewWindowOptions{
+	if runtime.GOOS == "darwin" {
+		// macOS wires Cmd+C/V/X/A/Z and Cmd+Q through the menu bar, so the
+		// web view needs the standard menus to have them at all.
+		menu := application.NewMenu()
+		menu.AddRole(application.AppMenu)
+		menu.AddRole(application.EditMenu)
+		menu.AddRole(application.WindowMenu)
+		wails.Menu.Set(menu)
+	}
+
+	win = wails.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "sysroad",
 		Width:            1440,
 		Height:           900,
@@ -67,6 +98,7 @@ func main() {
 		MinHeight:        480,
 		BackgroundColour: rgb(bg),
 		URL:              "/",
+		Linux:            application.LinuxWindow{Icon: icon},
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 38,
 			TitleBar:                application.MacTitleBarHiddenInset,

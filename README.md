@@ -121,6 +121,18 @@ make gui        # needs bun; on Linux also webkitgtk-6.0 (or webkit2gtk-4.1)
 ./bin/sysroad-gui
 ```
 
+To install it as an app:
+
+- **Arch / Omarchy:** `cd packaging/arch && makepkg -si`. It builds the checkout you're
+  in and installs `sysroad`, `sysroad-gui`, a launcher entry (Super+Space → sysroad) and
+  the icon. In Hyprland, `o.bind("SUPER + SHIFT + L", "sysroad", { launch = "sysroad-gui",
+  focus = "^sysroad$" })` opens it or brings it forward.
+- **macOS:** `make mac-app` builds `sysroad.app` into `~/Applications`, so it opens from
+  Spotlight and can stay in the Dock. It's ad-hoc signed and built locally, so Gatekeeper
+  doesn't quarantine it. It picks up your login shell's `PATH`, so Homebrew tools are found.
+
+Only one window runs at a time: launching it again brings the open one forward.
+
 - **Theme:** on Omarchy it uses your current theme and follows `omarchy-theme-set`
   live. On a Mac it's Vigil. The font is Obel Mono, bundled.
 - **Editor:** CodeMirror with vim mode (toggle it in the tab bar). Files save half a
