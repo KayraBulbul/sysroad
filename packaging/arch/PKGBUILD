@@ -7,12 +7,16 @@
 # mise or similar rather than pacman; build() checks for them instead.
 
 pkgname=sysroad
-pkgver=r12.8cdc3df
+# The version comes from the checkout. It's set here rather than in a
+# pkgver() function, which would rewrite this file on every build.
+pkgver="r$(git -C "$startdir/../.." rev-list --count HEAD 2>/dev/null || echo 0).$(git -C "$startdir/../.." rev-parse --short HEAD 2>/dev/null || echo 0)"
 pkgrel=1
 pkgdesc="A boot.dev-style systems programming course in C++: TUI, CLI and desktop app"
 arch=(x86_64 aarch64)
 url="https://github.com/KayraBulbul/sysroad"
-license=(LicenseRef-sysroad OFL-1.1)
+# sysroad itself has no licence yet; replace "unknown" once the repo gets one.
+# OFL-1.1 covers the bundled Obel Mono font, whose licence is installed.
+license=(unknown OFL-1.1)
 options=(!debug !lto)
 
 # Wails uses GTK4 + WebKitGTK 6.0, or GTK3 + WebKitGTK 4.1 with the gtk3 tag;
@@ -31,11 +35,6 @@ optdepends=(
 )
 
 _root() { cd "$startdir/../.." && pwd; }
-
-pkgver() {
-  cd "$(_root)"
-  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
-}
 
 build() {
   command -v go >/dev/null || { error "go isn't on your PATH"; return 1; }
