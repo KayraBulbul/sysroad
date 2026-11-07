@@ -1,0 +1,29 @@
+- name: prints its arguments
+  args: [hello, world]
+  stdout: "hello world\n"
+- name: no arguments prints a blank line
+  args: []
+  stdout: "\n"
+- name: -n leaves off the newline
+  args: [-n, hi]
+  stdout: "hi"
+- name: -n later on is just text
+  args: [hi, -n]
+  stdout: "hi -n\n"
+  hidden: true
+- name: -n on its own prints nothing
+  args: [-n]
+  stdout: ""
+  hidden: true
+- name: keeps spaces inside an argument
+  args: ["a  b"]
+  stdout: "a  b\n"
+  hidden: true
+- name: an empty first argument
+  args: ["", x]
+  stdout: " x\n"
+  hidden: true
+- name: many arguments
+  args: [a, b, c, d, e]
+  stdout: "a b c d e\n"
+  hidden: true

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -14,15 +13,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/KayraBulbul/sysroad/internal/app"
-	"github.com/KayraBulbul/sysroad/internal/gitsync"
 	"github.com/KayraBulbul/sysroad/internal/roadmap"
 	"github.com/KayraBulbul/sysroad/internal/store"
-)
-
-const (
-	pushDelay    = 15 * time.Second // after the last change
-	pullInterval = 5 * time.Minute
-	retryDelay   = 2 * time.Minute
 )
 
 type tickMsg time.Time
@@ -33,12 +25,8 @@ func tick() tea.Cmd {
 
 type syncDoneMsg struct{ err error }
 
-func syncCmd(dir string) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		return syncDoneMsg{gitsync.Sync(ctx, dir)}
-	}
+func syncCmd(s *app.Syncer) tea.Cmd {
+	return func() tea.Msg { return syncDoneMsg{s.Run()} }
 }
 
 type editorDoneMsg struct {
@@ -51,14 +39,7 @@ type core struct {
 	app  *app.App
 	w, h int
 
-	hasRepo   bool
-	hasRemote bool
-	syncing   bool
-	dirty     bool
-	lastWrite time.Time
-	lastSync  time.Time
-	retryAt   time.Time
-	syncErr   error
+	sync *app.Syncer
 
 	flash    string
 	flashErr bool
@@ -66,26 +47,20 @@ type core struct {
 }
 
 func newCore(a *app.App) core {
-	c := core{app: a, hasRepo: gitsync.IsRepo(a.Dir)}
-	c.hasRemote = c.hasRepo && gitsync.HasRemote(context.Background(), a.Dir)
-	return c
+	return core{app: a, sync: app.NewSyncer(a)}
 }
 
 // Dirty reports whether there are changes that haven't been synced yet.
-func (c *core) Dirty() bool { return c.dirty || c.syncing }
+func (c *core) Dirty() bool { return c.sync.Unsynced() }
 
 func (c *core) init() tea.Cmd {
-	if c.hasRepo {
-		c.syncing = true
-		return tea.Batch(tick(), syncCmd(c.app.Dir))
+	if c.sync.Begin() {
+		return tea.Batch(tick(), syncCmd(c.sync))
 	}
 	return tick()
 }
 
-func (c *core) changed() {
-	c.dirty = true
-	c.lastWrite = time.Now()
-}
+func (c *core) changed() { c.sync.Changed(time.Now()) }
 
 func (c *core) say(format string, args ...any) {
 	c.flash, c.flashErr, c.flashAt = fmt.Sprintf(format, args...), false, time.Now()
@@ -106,11 +81,10 @@ func (c *core) check(err error) {
 }
 
 func (c *core) syncNow() tea.Cmd {
-	if !c.hasRepo || c.syncing {
+	if !c.sync.Begin() {
 		return nil
 	}
-	c.syncing, c.dirty = true, false
-	return syncCmd(c.app.Dir)
+	return syncCmd(c.sync)
 }
 
 // update handles messages common to both views.
@@ -127,22 +101,13 @@ func (c *core) update(msg tea.Msg) (tea.Cmd, bool) {
 		if c.flash != "" && now.Sub(c.flashAt) > 5*time.Second {
 			c.flash = ""
 		}
-		due := (c.dirty && now.Sub(c.lastWrite) >= pushDelay) || now.Sub(c.lastSync) >= pullInterval
-		if c.hasRepo && !c.syncing && now.After(c.retryAt) && due {
-			return tea.Batch(tick(), c.syncNow()), true
+		_, latest := c.app.Engine.Latest()
+		if c.sync.Tick(now, latest) {
+			return tea.Batch(tick(), syncCmd(c.sync)), true
 		}
 		return tick(), true
 	case syncDoneMsg:
-		c.syncing = false
-		c.lastSync = time.Now()
-		switch {
-		case errors.Is(msg.err, gitsync.ErrBusy):
-			c.dirty = true
-		case msg.err != nil:
-			c.syncErr, c.dirty, c.retryAt = msg.err, true, time.Now().Add(retryDelay)
-		default:
-			c.syncErr = nil
-		}
+		c.sync.Finish(msg.err, time.Now())
 		if _, err := c.app.Reload(false); err != nil {
 			c.fail(err)
 		}
@@ -155,21 +120,21 @@ func (c *core) update(msg tea.Msg) (tea.Cmd, bool) {
 }
 
 func (c *core) syncStatus() string {
-	switch {
-	case !c.hasRepo:
+	switch c.sync.State() {
+	case app.SyncLocal:
 		return sDim.Render("local only")
-	case c.syncing:
+	case app.SyncBusy:
 		return sWarn.Render("⟳ syncing")
-	case c.syncErr != nil:
+	case app.SyncFailed:
 		return sErr.Render("✗ sync failed")
-	case c.dirty:
+	case app.SyncPending:
 		return sWarn.Render("● unsynced")
-	case c.lastSync.IsZero():
+	case app.SyncNever:
 		return ""
-	case !c.hasRemote:
+	case app.SyncCommitted:
 		return sDim.Render("✓ committed (no remote)")
 	default:
-		return sGood.Render("✓") + sDim.Render(" synced "+ago(c.lastSync))
+		return sGood.Render("✓") + sDim.Render(" synced "+ago(c.sync.LastSync))
 	}
 }
 
@@ -221,16 +186,7 @@ func (c *core) toggleTimer(id string) {
 }
 
 func (c *core) toggleStatus(id string, s store.Status) {
-	if c.app.Progress.StatusOf(id) == s {
-		s = store.Todo
-	}
-	if s == store.Done {
-		if t := c.app.Timer; t != nil && t.ID == id {
-			_, err := c.app.StopTimer()
-			c.fail(err)
-		}
-	}
-	c.check(c.app.SetStatus(id, s))
+	c.check(c.app.ToggleStatus(id, s))
 }
 
 func editorCommand() string {

@@ -51,11 +51,15 @@ var kindStyle = map[string]lipgloss.Style{
 	roadmap.KindLab:      lipgloss.NewStyle().Foreground(cYellow),
 	roadmap.KindProject:  lipgloss.NewStyle().Foreground(cGreen),
 	roadmap.KindCapstone: lipgloss.NewStyle().Foreground(cMagenta).Bold(true),
+	"lesson":             lipgloss.NewStyle().Foreground(cCyan),
+	"quiz":               lipgloss.NewStyle().Foreground(cYellow),
+	"video":              lipgloss.NewStyle().Foreground(cBlue),
 }
 
 var kindShort = map[string]string{
 	roadmap.KindSetup: "set", roadmap.KindRead: "read", roadmap.KindExercise: "ex",
 	roadmap.KindLab: "lab", roadmap.KindProject: "proj", roadmap.KindCapstone: "CAP",
+	"lesson": "code", "quiz": "quiz", "video": "vid",
 }
 
 // kindTag renders a fixed-width (4 col) kind label.

@@ -1,0 +1,284 @@
+title: Systems Programming in C++
+phases:
+  - id: p0
+    title: Setup
+    summary: A working C++20 toolchain on both machines and the lesson workflow.
+    chapters:
+      - id: setup-workflow
+        title: Toolchain & workflow
+        summary: |-
+          Check your compiler, sanitizers and debugger, then learn the loop every
+          lesson uses: read the brief, write code, Run, Submit.
+        lessons:
+          - id: setup-toolchain
+            title: Check your toolchain
+          - id: setup-lessons
+            title: How a lesson works
+          - id: setup-debugger
+            title: Debugger drills (gdb / lldb)
+          - id: setup-sanitizers
+            title: Sanitizers catch five bugs
+
+  - id: p1
+    title: C++ for a Go/Python brain
+    summary: |-
+      The everyday C++ you'll write for the rest of the course, learned by
+      building your own coreutils: echo, wc, cat, hexdump and grep.
+    chapters:
+      - id: cpp-coreutils-wc
+        title: "Coreutils I: echo & wc"
+        summary: main and argv, std::string, std::string_view, std::vector, reading input.
+        project: echo, then wc built up lesson by lesson
+        lessons:
+          - id: cpp-01-echo
+            title: echo
+          - id: cpp-02-words
+            title: Counting words
+          - id: cpp-03-counts
+            title: Lines, words and bytes from a stream
+          - id: cpp-04-wc-flags
+            title: "wc flags: -l, -w, -c"
+          - id: cpp-05-wc-files
+            title: Files, totals and errors
+          - id: cpp-06-wc-quiz
+            title: "Check: strings and views"
+            kind: quiz
+          - id: cpp-07-wc-format
+            title: GNU-exact column widths
+      - id: cpp-coreutils-cat
+        title: "Coreutils II: cat"
+        summary: Files and streams, binary-safe I/O, flags that rewrite output.
+        project: cat with every GNU flag
+        lessons:
+          - id: cpp-08-cat
+            title: cat one file, then many
+          - id: cpp-09-cat-binary
+            title: Binary-safe copying
+          - id: cpp-10-cat-number
+            title: "-n and -b: numbering lines"
+          - id: cpp-11-cat-squeeze
+            title: "-s: squeezing blank lines"
+          - id: cpp-12-cat-show
+            title: "-E, -T, -v, -A: showing the invisible"
+          - id: cpp-13-cat-quiz
+            title: "Check: streams"
+            kind: quiz
+      - id: cpp-types
+        title: Structs, classes & RAII
+        summary: Constructors, member functions, const, references vs pointers, destructors that clean up.
+        project: hexdump -C
+        lessons:
+          - id: cpp-14-structs
+            title: Structs and member functions
+          - id: cpp-15-refs-pointers
+            title: References vs pointers
+          - id: cpp-16-const
+            title: const everywhere
+          - id: cpp-17-raii
+            title: RAII — a File class that closes itself
+          - id: cpp-18-hexdump
+            title: hexdump -C, line by line
+          - id: cpp-19-hexdump-skip
+            title: "hexdump: -s, -n and squeezing repeats"
+          - id: cpp-20-types-quiz
+            title: "Check: ownership and lifetimes"
+            kind: quiz
+      - id: cpp-generic
+        title: Errors, lambdas & templates
+        summary: std::optional, error values vs exceptions, lambdas, <algorithm>, a first template.
+        project: grep
+        lessons:
+          - id: cpp-21-optional
+            title: std::optional and error values
+          - id: cpp-22-exceptions
+            title: Exceptions, and when not to use them
+          - id: cpp-23-lambdas
+            title: Lambdas and <algorithm>
+          - id: cpp-24-templates
+            title: Your first template
+          - id: cpp-25-grep
+            title: "grep: fixed strings"
+          - id: cpp-26-grep-flags
+            title: "grep: -i, -v, -n, -c"
+          - id: cpp-27-grep-recursive
+            title: "grep: -r over a directory tree"
+            kind: project
+
+  - id: p2
+    title: Memory, for real
+    summary: Layout, the stack and the heap, ownership, move semantics, UB — then rebuild String, Vector and HashMap.
+    chapters:
+      - id: mem-layout
+        title: Layout, sizeof & alignment
+        lessons: []
+      - id: mem-heap
+        title: Stack, heap, new/delete & smart pointers
+        lessons: []
+      - id: mem-move
+        title: Copies, moves & the rule of five
+        lessons: []
+      - id: mem-rebuild
+        title: "Rebuild: String, Vector, HashMap"
+        project: your containers, swapped into your coreutils
+        lessons: []
+
+  - id: p3
+    title: CMake & the text editor
+    summary: Real project builds, then your first capstone.
+    chapters:
+      - id: cmake
+        title: CMake in one sitting
+        lessons: []
+      - id: editor
+        title: "Capstone: text editor"
+        project: raw-mode terminal, rendering, file I/O, search, syntax highlighting
+        lessons: []
+
+  - id: p4
+    title: Data & machine code
+    summary: Bits, integers, floats, and reading x86-64 and arm64 from clang's output.
+    chapters:
+      - id: data-bits
+        title: Bits, integers & floats
+        lessons: []
+      - id: data-asm
+        title: Reading assembly
+        lessons: []
+      - id: data-labs
+        title: Data, Bomb & Attack Labs
+        lessons: []
+
+  - id: p5
+    title: Performance, caches & linking
+    chapters:
+      - id: perf-caches
+        title: Caches & the memory mountain
+        lessons: []
+      - id: perf-optimise
+        title: Making loops fast
+        lessons: []
+      - id: perf-linking
+        title: Linking, ELF & shared libraries
+        project: mini readelf
+        lessons: []
+
+  - id: p6
+    title: Processes & the shell
+    chapters:
+      - id: proc-basics
+        title: fork, exec, wait & pipes
+        lessons: []
+      - id: proc-signals
+        title: Signals & job control
+        lessons: []
+      - id: shell
+        title: "Capstone: your shell"
+        lessons: []
+
+  - id: p7
+    title: Virtual memory & allocators
+    chapters:
+      - id: vm
+        title: mmap, paging & the TLB
+        lessons: []
+      - id: alloc-cpp
+        title: C++ allocators & pmr
+        lessons: []
+      - id: malloc
+        title: "Capstone: your malloc"
+        project: plugged into your containers
+        lessons: []
+
+  - id: p8
+    title: Concurrency
+    chapters:
+      - id: conc-threads
+        title: Threads, atomics & memory order
+        lessons: []
+      - id: conc-sync
+        title: Mutexes on a futex, condition variables
+        lessons: []
+      - id: conc-pool
+        title: Thread pool & user-level threads
+        lessons: []
+
+  - id: p9
+    title: Networking
+    chapters:
+      - id: net-sockets
+        title: Sockets & echo servers
+        lessons: []
+      - id: net-events
+        title: poll, epoll & kqueue
+        lessons: []
+      - id: http
+        title: "Capstone: HTTP/1.1 server"
+        lessons: []
+
+  - id: p10
+    title: Storage
+    chapters:
+      - id: store-files
+        title: Files, fsync & crash consistency
+        lessons: []
+      - id: kv
+        title: "Capstone: KV store with a write-ahead log"
+        lessons: []
+      - id: kv-engine
+        title: LSM tree or B+tree
+        lessons: []
+
+  - id: p11
+    title: Interpreters
+    chapters:
+      - id: interp-tree
+        title: A tree-walking interpreter
+        lessons: []
+      - id: interp-vm
+        title: A bytecode VM
+        lessons: []
+      - id: interp-lang
+        title: "Capstone: your own language"
+        lessons: []
+
+  - id: p12
+    title: C & kernels
+    chapters:
+      - id: c-for-cpp
+        title: C for C++ programmers
+        lessons: []
+      - id: xv6
+        title: xv6 labs
+        lessons: []
+
+  - id: side
+    title: Side quests
+    label: "★"
+    optional: true
+    summary: Optional extras. None of them block the main path.
+    chapters:
+      - id: side-quests
+        title: Side quests
+        lessons:
+          - id: side-missing-semester
+            title: "Missing Semester: shell, editors, debugging & profiling"
+            kind: video
+            url: https://missing.csail.mit.edu/
+            detail: |-
+              Watch at 2× and skip what you know. The debugging/profiling and
+              code-quality lectures are the most useful for this course.
+          - id: side-zig
+            title: Zig taster — Ziglings
+            kind: lab
+            url: https://codeberg.org/ziglings/exercises
+            detail: Do the first 30 or so exercises to see how Zig's allocators and error unions compare to C++.
+          - id: side-odin
+            title: Odin taster — port your wc
+            kind: lab
+            url: https://odin-lang.org/docs/overview/
+            detail: Rewrite your wc in Odin and compare how strings, slices and allocators feel.
+          - id: side-c-compiler
+            title: Writing a C Compiler (Sandler)
+            kind: read
+            url: https://nostarch.com/writing-c-compiler
+            detail: A long, test-driven project book. Best after the interpreters phase.

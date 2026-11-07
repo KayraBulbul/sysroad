@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/KayraBulbul/sysroad/internal/app"
+	"github.com/KayraBulbul/sysroad/internal/course"
 	"github.com/KayraBulbul/sysroad/internal/roadmap"
 	"github.com/KayraBulbul/sysroad/internal/store"
 )
@@ -52,12 +53,14 @@ type Full struct {
 	confirm   string
 	onConfirm func()
 	vp        viewport.Model
+	lv        lessonView
 }
 
 func NewFull(a *app.App) *Full {
 	ti := textinput.New()
 	ti.CharLimit = 200
 	m := &Full{core: newCore(a), input: ti}
+	m.lv.app = a
 	m.jumpToCurrent()
 	return m
 }
@@ -110,7 +113,24 @@ func (m *Full) jumpToCurrent() {
 	}
 }
 
+// detailLesson is the course lesson open in the detail view, if any.
+func (m *Full) detailLesson() *course.Lesson {
+	if m.mode != modeDetail || m.step() == nil {
+		return nil
+	}
+	return m.app.Lesson(m.step().ID)
+}
+
 func (m *Full) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tickMsg:
+		m.lv.loadResult()
+	case lessonRunMsg:
+		return m, m.lv.finish(&m.core, msg)
+	case lessonEditDoneMsg:
+		m.fail(msg.err)
+		return m, nil
+	}
 	if cmd, handled := m.core.update(msg); handled {
 		if m.mode == modeDetail {
 			m.refreshDetail(false)
@@ -177,6 +197,10 @@ func (m *Full) updateNormal(key tea.KeyMsg) tea.Cmd {
 		m.jumpToCurrent()
 	case " ":
 		if m.focus == paneSteps && m.step() != nil {
+			if l := m.app.Lesson(m.step().ID); l != nil && l.Graded() {
+				m.say("Submit completes a lesson — enter to open it, then s")
+				return nil
+			}
 			m.toggleStatus(m.step().ID, store.Done)
 			m.advanceAfterDone()
 		}
@@ -205,26 +229,41 @@ func (m *Full) updateNormal(key tea.KeyMsg) tea.Cmd {
 			return m.editNote(sec.ID)
 		}
 	case "e":
+		if m.readOnly(sec) {
+			return nil
+		}
 		if m.focus == paneSteps && m.step() != nil {
 			return m.editStep(m.step().ID)
 		} else if sec != nil {
 			return m.editSection(sec.ID)
 		}
 	case "a":
-		if m.focus == paneSteps && sec != nil {
+		if m.focus == paneSteps && sec != nil && !sec.ReadOnly {
 			m.prompt(inAddStep, "New step in "+trunc(sec.Title, 30)+": ", "")
 		} else {
-			m.prompt(inAddSection, "New section title: ", "")
+			m.prompt(inAddSection, "New section of your own: ", "")
 		}
 	case "r":
+		if m.readOnly(sec) {
+			return nil
+		}
 		if id := m.selectedID(); id != "" {
 			m.prompt(inRename, "Rename: ", m.app.Roadmap.TitleOf(id))
 		}
 	case "D":
+		if m.readOnly(sec) {
+			return nil
+		}
 		m.askDelete()
 	case "J", "shift+down":
+		if m.readOnly(sec) {
+			return nil
+		}
 		m.moveItem(1)
 	case "K", "shift+up":
+		if m.readOnly(sec) {
+			return nil
+		}
 		m.moveItem(-1)
 	case "o":
 		url := ""
@@ -236,12 +275,21 @@ func (m *Full) updateNormal(key tea.KeyMsg) tea.Cmd {
 		}
 		m.fail(openURL(url))
 	case "s":
-		if !m.hasRepo {
+		if !m.sync.HasRepo {
 			m.say("Data dir isn't a git repo — see `sysroad init --help`")
 		}
 		return m.syncNow()
 	}
 	return nil
+}
+
+// readOnly blocks edits to course chapters, with a hint about what works.
+func (m *Full) readOnly(sec *roadmap.Section) bool {
+	if sec != nil && sec.ReadOnly {
+		m.say("Course chapters are read-only — press a in the left pane to add a section of your own")
+		return true
+	}
+	return false
 }
 
 func (m *Full) firstOpenStep(s *roadmap.Section) int {
@@ -354,7 +402,7 @@ func (m *Full) submitInput(v string) {
 		m.say("Added — press e to set kind, hours, link and details")
 	case inAddSection:
 		s := &roadmap.Section{ID: roadmap.NewID("", v), Title: v}
-		at := m.secCur + 1
+		at := len(r.Sections) // your own sections come after the course
 		r.Sections = roadmap.Insert(r.Sections, at, s)
 		m.secCur, m.stepCur, m.focus = at, 0, paneSections
 		m.check(m.app.SaveRoadmap())
@@ -381,6 +429,9 @@ func (m *Full) submitInput(v string) {
 
 func (m *Full) openDetail() {
 	m.mode = modeDetail
+	if st := m.step(); st != nil && m.app.Lesson(st.ID) != nil {
+		m.lv.set(st.ID)
+	}
 	m.vp = viewport.New(m.w, m.h-2)
 	m.refreshDetail(true)
 }
@@ -400,6 +451,32 @@ func (m *Full) refreshDetail(top bool) {
 }
 
 func (m *Full) updateDetail(key tea.KeyMsg) tea.Cmd {
+	if l := m.detailLesson(); l != nil {
+		k := key.String()
+		if m.lv.confirm == "" {
+			switch k {
+			case "esc", "q", "backspace":
+				m.mode = modeNormal
+				return nil
+			case "]", "[":
+				m.moveCursor(map[string]int{"]": 1, "[": -1}[k])
+				if st := m.step(); st != nil && m.app.Lesson(st.ID) != nil {
+					m.lv.set(st.ID)
+				} else {
+					m.refreshDetail(true)
+				}
+				return nil
+			case " ":
+				if l.Graded() {
+					m.say("Submit (s) completes a lesson")
+					return nil
+				}
+			}
+		}
+		if cmd, handled := m.lv.key(&m.core, k, m.h-4); handled {
+			return cmd
+		}
+	}
 	switch key.String() {
 	case "esc", "q", "enter", "backspace":
 		m.mode = modeNormal
@@ -435,6 +512,24 @@ func (m *Full) View() string {
 	}
 	header := m.header()
 	footer := m.footer()
+	if l := m.detailLesson(); l != nil {
+		m.lv.set(l.ID)
+		w := m.w - 4
+		lines := []string{"  " + levelLine(m.app, min(w, 110))}
+		var body []string
+		if w >= 110 {
+			body = m.lv.split(w, m.h-3) // boot.dev layout: lesson left, output right
+		} else {
+			body = m.lv.screen(w, m.h-3)
+		}
+		for _, line := range body {
+			lines = append(lines, "  "+trunc(line, w))
+		}
+		for len(lines) < m.h-2 {
+			lines = append(lines, "")
+		}
+		return lipgloss.JoinVertical(lipgloss.Left, header, strings.Join(lines[:m.h-2], "\n"), footer)
+	}
 	if m.mode == modeDetail {
 		return lipgloss.JoinVertical(lipgloss.Left, header, m.vp.View(), footer)
 	}
@@ -494,7 +589,9 @@ func (m *Full) header() string {
 	ov := m.app.Overall()
 	now := time.Now()
 	// In priority order; the tail is dropped when the terminal is narrow.
+	lvl, _, _ := course.Level(m.app.XP())
 	parts := []string{
+		sAccent.Render(fmt.Sprintf("Lv %d", lvl)) + sDim.Render(fmt.Sprintf(" %d XP", m.app.XP())),
 		m.streakText(),
 		"today " + store.FormatMinutes(m.app.TodayMinutes(now)),
 		m.timerText(),
@@ -516,6 +613,14 @@ func (m *Full) header() string {
 	return spread(left, right, m.w)
 }
 
+// fmtHours renders an estimate as "15m", "1.5h" or "12h".
+func fmtHours(h float64) string {
+	if h < 1 {
+		return fmt.Sprintf("%dm", int(h*60+0.5))
+	}
+	return strings.TrimSuffix(fmt.Sprintf("%.1f", h), ".0") + "h"
+}
+
 func nonEmpty(ss []string) []string {
 	var out []string
 	for _, s := range ss {
@@ -533,14 +638,18 @@ func (m *Full) footer() string {
 		s = " " + m.input.View()
 	case m.mode == modeConfirm:
 		s = " " + sWarn.Render(m.confirm)
+	case m.detailLesson() != nil && m.lv.confirm != "":
+		s = " " + sWarn.Render(m.lv.confirm)
 	case m.flash != "":
 		st := sGood
 		if m.flashErr {
 			st = sErr
 		}
 		s = " " + st.Render(m.flash)
-	case m.syncErr != nil && m.flash == "":
-		s = " " + sErr.Render("sync: "+m.syncErr.Error())
+	case m.sync.Err != nil && m.flash == "":
+		s = " " + sErr.Render("sync: "+m.sync.Err.Error())
+	case m.detailLesson() != nil:
+		s = m.lv.hints(&m.core)
 	case m.mode == modeDetail:
 		s = keyHints([][2]string{{"esc", "back"}, {"J/K", "next/prev"}, {"space", "done"}, {"t", "timer"}, {"n", "note"}, {"e", "edit"}, {"o", "open"}})
 	case m.mode == modeHelp:
@@ -561,10 +670,22 @@ func keyHints(keys [][2]string) string {
 
 func (m *Full) renderSections(w, h int) string {
 	secs := m.app.Roadmap.Sections
-	start, end := window(len(secs), m.secCur, h/2)
+	start, end := window(len(secs), m.secCur, max(h/2-2, 1))
 	var lines []string
+	group := ""
+	if start > 0 {
+		group = secs[start-1].Group
+	}
 	for i := start; i < end; i++ {
 		s := secs[i]
+		if s.Group != group || (i == start && s.Group != "") {
+			group = s.Group
+			label := group
+			if label == "" {
+				label = "Your own"
+			}
+			lines = append(lines, sDim.Render(trunc(strings.ToUpper(label), w)))
+		}
 		st := m.app.SectionStats(s)
 		title := trunc(s.Title, w-2)
 		if s.Optional {
@@ -606,7 +727,7 @@ func (m *Full) renderSteps(w, h int) string {
 			right = append(right, sWarn.Render(store.FormatMinutes(mins)))
 		}
 		if st.Hours > 0 {
-			right = append(right, sDim.Render(fmt.Sprintf("~%gh", st.Hours)))
+			right = append(right, sDim.Render("~"+fmtHours(st.Hours)))
 		}
 		if st.Platform != "" {
 			right = append(right, sDim.Render("["+st.Platform+"]"))
@@ -621,6 +742,9 @@ func (m *Full) renderSteps(w, h int) string {
 			right = append(right, sDim.Render("✎"))
 		}
 		title := st.Title
+		if l := m.app.Lesson(st.ID); l != nil && !l.Written && l.Detail == "" && l.URL == "" {
+			title = sDim.Render(title + " · soon")
+		}
 		switch status {
 		case store.Done:
 			title = sDim.Render(title)
@@ -646,7 +770,7 @@ func (m *Full) stepDetail(sec *roadmap.Section, st *roadmap.Step, w int, full bo
 	b.WriteString(wrap(sBold.Render(st.Title), w) + "\n")
 	meta := []string{kindTag(st.Kind), statusIcon(p.StatusOf(st.ID)) + " " + string(p.StatusOf(st.ID))}
 	if st.Hours > 0 {
-		meta = append(meta, fmt.Sprintf("est %gh", st.Hours))
+		meta = append(meta, "est "+fmtHours(st.Hours))
 	}
 	meta = append(meta, "logged "+store.FormatMinutes(p.Minutes[st.ID]))
 	if st.Platform != "" {
@@ -734,7 +858,12 @@ func helpText() string {
 		{"space", "toggle done"}, {"p", "toggle in progress"}, {"x", "toggle skipped"},
 		{"t", "start/stop timer on the selected item"}, {"L", "log time manually"},
 		{"n", "edit note (step, or section in the left pane)"}, {"N", "edit the section's note"},
-		{"", "Editing the roadmap"},
+		{"", "Lessons (enter on a lesson)"},
+		{"r / s", "run the visible tests / submit every test"},
+		{"h / u", "next hint / under the hood (after passing)"},
+		{"e / v / R", "edit in $EDITOR / peek at the solution / reset to starter"},
+		{"J/K", "scroll the output"}, {"[ ]", "previous / next lesson"},
+		{"", "Your own sections (course chapters are read-only)"},
 		{"a", "add step (right pane) / section (left pane)"}, {"r", "rename"},
 		{"e", "edit in $EDITOR as YAML (kind, hours, link, details…)"},
 		{"J/K", "move item down / up"}, {"D", "delete"},

@@ -1,5 +1,5 @@
-// Package app ties the roadmap, progress log and local timer together for a
-// single data directory.
+// Package app ties the course, the learner's own roadmap sections, the
+// progress log and the local timer together for a single data directory.
 package app
 
 import (
@@ -7,17 +7,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/KayraBulbul/sysroad/internal/course"
 	"github.com/KayraBulbul/sysroad/internal/roadmap"
 	"github.com/KayraBulbul/sysroad/internal/store"
 )
 
 const (
-	RoadmapFile = "roadmap.yaml"
-	EventsFile  = "events.jsonl"
-	LocalDir    = ".local" // machine-local, gitignored
-	TimerFile   = "timer.json"
+	CustomFile = "custom.yaml" // the learner's own sections
+	EventsFile = "events.jsonl"
+	OldRoadmap = "roadmap.yaml" // pre-course data layout, migrated on open
+	ArchiveDir = "archive"
+	LocalDir   = ".local" // machine-local, gitignored
+	TimerFile  = "timer.json"
 )
 
 // DefaultDir is the data repo location, overridable with $SYSROAD_DIR.
@@ -31,11 +35,15 @@ func DefaultDir() string {
 
 type App struct {
 	Dir      string
-	Roadmap  *roadmap.Roadmap
+	Course   *course.Course
+	Engine   *course.Engine
+	Roadmap  *roadmap.Roadmap // course chapters followed by the learner's own sections
 	Progress *store.Progress
 	Timer    *store.Timer
 
-	roadmapMod, eventsMod, timerMod time.Time
+	courseSecs                     []*roadmap.Section
+	customTitle                    string
+	customMod, eventsMod, timerMod time.Time
 }
 
 func (a *App) path(name string) string { return filepath.Join(a.Dir, name) }
@@ -43,37 +51,41 @@ func (a *App) timerPath() string       { return filepath.Join(a.Dir, LocalDir, T
 
 var ErrNotInitialised = errors.New("no sysroad data found — run `sysroad init` first")
 
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
+
 func Open(dir string) (*App, error) {
-	if _, err := os.Stat(filepath.Join(dir, RoadmapFile)); errors.Is(err, os.ErrNotExist) {
+	if !exists(filepath.Join(dir, EventsFile)) && !exists(filepath.Join(dir, CustomFile)) && !exists(filepath.Join(dir, OldRoadmap)) {
 		return nil, ErrNotInitialised
 	}
-	a := &App{Dir: dir}
+	c, err := course.Load()
+	if err != nil {
+		return nil, err
+	}
+	a := &App{Dir: dir, Course: c, Engine: course.NewEngine(dir), courseSecs: c.Roadmap().Sections}
+	if err := a.migrate(); err != nil {
+		return nil, fmt.Errorf("migrating to the course layout: %w", err)
+	}
 	if _, err := a.Reload(true); err != nil {
 		return nil, err
 	}
 	return a, nil
 }
 
-// Seed writes the default roadmap and repo plumbing into an empty dir.
+const customSeed = "title: My own steps\nsections: []\n"
+
+// gitignore keeps machine-local state and build output out of the data repo.
+var gitignore = []string{LocalDir + "/", "*.tmp", "*.o", "a.out", "build/", ".DS_Store"}
+
+// Seed writes the repo plumbing into an empty dir.
 func Seed(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	// Store the roadmap in the encoder's canonical form so later saves from
-	// the TUI only change the lines that were edited (keeps git merges clean).
-	r, err := roadmap.Parse(roadmap.DefaultYAML)
-	if err != nil {
-		return err
-	}
-	canonical, err := roadmap.Marshal(r)
-	if err != nil {
-		return err
-	}
 	files := map[string][]byte{
-		RoadmapFile:      canonical,
+		CustomFile:       []byte(customSeed),
 		EventsFile:       nil,
 		".gitattributes": []byte(EventsFile + " merge=union\n"),
-		".gitignore":     []byte(LocalDir + "/\n*.tmp\n"),
+		".gitignore":     []byte(strings.Join(gitignore, "\n") + "\n"),
 	}
 	for name, data := range files {
 		p := filepath.Join(dir, name)
@@ -98,12 +110,21 @@ func mtime(p string) time.Time {
 // Reload re-reads files whose mtime changed (another process, or a git pull).
 func (a *App) Reload(force bool) (bool, error) {
 	changed := false
-	if m := mtime(a.path(RoadmapFile)); force || !m.Equal(a.roadmapMod) {
-		r, err := roadmap.Load(a.path(RoadmapFile))
-		if err != nil {
-			return false, err
+	if m := mtime(a.path(CustomFile)); force || !m.Equal(a.customMod) {
+		custom := &roadmap.Roadmap{}
+		if exists(a.path(CustomFile)) {
+			r, err := roadmap.Load(a.path(CustomFile))
+			if err != nil {
+				return false, err
+			}
+			custom = r
 		}
-		a.Roadmap, a.roadmapMod, changed = r, m, true
+		merged := &roadmap.Roadmap{Title: a.Course.Title}
+		merged.Sections = append(append(merged.Sections, a.courseSecs...), custom.Sections...)
+		if err := merged.Validate(); err != nil {
+			return false, fmt.Errorf("%s: %w (an ID clashes with the course)", CustomFile, err)
+		}
+		a.Roadmap, a.customTitle, a.customMod, changed = merged, custom.Title, m, true
 	}
 	if m := mtime(a.path(EventsFile)); force || !m.Equal(a.eventsMod) {
 		ev, err := store.ReadEvents(a.path(EventsFile))
@@ -147,12 +168,39 @@ func (a *App) LogTime(id string, minutes int) error {
 	return a.append(store.Event{Type: store.EvTime, ID: id, Minutes: minutes})
 }
 
+// SaveRoadmap writes the learner's own (non-course) sections to custom.yaml.
 func (a *App) SaveRoadmap() error {
-	if err := a.Roadmap.Save(a.path(RoadmapFile)); err != nil {
+	custom := &roadmap.Roadmap{Title: a.customTitle}
+	if custom.Title == "" {
+		custom.Title = "My own steps"
+	}
+	for _, s := range a.Roadmap.Sections {
+		if !s.ReadOnly {
+			custom.Sections = append(custom.Sections, s)
+		}
+	}
+	if custom.Sections == nil {
+		custom.Sections = []*roadmap.Section{}
+	}
+	if err := custom.Save(a.path(CustomFile)); err != nil {
 		return err
 	}
-	a.roadmapMod = mtime(a.path(RoadmapFile))
+	a.customMod = mtime(a.path(CustomFile))
 	return nil
+}
+
+// Lesson returns the course lesson for a step ID, or nil.
+func (a *App) Lesson(id string) *course.Lesson { return a.Course.Lesson(id) }
+
+// XP is the total earned from completed course lessons.
+func (a *App) XP() int {
+	xp := 0
+	for _, l := range a.Course.Lessons() {
+		if a.Progress.StatusOf(l.ID) == store.Done {
+			xp += course.XPFor(l)
+		}
+	}
+	return xp
 }
 
 // StartTimer starts timing id, stopping (and logging) any running timer first.
@@ -212,6 +260,13 @@ func (a *App) Counts(sec *roadmap.Section, st *roadmap.Step) bool {
 	return !st.Optional || s == store.Done
 }
 
+// Available is false for course lessons that aren't written yet, so the
+// current step never lands on one.
+func (a *App) Available(st *roadmap.Step) bool {
+	l := a.Lesson(st.ID)
+	return l == nil || l.Written || l.Detail != "" || l.URL != ""
+}
+
 func (a *App) mainSteps() []Ref {
 	var refs []Ref
 	for _, sec := range a.Roadmap.Sections {
@@ -219,7 +274,7 @@ func (a *App) mainSteps() []Ref {
 			continue
 		}
 		for _, st := range sec.Steps {
-			if !st.Optional {
+			if !st.Optional && a.Available(st) {
 				refs = append(refs, Ref{sec, st})
 			}
 		}
