@@ -96,6 +96,9 @@ type Meta struct {
 	// Optimize builds the program (not the tests) with -O2 and no
 	// sanitizers, for lessons that measure speed.
 	Optimize bool `yaml:"optimize"`
+	// Program names the program (default: the first file's name), as
+	// Run shows it and as the binary is called.
+	Program string `yaml:"program"`
 	// Build "cmake" builds your CMake project instead of compiling the
 	// .cpp files directly; cmake.yaml says how it's graded.
 	Build string `yaml:"build"`

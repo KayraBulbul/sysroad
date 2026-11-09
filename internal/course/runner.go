@@ -378,6 +378,9 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	cctx, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
 	prog := filepath.Join(build, "prog")
+	if l.Meta.Program != "" {
+		prog = filepath.Join(build, l.Meta.Program)
+	}
 	testBin := filepath.Join(build, "tests-"+string(mode))
 	var progRes, testRes compiled
 	var wg sync.WaitGroup
@@ -681,6 +684,8 @@ func progName(l *Lesson, program string) string {
 	switch {
 	case program != "":
 		return "./" + program
+	case l.Meta.Program != "":
+		return "./" + l.Meta.Program
 	case l.Meta.Build == "cmake":
 		if spec, err := l.CMake(); err == nil && spec.Program != "" {
 			return "./" + spec.Program

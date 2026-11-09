@@ -1,9 +1,11 @@
 package tui
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -131,7 +133,33 @@ func (v *lessonView) finish(c *core, msg lessonRunMsg) tea.Cmd {
 		c.say("%s", completedText(l, out))
 	}
 	if msg.res.Interactive != nil {
-		return tea.ExecProcess(msg.res.Interactive, func(err error) tea.Msg { return lessonEditDoneMsg{err} })
+		return tea.Exec(&interactiveRun{cmd: msg.res.Interactive}, func(err error) tea.Msg { return lessonEditDoneMsg{err} })
+	}
+	return nil
+}
+
+// interactiveRun hands the terminal to a lesson's program. If it fails,
+// it waits for Enter first, or redrawing the sidebar would wipe the error
+// the program printed.
+type interactiveRun struct {
+	cmd *exec.Cmd
+	in  io.Reader
+	out io.Writer
+}
+
+func (r *interactiveRun) SetStdin(in io.Reader)    { r.in, r.cmd.Stdin = in, in }
+func (r *interactiveRun) SetStdout(out io.Writer)  { r.out, r.cmd.Stdout = out, out }
+func (r *interactiveRun) SetStderr(errw io.Writer) { r.cmd.Stderr = errw }
+
+func (r *interactiveRun) Run() error {
+	err := r.cmd.Run()
+	var ee *exec.ExitError
+	if err != nil && !errors.As(err, &ee) {
+		return err
+	}
+	if err != nil && r.in != nil && r.out != nil {
+		fmt.Fprintf(r.out, "\r\n\x1b[90m[%s exited: %s] press Enter to go back\x1b[39m", filepath.Base(r.cmd.Path), ee)
+		bufio.NewReader(r.in).ReadString('\n')
 	}
 	return nil
 }
