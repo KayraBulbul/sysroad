@@ -366,6 +366,7 @@ func (e *Engine) runCMake(ctx context.Context, l *Lesson, mode Mode) (*Result, e
 	}
 
 	r := &Result{}
+	headed := false
 	model, err := readCodeModel(bdir)
 	if err != nil {
 		return fail("✗ couldn't read the project back from CMake", err.Error()+"\n"), nil
@@ -377,6 +378,10 @@ func (e *Engine) runCMake(ctx context.Context, l *Lesson, mode Mode) (*Result, e
 			return
 		}
 		r.Stage = "project"
+		if !headed {
+			headed = true
+			out.WriteString(section("Project", ""))
+		}
 		out.WriteString(red("✗ ") + what + "\n")
 		for _, p := range problems {
 			out.WriteString("  " + p + "\n")

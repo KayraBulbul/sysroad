@@ -27,6 +27,12 @@ var doctestHeader []byte
 //go:embed third_party/sysroad_doctest.hpp
 var doctestPrelude []byte
 
+// Compiled into the test runner's main(): reports results as JSON lines,
+// which testreport.go lays out.
+//
+//go:embed third_party/sysroad_reporter.hpp
+var doctestReporter []byte
+
 // Mode is what a learner asked for: Run (visible tests, stop at the first
 // failure, show a sample run) or Submit (every test; a pass completes it).
 type Mode string
@@ -245,6 +251,7 @@ func (e *Engine) doctest(ctx context.Context, cxx string) (includeDir, mainObj s
 	h := sha256.New()
 	h.Write(doctestHeader)
 	h.Write(doctestPrelude)
+	h.Write(doctestReporter)
 	h.Write([]byte(cxx))
 	h.Write(ver)
 	flags, _ := e.flags(ctx, cxx)
@@ -265,9 +272,12 @@ func (e *Engine) doctest(ctx context.Context, cxx string) (includeDir, mainObj s
 	if err := os.WriteFile(filepath.Join(dir, "sysroad_doctest.hpp"), doctestPrelude, 0o644); err != nil {
 		return "", "", err
 	}
+	if err := os.WriteFile(filepath.Join(dir, "sysroad_reporter.hpp"), doctestReporter, 0o644); err != nil {
+		return "", "", err
+	}
 	src := filepath.Join(dir, fmt.Sprintf("doctest_main.%d.cpp", os.Getpid()))
 	defer os.Remove(src)
-	if err := os.WriteFile(src, []byte("#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN\n#include \"doctest.h\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(src, []byte("#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN\n#include \"doctest.h\"\n#include \"sysroad_reporter.hpp\"\n"), 0o644); err != nil {
 		return "", "", err
 	}
 	// Unique per process: the sidebar and a shell `sysroad run` may race here.
@@ -441,7 +451,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 			Output: string(progRes.out) + msg + "\n" + dim("Check that the functions the lesson asks for keep their exact names and signatures.") + "\n"}, nil
 	}
 	if w := strings.TrimSpace(string(progRes.out)); w != "" {
-		out.WriteString(w + "\n\n")
+		out.WriteString(section("Compiler warnings", "") + w + "\n\n")
 	}
 
 	return e.grade(ctx, l, mode, &out, graded{prog: pathIf(needProg, prog), testBin: pathIf(len(testFiles) > 0, testBin), r: &Result{}}), nil
@@ -479,6 +489,7 @@ func (e *Engine) grade(ctx context.Context, l *Lesson, mode Mode, out *strings.B
 			r.Interactive = cmd
 		} else {
 			res := e.exec(ctx, g.prog, s.Args, s.Stdin, s.Files, checkTimeout)
+			out.WriteString(section("Sample run", ""))
 			out.WriteString(dim("$ "+shellLine(progName(l, ""), s.Args, s.Stdin)) + "\n")
 			out.WriteString(res.stdout)
 			if res.stdout != "" && !strings.HasSuffix(res.stdout, "\n") {
@@ -491,21 +502,25 @@ func (e *Engine) grade(ctx context.Context, l *Lesson, mode Mode, out *strings.B
 		}
 	}
 
+	crashed := false
 	if g.testBin != "" && !stopped {
-		args := []string{"--no-version", "--no-intro", "--no-path-filenames", "--force-colors"}
-		if mode == ModeRun {
-			args = append(args, "--abort-after=1")
-		}
-		res := e.exec(ctx, g.testBin, args, "", nil, testTimeout)
-		passed, total := doctestCounts(res.stdout + res.stderr)
+		res, rep := e.runTests(ctx, g.testBin, mode)
+		passed, total := rep.counts()
 		r.Passed += passed
 		r.Total += total
 		if res.code != 0 {
 			allOK = false
 			r.Stage = "tests"
-			out.WriteString(cleanDoctest(tidySanitizer(res.stdout+"\n"+res.stderr, work, testsDir)) + "\n")
-			if res.note != "" {
-				out.WriteString(red(res.note) + "\n")
+			crashed = rep.crashed()
+			if len(rep.cases) == 0 {
+				// It died before a single test started: show what it said.
+				out.WriteString(section("Tests", ""))
+				out.WriteString(strings.TrimSpace(tidySanitizer(res.stdout+"\n"+res.stderr, work, testsDir)) + "\n")
+				if res.note != "" {
+					out.WriteString(red(strings.TrimPrefix(res.note, " ")) + "\n")
+				}
+			} else {
+				out.WriteString(rep.render(mode, res.stdout, tidySanitizer(res.stderr, work, testsDir), res.note))
 			}
 		}
 	}
@@ -523,6 +538,9 @@ func (e *Engine) grade(ctx context.Context, l *Lesson, mode Mode, out *strings.B
 		ok, passed, total, text := e.runChecks(ctx, l, g, checks, mode)
 		r.Passed += passed
 		r.Total += total
+		if text != "" {
+			out.WriteString(section("Program checks", fmt.Sprintf("%d passed · %d failed", passed, total-passed)))
+		}
 		out.WriteString(text)
 		if !ok {
 			allOK = false
@@ -536,27 +554,16 @@ func (e *Engine) grade(ctx context.Context, l *Lesson, mode Mode, out *strings.B
 		r.Stage, r.Summary = "done", fmt.Sprintf("✓ all %d tests passed — lesson complete", r.Total)
 	case allOK:
 		r.Stage, r.Summary = "done", fmt.Sprintf("✓ %d visible tests pass — submit when ready", r.Total)
-	case r.Stage == "tests" && r.Total == 0:
-		r.Summary = "✗ the tests crashed — the report above says where"
+	case r.Stage == "tests" && (crashed || r.Total == 0):
+		r.Summary = "✗ the tests crashed — the report below says where"
+	case r.Stage == "tests" && r.Passed == r.Total:
+		r.Summary = "✗ the tests passed, but the test program failed — see below"
+	case r.Total-r.Passed == 1:
+		r.Summary = "✗ 1 test failing"
 	default:
-		r.Summary = fmt.Sprintf("✗ %d/%d passed", r.Passed, r.Total)
+		r.Summary = fmt.Sprintf("✗ %d tests failing", r.Total-r.Passed)
 	}
 	return r
-}
-
-// cleanDoctest drops doctest's noise lines.
-func cleanDoctest(s string) string {
-	var keep []string
-	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
-		plain := strings.TrimSpace(stripANSI(l))
-		if strings.Contains(plain, "Aborting - too many failed asserts") ||
-			strings.HasPrefix(plain, "[doctest]") ||
-			(plain != "" && strings.Trim(plain, "=") == "") {
-			continue
-		}
-		keep = append(keep, l)
-	}
-	return strings.TrimSpace(strings.Join(keep, "\n"))
 }
 
 func compile(ctx context.Context, dir, cxx string, args []string) compiled {
@@ -594,16 +601,22 @@ func sortedKeys(m map[string][]byte) []string {
 	return keys
 }
 
-var doctestCasesRE = regexp.MustCompile(`test cases:\s*(\d+)\s*\|\s*(\d+) passed`)
-
-func doctestCounts(s string) (passed, total int) {
-	m := doctestCasesRE.FindStringSubmatch(stripANSI(s))
-	if m == nil {
-		return 0, 0
+// runTests runs the doctest binary with sysroad's reporter and reads back
+// its report.
+func (e *Engine) runTests(ctx context.Context, bin string, mode Mode) (execResult, *testReport) {
+	f, err := os.CreateTemp("", "sysroad-tests-*.jsonl")
+	if err != nil {
+		return execResult{stderr: err.Error(), code: -1}, &testReport{}
 	}
-	fmt.Sscan(m[1], &total)
-	fmt.Sscan(m[2], &passed)
-	return passed, total
+	f.Close()
+	defer os.Remove(f.Name())
+	args := []string{"--reporters=sysroad", "--out=" + f.Name()}
+	if mode == ModeRun {
+		args = append(args, "--abort-after=1")
+	}
+	res := e.exec(ctx, bin, args, "", nil, testTimeout)
+	data, _ := os.ReadFile(f.Name())
+	return res, parseTestReport(data)
 }
 
 func (e *Engine) runChecks(ctx context.Context, l *Lesson, g graded, checks []Check, mode Mode) (ok bool, passed, total int, text string) {
