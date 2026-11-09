@@ -792,7 +792,12 @@ func (e *Engine) checkToolchain(ctx context.Context) (*Result, error) {
 	}
 	// CMake is only needed from phase 3 on, so it's a warning here.
 	if v, err := cmakeVersion(ctx); err == nil {
-		item(true, false, "cmake (phase 3 on)", v+" · generator: "+generator())
+		cmake, _, _ := CMakeTools()
+		if verr := checkCMakeVersion(ctx, cmake); verr != nil {
+			item(false, false, "cmake (phase 3 on)", verr.Error())
+		} else {
+			item(true, false, "cmake (phase 3 on)", v+" · generator: "+generator())
+		}
 	} else {
 		item(false, false, "cmake (phase 3 on)", err.Error())
 	}

@@ -109,14 +109,47 @@ const cmakeMissing = "cmake isn't installed. Omarchy: sudo pacman -S cmake ninja
 // generator is $CMAKE_GENERATOR if you set one, else Ninja when it's
 // installed (faster, and the output is quieter), else Makefiles, which
 // every Mac and Linux box has.
+// Multi-config generators (Ninja Multi-Config, Xcode, Visual Studio) are
+// skipped: grading builds and reads back one Debug configuration.
 func generator() string {
-	if g := os.Getenv("CMAKE_GENERATOR"); g != "" {
+	if g := os.Getenv("CMAKE_GENERATOR"); g != "" && !multiConfig(g) {
 		return g
 	}
 	if _, err := exec.LookPath("ninja"); err == nil {
 		return "Ninja"
 	}
 	return "Unix Makefiles"
+}
+
+func multiConfig(g string) bool {
+	return strings.Contains(g, "Multi-Config") || g == "Xcode" || strings.HasPrefix(g, "Visual Studio")
+}
+
+// minCMake is the oldest CMake the grading works with: cmake_language(DEFER)
+// needs 3.19, and the lessons ask for 3.20.
+var minCMake = [2]int{3, 20}
+
+var cmakeVersionRE = regexp.MustCompile(`cmake version (\d+)\.(\d+)`)
+
+// checkCMakeVersion returns an error for a CMake older than minCMake.
+func checkCMakeVersion(ctx context.Context, cmake string) error {
+	cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(cctx, cmake, "--version").Output()
+	if err != nil {
+		return fmt.Errorf("cmake --version failed: %v", err)
+	}
+	m := cmakeVersionRE.FindStringSubmatch(string(out))
+	if m == nil {
+		return nil // an unusual build; let it try
+	}
+	major, _ := strconv.Atoi(m[1])
+	minor, _ := strconv.Atoi(m[2])
+	if major < minCMake[0] || (major == minCMake[0] && minor < minCMake[1]) {
+		return fmt.Errorf("%s is too old: these lessons need CMake %d.%d or newer. Omarchy: sudo pacman -S cmake · Mac: brew upgrade cmake",
+			firstLine(string(out)), minCMake[0], minCMake[1])
+	}
+	return nil
 }
 
 // projectInclude runs at the end of each project() call (through
@@ -246,6 +279,9 @@ func (e *Engine) runCMake(ctx context.Context, l *Lesson, mode Mode) (*Result, e
 	cmake, ctest, err := CMakeTools()
 	if err != nil {
 		return &Result{Stage: "compile", Summary: "✗ cmake isn't installed", Output: err.Error() + "\n"}, nil
+	}
+	if err := checkCMakeVersion(ctx, cmake); err != nil {
+		return &Result{Stage: "compile", Summary: "✗ cmake is too old", Output: err.Error() + "\n"}, nil
 	}
 	cxx, err := Compiler()
 	if err != nil {
@@ -406,6 +442,9 @@ func (e *Engine) runCMake(ctx context.Context, l *Lesson, mode Mode) (*Result, e
 				dim("Check that the functions the lesson asks for keep their exact names and signatures,\nand that the tests can see the headers of "+strings.Join(spec.TestsLink, ", ")+".")+"\n"), nil
 		}
 		g.testBin = filepath.Join(binDir, target)
+		if t := model.targets[target]; t != nil && len(t.Artifacts) > 0 {
+			g.testBin = model.path(t.Artifacts[0].Path) // where CMake really put it
+		}
 	}
 	if spec.CTest != nil && !stopped {
 		problems, text := e.runCTest(ctx, ctest, work, bdir, *spec.CTest)
