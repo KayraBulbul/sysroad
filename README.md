@@ -219,9 +219,11 @@ The course lives in `internal/course/content/` and is embedded in the binary:
 
 - `course.yaml`: phases → chapters → lessons. A lesson without a folder shows as "soon".
 - `lessons/<id>/lesson.md`: front matter (`title`, `minutes`, `xp`, `files` you edit,
-  an optional `run:` sample, `deeper:` links, and `optimize: true` for lessons that time
-  things, which builds the program with -O2 and no sanitizers) and the brief, ending in
-  `## Assignment`.
+  an optional `run:` sample, `deeper:` links, `program:` to name the program, and
+  `optimize: true` for lessons that time things, which builds the program with -O2 and no
+  sanitizers) and the brief, ending in `## Assignment`. `run: {interactive: true}` hands
+  the program the terminal after the visible tests (the editor capstone); the TUI and CLI
+  run it in place, the desktop app in a terminal window.
 - `starter/` and `solution/`: the files. `make test` checks that every starter fails Run
   and every solution passes Submit.
 - `tests/visible_*.cpp` (Run and Submit) and `tests/hidden_*.cpp` (Submit only): doctest
@@ -233,5 +235,14 @@ The course lives in `internal/course/content/` and is embedded in the binary:
 - Quizzes have `kind: quiz` and a `quiz.yaml` instead of code: a list of `q` (markdown),
   optional `code`, `options`, `answer` (0-based) and `why`. Answering every question
   right completes the lesson; a wrong pick is crossed out and costs nothing.
+- CMake lessons (`build: cmake`, from phase 3) build the learner's own `CMakeLists.txt`
+  instead (Ninja if installed, else Makefiles; `$CMAKE_GENERATOR` overrides) and are
+  graded by `cmake.yaml`: target shapes read back through CMake's File API (`targets:`
+  type, links, flags, C++ standard), extra configures with other `-D` values
+  (`variants:`), the lesson's doctest tests linked against the learner's targets
+  (`tests_link:`), their own CTest tests (`ctest:`) and `cmake --install` (`install:`).
+  Checks run the target named by `program:` (or a check's own `program:`). The
+  sanitizers come in through `CMAKE_CXX_FLAGS`, and `FetchContent` of `doctest` is served
+  from a bundled copy, so grading works offline.
 - Sanitizer reports are trimmed to the learner's frames, with short paths and type
   names (`internal/course/sanreport.go`).

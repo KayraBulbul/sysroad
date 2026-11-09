@@ -1,0 +1,17 @@
+- name: one header changed
+  stdin: &hello "time main.cpp 10\ntime greet.cpp 10\ntime greet.hpp 30\ntime main.o 20\ntime greet.o 20\ntime app 25\n\napp: main.o greet.o\n  c++ main.o greet.o -o app\nmain.o: main.cpp greet.hpp\n  c++ -c main.cpp\ngreet.o: greet.cpp greet.hpp\n  c++ -c greet.cpp\n"
+  stdout: "c++ -c main.cpp\nc++ -c greet.cpp\nc++ main.o greet.o -o app\n"
+- name: just one object file
+  args: [greet.o]
+  stdin: *hello
+  stdout: "c++ -c greet.cpp\n"
+  hidden: true
+- name: up to date
+  stdin: "time in.txt 1\ntime out.txt 2\nout.txt: in.txt\n  cp in.txt out.txt\n"
+  stdout: "minimake: 'out.txt' is up to date.\n"
+  hidden: true
+- name: a cycle
+  stdin: "a: b\n  touch a\nb: a\n  touch b\n"
+  stdout: ""
+  exit: 2
+  hidden: true

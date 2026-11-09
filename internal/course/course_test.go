@@ -55,6 +55,11 @@ func TestLessonsSolutionsPassStartersFail(t *testing.T) {
 			continue
 		}
 		t.Run(l.ID, func(t *testing.T) {
+			if l.Meta.Build == "cmake" {
+				if _, _, err := CMakeTools(); err != nil {
+					t.Skip("no cmake")
+				}
+			}
 			e := &Engine{DataDir: t.TempDir(), CacheDir: cache}
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
@@ -72,7 +77,11 @@ func TestLessonsSolutionsPassStartersFail(t *testing.T) {
 				t.Fatal(err)
 			}
 			for name, data := range sol {
-				if err := os.WriteFile(filepath.Join(e.WorkDir(l), name), data, 0o644); err != nil {
+				p := filepath.Join(e.WorkDir(l), filepath.FromSlash(name))
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, data, 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}

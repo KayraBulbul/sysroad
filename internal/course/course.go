@@ -96,6 +96,12 @@ type Meta struct {
 	// Optimize builds the program (not the tests) with -O2 and no
 	// sanitizers, for lessons that measure speed.
 	Optimize bool `yaml:"optimize"`
+	// Program names the program (default: the first file's name), as
+	// Run shows it and as the binary is called.
+	Program string `yaml:"program"`
+	// Build "cmake" builds your CMake project instead of compiling the
+	// .cpp files directly; cmake.yaml says how it's graded.
+	Build string `yaml:"build"`
 }
 
 type Link struct {
@@ -121,6 +127,8 @@ type Check struct {
 	Stdout *string           `yaml:"stdout"`
 	Exit   *int              `yaml:"exit"`
 	Hidden bool              `yaml:"hidden"`
+	// Program is the CMake target to run, if not cmake.yaml's program.
+	Program string `yaml:"program"`
 }
 
 // Graded reports whether Submit (rather than a manual tick) completes it.
@@ -457,6 +465,13 @@ func (c *Course) Validate() error {
 		}
 		if _, err := l.Checks(); err != nil {
 			errs = append(errs, err.Error())
+		}
+		if l.Meta.Build == "cmake" {
+			if _, err := l.CMake(); err != nil {
+				errs = append(errs, err.Error())
+			}
+		} else if l.Meta.Build != "" {
+			errs = append(errs, l.ID+": unknown build "+l.Meta.Build)
 		}
 	}
 	if len(errs) > 0 {

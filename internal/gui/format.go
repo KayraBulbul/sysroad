@@ -31,6 +31,9 @@ func (s *Service) Format(id, name, content string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if !isCxxFile(name) {
+		return content, nil // CMakeLists.txt and such: clang-format would mangle them
+	}
 	bin, err := exec.LookPath("clang-format")
 	if err != nil {
 		hint := "sudo pacman -S clang"
@@ -71,4 +74,13 @@ func hasClangFormat(dir string) bool {
 			return false
 		}
 	}
+}
+
+// isCxxFile reports whether clang-format should touch the file.
+func isCxxFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".ipp", ".inl":
+		return true
+	}
+	return false
 }

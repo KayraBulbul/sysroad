@@ -204,7 +204,7 @@ phases:
           - id: cmake-04-options
             title: "Build types, warnings and sanitizers"
           - id: cmake-05-tests
-            title: Tests with CTest and doctest
+            title: Tests with CTest
           - id: cmake-06-deps
             title: Dependencies with FetchContent
           - id: cmake-07-coreutils

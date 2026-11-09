@@ -1,0 +1,15 @@
+- name: standard input
+  stdin: "one two\nthree\n"
+  stdout: "      2       3      14\n"
+- name: two files and a total
+  args: [a.txt, b.txt]
+  files:
+    a.txt: "a b c\n"
+    b.txt: "  d\n\ne f"
+  stdout: "      1       3       6 a.txt\n      2       3       8 b.txt\n      3       6      14 total\n"
+  hidden: true
+- name: a missing file
+  args: [nope.txt]
+  stdout: ""
+  exit: 1
+  hidden: true

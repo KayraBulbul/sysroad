@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -83,15 +84,6 @@ func runLesson(dir string, args []string, mode course.Mode) error {
 	if err != nil {
 		return err
 	}
-	if r.Interactive != nil {
-		cmd := r.Interactive
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-		err := cmd.Run()
-		if _, ok := err.(*exec.ExitError); ok {
-			err = nil
-		}
-		return err
-	}
 	if o := strings.TrimRight(r.Output, "\n"); o != "" {
 		emit(o + "\n\n")
 	}
@@ -112,6 +104,17 @@ func runLesson(dir string, args []string, mode course.Mode) error {
 		if gitsync.IsRepo(dir) {
 			if err := syncWithRetry(dir, 20*time.Second); err != nil {
 				emit(paint("90", "(not synced yet: "+err.Error()+")") + "\n")
+			}
+		}
+	}
+	// An interactive program gets the terminal once the results are out.
+	if r.Interactive != nil {
+		emit(paint("90", "Starting "+filepath.Base(r.Interactive.Path)+"…") + "\n")
+		cmd := r.Interactive
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+		if err := cmd.Run(); err != nil {
+			if _, ok := err.(*exec.ExitError); !ok {
+				return err
 			}
 		}
 	}

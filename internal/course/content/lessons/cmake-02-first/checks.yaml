@@ -1,0 +1,13 @@
+- name: two names
+  args: [Ada, Grace]
+  stdout: "Hello, Ada!\nHello, Grace!\n"
+- name: no names
+  stdout: "Hello, stranger!\n"
+- name: a question
+  args: ["world?"]
+  stdout: "Hello, world?\n"
+  hidden: true
+- name: a flag isn't a name
+  args: ["--loud"]
+  stdout: "Hello, stranger!\n"
+  hidden: true
