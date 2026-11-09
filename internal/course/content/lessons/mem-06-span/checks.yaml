@@ -1,0 +1,37 @@
+- name: three players
+  args: ["scores.bin"]
+  files:
+    scores.bin: !!binary "U0NPUgEAAwADYWRhDS8AAAVncmFjZY4mAAAFbGludXMAAgAA"
+  stdout: "version 1, 3 players\nada         12045\ngrace        9870\nlinus         512\n"
+- name: a file cut off in the last score
+  args: ["cut.bin"]
+  files:
+    cut.bin: !!binary "U0NPUgEAAwADYWRhDS8AAAVncmFjZY4mAAAFbGludXMAAg=="
+  stdout: "version 1, 3 players\nada         12045\ngrace        9870\n"
+  exit: 1
+- name: big numbers and long names
+  args: ["big.bin"]
+  files:
+    big.bin: !!binary "U0NPUgIAAgADa2VuAChr7hRhYWFhYWFhYWFhYWFhYWFhYWFhYQcAAAA="
+  stdout: "version 2, 2 players\nken        4000000000\naaaaaaaaaaaaaaaaaaaa      7\n"
+  hidden: true
+- name: no players
+  args: ["empty.bin"]
+  files:
+    empty.bin: !!binary "U0NPUgEAAAA="
+  stdout: "version 1, 0 players\n"
+  hidden: true
+- name: the count is a lie
+  args: ["lie.bin"]
+  files:
+    lie.bin: !!binary "U0NPUgEAyAABeAEAAAA="
+  stdout: "version 1, 200 players\nx               1\n"
+  exit: 1
+  hidden: true
+- name: an empty file
+  args: ["zero.bin"]
+  files:
+    zero.bin: ""
+  stdout: ""
+  exit: 1
+  hidden: true

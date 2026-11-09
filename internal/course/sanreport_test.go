@@ -1,6 +1,7 @@
 package course
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -50,6 +51,36 @@ func TestTidySanitizerShortensTypes(t *testing.T) {
 	want := "ERROR: AddressSanitizer: x\n    #0 welcome(std::string_view, std::vector<int> const&) bugs.cpp:31:12\n" +
 		"SUMMARY: AddressSanitizer: heap-use-after-free in __asan_memcpy"
 	if got := tidySanitizer(in, "/w", "/t"); got != want {
+		t.Fatalf("got:\n%s", got)
+	}
+}
+
+func TestTidySanitizerDropsOperatorNew(t *testing.T) {
+	in := "ERROR: AddressSanitizer: heap-use-after-free on address 0x7b\nfreed by thread T0 here:\n" +
+		"    #0 0x1 in operator delete(void*) /w/alloc_count.cpp:33:9\n" +
+		"    #1 0x2 in operator delete[](void*) /w/alloc_count.cpp:38:5\n" +
+		"    #2 0x3 in shout(std::string const&) /w/bugs.cpp:37:5\n"
+	want := "ERROR: AddressSanitizer: heap-use-after-free on address 0x7b\nfreed by thread T0 here:\n" +
+		"    #0 shout(std::string const&) bugs.cpp:37:5\n"
+	if got := tidySanitizer(in, "/w", "/t"); got != want {
+		t.Fatalf("got:\n%s", got)
+	}
+}
+
+func TestTidySanitizerFoldsDeepRecursion(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("AddressSanitizer:DEADLYSIGNAL\n==7==ERROR: AddressSanitizer: stack-overflow on address 0x7ff (pc 0x55 bp 0x7ff sp 0x7fe T0)\n")
+	for i := 0; i < 200; i++ {
+		fmt.Fprintf(&b, "    #%d 0x%x in sum_list(Node const*) /w/walk.cpp:13:26\n", i, 0x5500+i)
+	}
+	b.WriteString("    #200 0x55 in main /w/main.cpp:9:3\n\n==7==Register values:\nrax = 0x00007b35d7654f18  rbx = 0x00007ffd49b05780  \n r8 = 0x0000000000000000   r9 = 0x0\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: stack-overflow /w/walk.cpp:13:26 in sum_list(Node const*)")
+	want := `ERROR: AddressSanitizer: stack-overflow on address 0x7ff
+    #0 sum_list(Node const*) walk.cpp:13:26
+    … the same frame 199 more times
+    #1 main main.cpp:9:3
+
+SUMMARY: AddressSanitizer: stack-overflow walk.cpp:13:26 in sum_list(Node const*)`
+	if got := tidySanitizer(b.String(), "/w", "/t"); got != want {
 		t.Fatalf("got:\n%s", got)
 	}
 }

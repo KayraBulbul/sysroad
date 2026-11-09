@@ -1,0 +1,28 @@
+- name: a PNG and a text file
+  args: ["logo.png", "notes.txt"]
+  files:
+    logo.png: !!binary "iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAj0lEQVR4nOXOMQEAAAzDoEiv9MngGApoz6UDWjqgpQNaOqClA1o6oKUDWjqgpQNaOqClA1o6oKUDWjqgpQNaOqClA1o6oKUDWjqgpQNaOqClA1o6oKUDWjqgpQNaOqClA1o6oKUDWjqgpQNaOqClA1o6oKUDWjqgpQNaOqClA1o6oKUDWjqgpQNaOqClA9oBE+4BaUw0ttwAAAAASUVORK5CYII="
+    notes.txt: "not a picture\n"
+  stdout: "logo.png: 64 x 48, 8-bit RGBA\nnotes.txt: not a PNG\n"
+  exit: 1
+- name: three real PNGs
+  args: ["icon.png", "wide.png", "inter.png"]
+  files:
+    icon.png: !!binary "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFElEQVR4nGNoIBEwjGoY1TB8NQAAJYSAEGy7FvQAAAAASUVORK5CYII="
+    wide.png: !!binary "iVBORw0KGgoAAAANSUhEUgABEXAAAAADAQAAAACX8OHtAAAAOUlEQVR4nO3OMQEAAAgDoEU3ui3mISQgAwAAAAAAAADAI7kOAAAAAAAAAADQlOsAAAAAAAAAAABNC/kGR/6Uz/GAAAAAAElFTkSuQmCC"
+    inter.png: !!binary "iVBORw0KGgoAAAANSUhEUgAAAAUAAAAEEAQAAAHLrdEeAAAAD0lEQVR4nGNowAIYKBMEAJCuKAG05GM2AAAAAElFTkSuQmCC"
+  stdout: "icon.png: 16 x 16, 8-bit RGB\nwide.png: 70000 x 3, 1-bit grey\ninter.png: 5 x 4, 16-bit grey + alpha, interlaced\n"
+  hidden: true
+- name: a palette image
+  args: ["pal.png"]
+  files:
+    pal.png: !!binary "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACBAMAAACAmBAXAAAADElEQVR4nGNoYGgAAAIEAQHNMi3gAAAAAElFTkSuQmCC"
+  stdout: "pal.png: 2 x 2, 4-bit palette\n"
+  hidden: true
+- name: an empty file
+  args: ["empty.png"]
+  files:
+    empty.png: ""
+  stdout: "empty.png: not a PNG\n"
+  exit: 1
+  hidden: true

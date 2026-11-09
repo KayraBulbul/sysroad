@@ -1,0 +1,112 @@
+- q: Where do `n` and the 100 ints live?
+  code: |
+    void f() {
+        int n = 100;
+        auto* a = new int[n];
+        // ...
+        delete[] a;
+    }
+  options:
+  - Both on the heap
+  - "`n` and the pointer `a` on the stack; the 100 ints on the heap"
+  - Both on the stack
+  - "`n` on the stack; `a` and the ints in a global area"
+  answer: 1
+  why: |
+    Locals, including the pointer variable `a`, live in `f`'s stack
+    frame. `new` puts the array on the heap, and only `delete[]` frees
+    it. Returning from `f` would free the pointer but not the ints.
+
+- q: Why does a million-deep recursion crash when a million-iteration loop doesn't?
+  options:
+  - Recursion is slower, so it times out
+  - The compiler limits recursion depth to 65,536
+  - Each call pushes a frame, and a million frames don't fit in the ~8 MB stack
+  - Recursion allocates on the heap, which runs out
+  answer: 2
+  why: |
+    Every active call keeps its frame until it returns. A loop reuses
+    one frame. For input of unknown depth, use a loop, with your own
+    `std::vector` as the stack if you need one.
+
+- q: What's wrong here?
+  code: |
+    std::string* names = new std::string[3];
+    // ...
+    delete names;
+  options:
+  - "It should be `delete[] names`: arrays need `delete[]`"
+  - Nothing, `delete` works for arrays too
+  - "`std::string` can't be allocated with `new`"
+  - It should be `free(names)`
+  answer: 0
+  why: |
+    `new[]` pairs with `delete[]`. For types with destructors, `new[]`
+    stores the count just before the array, so `delete` both skips
+    destructors and frees the wrong address. ASan calls that a
+    bad-free.
+
+- q: What does ASan's `heap-use-after-free` report show besides where the bad access happened?
+  options:
+  - The value that was read
+  - Which thread will free it next
+  - Nothing, just the one stack
+  - Where the memory was freed, and where it was allocated
+  answer: 3
+  why: |
+    Three stacks: the bad access, the `delete` that freed the block,
+    and the `new` that allocated it. The second one is usually where
+    the bug is.
+
+- q: After these lines, who owns the `Entry`?
+  code: |
+    auto a = std::make_unique<Entry>();
+    Entry* raw = a.get();
+    std::unique_ptr<Entry> b = std::move(a);
+  options:
+  - "`a`, `raw` and `b` all share it"
+  - "`b` owns it; `a` is empty; `raw` just points at it"
+  - "`raw` owns it, because it was taken first"
+  - "`a` still owns it; `std::move` only copied it"
+  answer: 1
+  why: |
+    Moving a `unique_ptr` transfers ownership and leaves the source
+    null. `raw` was never an owner: raw pointers observe. When `b` is
+    destroyed, the `Entry` is deleted and `raw` dangles.
+
+- q: A parent holds `shared_ptr`s to its children, and each child holds a `shared_ptr` back to its parent. What happens when the last outside pointer to the parent goes away?
+  options:
+  - Everything is freed in order, parent first
+  - The program crashes with a double free
+  - Nothing is freed. Each holds the other's count above zero, so it leaks
+  - The children are freed but the parent leaks
+  answer: 2
+  why: |
+    That's a reference cycle. The child's link to its parent should be
+    a `std::weak_ptr`, which watches without keeping the parent alive.
+
+- q: What does `w.lock()` return once every `shared_ptr` to the object is gone?
+  options:
+  - An empty `shared_ptr`
+  - A dangling `shared_ptr`
+  - It throws `std::bad_weak_ptr`
+  - The object, brought back to life
+  answer: 0
+  why: |
+    `lock()` checks the control block's strong count. If it's zero, you
+    get an empty `shared_ptr`, so test it before using it:
+    `if (auto p = w.lock()) ...`. (The `shared_ptr` *constructor* from
+    a `weak_ptr` is the one that throws.)
+
+- q: Why does `IntList`'s destructor loop instead of relying on the default?
+  options:
+  - The default destructor leaks the nodes
+  - "`unique_ptr` can't be destroyed automatically inside a class"
+  - Loops are always faster than destructors
+  - The default destroys `head_`, which destroys its `next`, and so on, recursing once per node
+  answer: 3
+  why: |
+    Each `unique_ptr<Node>` destroying its node destroys that node's
+    `next` from inside its own destructor. For a long list that's deep
+    recursion and a stack overflow. `while (head_) head_ = std::move(head_->next);`
+    frees one node per iteration.

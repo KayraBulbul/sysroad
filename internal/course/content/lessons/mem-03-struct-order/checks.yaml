@@ -1,0 +1,7 @@
+- name: pack four fields
+  args: ["--pack", "char", "double", "char", "int"]
+  stdout: "as written: sizeof 24, 10 bytes of padding\npacked:\noffset  size  field\n     0     8  double\n     8     4  int\n    12     1  char\n    13     1  char\n    14        (2 bytes padding)\nsizeof 16, alignof 8, 2 bytes of padding\n"
+- name: already packed
+  args: ["--pack", "ptr", "int", "short", "char", "char"]
+  stdout: "as written: sizeof 16, 0 bytes of padding\npacked:\noffset  size  field\n     0     8  ptr\n     8     4  int\n    12     2  short\n    14     1  char\n    15     1  char\nsizeof 16, alignof 8, 0 bytes of padding\n"
+  hidden: true

@@ -1,6 +1,7 @@
 package course
 
 import (
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -16,10 +17,12 @@ var (
 	sanPidRE     = regexp.MustCompile(`==\d+==`)
 	sanFrameRE   = regexp.MustCompile(`^(\s*)#\d+ 0x[0-9a-f]+ in (.*)$`)
 	sanPcRE      = regexp.MustCompile(` at pc 0x[0-9a-f]+ bp 0x[0-9a-f]+ sp 0x[0-9a-f]+`)
+	sanPcParenRE = regexp.MustCompile(` \(pc 0x[0-9a-f]+ bp 0x[0-9a-f]+ sp 0x[0-9a-f]+ T\d+\)`)
 	sanBuildIDRE = regexp.MustCompile(` \(BuildId: [0-9a-f]+\)`)
 	sanDoctestRE = regexp.MustCompile(`\S*/doctest\.h`)
 	sanBinRE     = regexp.MustCompile(` \(/\S+\+0x[0-9a-f]+\)`)
 	sanAllocRE   = regexp.MustCompile(`, std::allocator<[^<>]*>>`)
+	sanRegRE     = regexp.MustCompile(`^\s*[a-z0-9]+ = 0x[0-9a-f]+`)
 )
 
 // The spelled-out names of common standard types, and what you'd write.
@@ -33,9 +36,13 @@ var sanTypes = strings.NewReplacer(
 )
 
 // noiseFrame reports whether a stack frame is outside the learner's code:
-// the standard library, the C runtime, doctest's runner, or sanitizer
-// internals with no source line.
+// the standard library, the C runtime, doctest's runner, sanitizer
+// internals with no source line, or operator new and delete themselves
+// (some lessons replace them to count allocations).
 func noiseFrame(frame string) bool {
+	if strings.HasPrefix(frame, "operator new") || strings.HasPrefix(frame, "operator delete") {
+		return true
+	}
 	for _, s := range []string{"/usr/", "/Library/Developer/", "/Applications/Xcode", "doctest.h",
 		"libc_start", "_start (", "start (", "libsystem", "libclang_rt", "__asan", "__ubsan", "__sanitizer"} {
 		if strings.Contains(frame, s) {
@@ -55,6 +62,14 @@ func tidySanitizer(s, work, testsDir string) string {
 	sep := string(filepath.Separator)
 	var out []string
 	skipping, frame := false, 0
+	// Deep recursion repeats one frame hundreds of times: keep the first.
+	last, repeats := "", 0
+	flush := func() {
+		if repeats > 0 {
+			out = append(out, fmt.Sprintf("    … the same frame %d more times", repeats))
+		}
+		last, repeats = "", 0
+	}
 	for _, line := range strings.Split(s, "\n") {
 		if strings.HasPrefix(line, "Shadow bytes around the buggy address:") {
 			skipping = true
@@ -66,7 +81,9 @@ func tidySanitizer(s, work, testsDir string) string {
 			}
 			continue
 		}
-		if strings.Contains(line, "ABORTING") {
+		if strings.Contains(line, "ABORTING") || strings.HasSuffix(line, "Sanitizer:DEADLYSIGNAL") ||
+			strings.HasSuffix(line, "Register values:") || sanRegRE.MatchString(line) ||
+			strings.HasSuffix(line, "Sanitizer can not provide additional info.") {
 			continue
 		}
 		line = strings.ReplaceAll(line, testsDir+sep, "tests"+sep)
@@ -74,6 +91,7 @@ func tidySanitizer(s, work, testsDir string) string {
 		line = sanDoctestRE.ReplaceAllString(line, "doctest.h")
 		line = sanPidRE.ReplaceAllString(line, "")
 		line = sanPcRE.ReplaceAllString(line, "")
+		line = sanPcParenRE.ReplaceAllString(line, "")
 		line = sanBuildIDRE.ReplaceAllString(line, "")
 		short := func(s string) string {
 			return sanAllocRE.ReplaceAllString(sanTypes.Replace(sanBinRE.ReplaceAllString(s, "")), ">")
@@ -82,13 +100,22 @@ func tidySanitizer(s, work, testsDir string) string {
 			if noiseFrame(m[2]) {
 				continue
 			}
-			out = append(out, m[1]+"#"+strconv.Itoa(frame)+" "+short(m[2]))
+			text := short(m[2])
+			if text == last {
+				repeats++
+				continue
+			}
+			flush()
+			last = text
+			out = append(out, m[1]+"#"+strconv.Itoa(frame)+" "+text)
 			frame++
 			continue
 		}
+		flush()
 		frame = 0
 		out = append(out, short(line))
 	}
+	flush()
 	// No runs of blank lines.
 	var tidy []string
 	for i, l := range out {

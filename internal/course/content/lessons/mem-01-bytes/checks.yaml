@@ -1,0 +1,18 @@
+- name: an int
+  args: ["int", "258"]
+  stdout: "int 258: 4 bytes\n02 01 00 00\n"
+- name: a float
+  args: ["float", "-0.5"]
+  stdout: "float -0.5: 4 bytes\n00 00 00 bf\nsign 1  exponent 126 (2^-1)  mantissa 0x000000\n"
+- name: a double
+  args: ["double", "0.1"]
+  stdout: "double 0.1: 8 bytes\n9a 99 99 99 99 99 b9 3f\n"
+  hidden: true
+- name: a negative short
+  args: ["short", "-2"]
+  stdout: "short -2: 2 bytes\nfe ff\n"
+  hidden: true
+- name: float 3
+  args: ["float", "3"]
+  stdout: "float 3: 4 bytes\n00 00 40 40\nsign 0  exponent 128 (2^1)  mantissa 0x400000\n"
+  hidden: true

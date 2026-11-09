@@ -1,0 +1,14 @@
+- name: count and look up
+  args: ["the", "fox", "cat"]
+  stdin: "the quick brown fox jumps over the lazy dog\n"
+  stdout: "the: 2\nfox: 1\ncat: 0\n8 different words, capacity 16\n"
+- name: lots of words
+  args: ["w0", "w499", "w500"]
+  stdin: "w0 w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 w18 w19 w20 w0 w0\n"
+  stdout: "w0: 3\nw499: 0\nw500: 0\n21 different words, capacity 32\n"
+  hidden: true
+- name: no input
+  args: ["x"]
+  stdin: ""
+  stdout: "x: 0\n0 different words, capacity 8\n"
+  hidden: true
