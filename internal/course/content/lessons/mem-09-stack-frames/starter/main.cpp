@@ -25,7 +25,6 @@ static void nest(int depth) {
 
 int main() {
     nest(0);
-    std::fflush(stdout);  // so this shows even if what follows crashes
 
     const long n = 1'000'000;
     std::vector<Node> list(n);
@@ -33,7 +32,6 @@ int main() {
         list[i] = {i + 1, i + 1 < n ? &list[i + 1] : nullptr};
     }
     std::printf("\nsum of a %ld-node list: %ld\n", n, sum_list(list.data()));
-    std::fflush(stdout);
 
     // A tree that's one long chain of left children.
     std::vector<Tree> chain(n);

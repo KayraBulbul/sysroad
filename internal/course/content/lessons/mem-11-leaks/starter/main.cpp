@@ -6,10 +6,8 @@
 int main() {
     std::printf("sum_numbers(\"1 2 3\")   = %d\n", sum_numbers("1 2 3"));
     std::printf("sum_numbers(\"1 two 3\") = %d\n", sum_numbers("1 two 3"));
-    std::fflush(stdout);
 
     std::printf("shout(\"hello\\nworld\")  = %s\n", shout("hello\nworld").c_str());
-    std::fflush(stdout);
 
     int src[] = {1, 2, 3};
     int* d = doubled_copy(src, 3);
@@ -18,7 +16,6 @@ int main() {
     d = doubled_copy(src, 0);
     std::printf("doubled_copy(0 ints)   = %s\n", d == nullptr ? "nullptr" : "a pointer");
     delete[] d;
-    std::fflush(stdout);
 
     std::printf("count_unique(\"a b a c b\") = %zu\n", count_unique("a b a c b"));
 }

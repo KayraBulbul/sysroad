@@ -1,0 +1,101 @@
+- q: "`Buffer` holds a `char* data_` and has only a destructor that does `delete[] data_`. What happens here?"
+  code: |
+    Buffer a(std::string_view("hi"));
+    Buffer b = a;
+  options:
+  - "`b` gets its own copy of the bytes"
+  - "It doesn't compile without a copy constructor"
+  - "`a` and `b` share one buffer, and it's deleted twice when they go out of scope"
+  - "`b` is empty"
+  answer: 2
+  why: |
+    The generated copy constructor copies each member, including the
+    pointer. Two owners, two `delete[]`s: a double free. That's the
+    rule of three. A class with a custom destructor needs custom copies
+    too (or none at all, `= delete`).
+
+- q: Which of these is an rvalue?
+  options:
+  - "`name`, a local `std::string`"
+  - "`names[0]`"
+  - "`*p`"
+  - "`name + \"!\"`"
+  answer: 3
+  why: |
+    `name + "!"` makes a temporary string that nobody can refer to
+    afterwards, so it may be moved from. The others name objects that
+    live on, which makes them lvalues.
+
+- q: What does `std::move(x)` do by itself?
+  options:
+  - Casts `x` to an rvalue, so a move constructor or move assignment can be chosen
+  - Moves `x`'s contents into a temporary
+  - Destroys `x`
+  - Marks `x` as const
+  answer: 0
+  why: |
+    It's just a cast (`static_cast<T&&>`). Nothing happens until the
+    result is used to initialise or assign something. `std::move(x);`
+    on its own line does nothing at all.
+
+- q: After `std::string b = std::move(a);`, what can you safely do with `a`?
+  options:
+  - Nothing, it's destroyed
+  - Assign it a new value, or let it be destroyed
+  - Read it, it still holds the old text
+  - Only call `std::move` on it again
+  answer: 1
+  why: |
+    A moved-from object is valid but in an unspecified state. Giving it
+    a new value or destroying it is always fine. Reading it without
+    reassigning first relies on behaviour the standard doesn't promise.
+
+- q: A class has a user-declared copy constructor and nothing else. What does `T b = std::move(a);` call?
+  options:
+  - The compiler-generated move constructor
+  - Nothing, it doesn't compile
+  - The move constructor, after warning
+  - The copy constructor, because declaring it switched the implicit moves off
+  answer: 3
+  why: |
+    Declaring a copy constructor, copy assignment or destructor
+    suppresses the implicit move operations. The rvalue then binds to
+    `const T&`, and you silently get a copy. That was `Line` in 2.3.5.
+
+- q: Why does `std::vector` copy elements when it grows, if their move constructor isn't `noexcept`?
+  options:
+  - Copies are faster than moves for most types
+  - If a move threw halfway, the old elements would already be gutted and the vector couldn't be restored
+  - The standard forbids moving during reallocation
+  - It doesn't; it always moves
+  answer: 1
+  why: |
+    `push_back` guarantees that a failure leaves the vector unchanged.
+    Copying keeps the originals intact until the new buffer is
+    complete. Moving is only safe if it can't throw, hence
+    `std::move_if_noexcept`.
+
+- q: "`int x = INT_MAX; if (x + 1 < x) puts(\"wrapped\");` — what does an optimising compiler do?"
+  options:
+  - Prints `wrapped`, because the addition wraps to `INT_MIN`
+  - Throws an overflow exception
+  - Can delete the check entirely, because signed overflow is undefined and so "can't happen"
+  - Promotes `x` to `long` so there's no overflow
+  answer: 2
+  why: |
+    The compiler may assume UB never occurs, and then `x + 1 < x` is
+    always false. Check before the operation (`x > INT_MAX - 1`) or use
+    `__builtin_add_overflow`.
+
+- q: Which way of reading a `std::uint32_t` from a byte buffer at an arbitrary offset is defined behaviour?
+  options:
+  - "`std::memcpy(&v, buf + off, 4);`"
+  - "`v = *reinterpret_cast<const std::uint32_t*>(buf + off);`"
+  - "`v = *(std::uint32_t*)(buf + off);`"
+  - "`v = reinterpret_cast<const std::uint32_t&>(buf[off]);`"
+  answer: 0
+  why: |
+    The other three read through a pointer of the wrong type, which
+    breaks strict aliasing, and at a possibly misaligned address.
+    `memcpy` copies bytes, which is always allowed, and compiles to a
+    single load anyway.

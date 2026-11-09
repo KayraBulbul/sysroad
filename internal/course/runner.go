@@ -193,6 +193,25 @@ func Compiler() (string, error) {
 
 var warnFlags = []string{"-Wall", "-Wextra"}
 
+// flushSource is linked into every program. When a sanitizer stops the
+// program (a bad access, undefined behaviour, or leaks found at exit) it
+// exits without flushing stdio, and what the program printed so far would be
+// lost. This flushes it first.
+const flushSource = `#include <cstdio>
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(undefined_behavior_sanitizer)
+#include <sanitizer/common_interface_defs.h>
+namespace {
+struct SysroadFlush {
+    SysroadFlush() {
+        __sanitizer_set_death_callback([] { std::fflush(nullptr); });
+    }
+} sysroad_flush;
+}  // namespace
+#endif
+#endif
+`
+
 func sanitizerEnv() []string {
 	env := os.Environ()
 	asan := "abort_on_error=0"
@@ -339,6 +358,13 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	var progRes, testRes compiled
 	var wg sync.WaitGroup
 
+	flush := filepath.Join(build, "sysroad_flush.cpp")
+	if needProg {
+		if err := os.WriteFile(flush, []byte(flushSource), 0o644); err != nil {
+			return nil, err
+		}
+	}
+
 	// The program build carries the warnings you see. Without a program
 	// to build, a syntax-only pass shows them instead.
 	wg.Add(1)
@@ -346,7 +372,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		defer wg.Done()
 		args := append(append(append([]string{}, flags...), warnFlags...), "-I", ".")
 		if needProg {
-			args = append(append(args, srcs...), "-o", prog)
+			args = append(append(args, srcs...), flush, "-o", prog)
 		} else {
 			args = append(append(args, "-fsyntax-only"), srcs...)
 		}

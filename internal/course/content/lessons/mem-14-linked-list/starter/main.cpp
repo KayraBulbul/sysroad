@@ -26,7 +26,6 @@ int main() {
     }
     print("now:", l);
     std::printf("contains 3:  %s\n", l.contains(3) ? "yes" : "no");
-    std::fflush(stdout);
 
     {
         IntList big;
@@ -34,7 +33,6 @@ int main() {
             big.push_back(i);
         }
         std::printf("\na big list:  size %zu\n", big.size());
-        std::fflush(stdout);
     }
     std::printf("...and it was freed without running out of stack\n");
 }
