@@ -389,6 +389,13 @@ func (e *Engine) runCMake(ctx context.Context, l *Lesson, mode Mode) (*Result, e
 			}
 		}
 	}
+	// The tests are added at the end of the first project() call; without
+	// one, there's nothing to hook them onto.
+	if hasTests && model.targets["sysroad_tests_run"] == nil {
+		hasTests = false
+		project(false, "project()", []string{"CMakeLists.txt has no project(...) call. It goes right after cmake_minimum_required."})
+		out.WriteString("\n")
+	}
 	stopped := mode == ModeRun && r.Stage != ""
 	if hasTests && !stopped {
 		target := "sysroad_tests_" + string(mode)
