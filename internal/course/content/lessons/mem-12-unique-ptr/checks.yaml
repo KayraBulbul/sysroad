@@ -1,0 +1,22 @@
+- name: a small project
+  stdin: "src/main.cpp\nsrc/util/str.cpp\nREADME.md\n"
+  stdout: ".\n├── README.md\n└── src\n    ├── main.cpp\n    └── util\n        └── str.cpp\n\n2 directories, 3 files\n"
+- name: just one directory
+  args: ["src"]
+  stdin: "src/main.cpp\nsrc/util/str.cpp\nREADME.md\n"
+  stdout: "src\n├── main.cpp\n└── util\n    └── str.cpp\n\n1 directory, 2 files\n"
+- name: a nested path and repeated lines
+  args: ["a/b"]
+  stdin: "./a/b/c.txt\na/b/c.txt\na/b/d/e\na/z\n"
+  stdout: "a/b\n├── c.txt\n└── d\n    └── e\n\n1 directory, 2 files\n"
+  hidden: true
+- name: a path that isn't there
+  args: ["nope"]
+  stdin: "a/b\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: no input
+  stdin: ""
+  stdout: ".\n\n0 directories, 0 files\n"
+  hidden: true
