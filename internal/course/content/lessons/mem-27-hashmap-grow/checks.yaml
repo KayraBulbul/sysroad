@@ -1,0 +1,7 @@
+- name: set, get, del and list
+  stdin: "set apple 3\nset pear 5\nset fig 1\nget apple\ndel apple\nget apple\ndel kiwi\nset fig 2\nlist\n"
+  stdout: "apple = 3\ndeleted apple\napple is not set\nno such key: kiwi\n  fig = 2\n  pear = 5\n2 entries\n"
+- name: lots of churn
+  stdin: "set a 1\ndel a\nset a 2\ndel a\nset a 3\nset b x y z\nlist\ndel a\ndel b\nlist\n"
+  stdout: "deleted a\ndeleted a\n  a = 3\n  b = x y z\n2 entries\ndeleted a\ndeleted b\n0 entries\n"
+  hidden: true

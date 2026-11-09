@@ -167,7 +167,7 @@ phases:
             kind: quiz
       - id: mem-rebuild
         title: "Rebuild: String, Vector, HashMap"
-        project: your containers, swapped into your coreutils
+        project: your containers, put to work in wordfreq
         lessons:
           - id: mem-23-string
             title: "String, with the small-string optimisation"
@@ -183,7 +183,7 @@ phases:
           - id: mem-27-hashmap-grow
             title: "HashMap: deletion and rehashing"
           - id: mem-28-swap-in
-            title: "Swap your containers into wc, cat and grep"
+            title: "wordfreq: your containers at work"
             kind: project
           - id: mem-29-bench
             title: Benchmark yours against the standard library

@@ -193,6 +193,19 @@ func Compiler() (string, error) {
 
 var warnFlags = []string{"-Wall", "-Wextra"}
 
+// optimizedFlags is baseFlags with -O2 and assertions off: what a release
+// build would use.
+func optimizedFlags() []string {
+	out := make([]string, 0, len(baseFlags)+1)
+	for _, f := range baseFlags {
+		if f == "-O0" {
+			f = "-O2"
+		}
+		out = append(out, f)
+	}
+	return append(out, "-DNDEBUG")
+}
+
 // flushSource is linked into every program. When a sanitizer stops the
 // program (a bad access, undefined behaviour, or leaks found at exit) it
 // exits without flushing stdio, and what the program printed so far would be
@@ -350,6 +363,14 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	}
 	needProg := len(checks) > 0 || l.Meta.Run != nil
 	flags, sanNote := e.flags(ctx, cxx)
+	// Lessons that time things build the program optimised and without
+	// sanitizers, which would otherwise swamp the measurements. The tests
+	// keep the sanitizers.
+	progFlags := flags
+	if l.Meta.Optimize {
+		progFlags = optimizedFlags()
+		sanNote = "Run builds this program with -O2 and no sanitizers, so its timings mean something. The tests still use sanitizers."
+	}
 
 	cctx, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
@@ -370,7 +391,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		args := append(append(append([]string{}, flags...), warnFlags...), "-I", ".")
+		args := append(append(append([]string{}, progFlags...), warnFlags...), "-I", ".")
 		if needProg {
 			args = append(append(args, srcs...), flush, "-o", prog)
 		} else {

@@ -93,6 +93,9 @@ type Meta struct {
 	Video   *Link    `yaml:"video"`
 	Deeper  []Link   `yaml:"deeper"` // optional reference links
 	Run     *Sample  `yaml:"run"`    // sample run shown by Run
+	// Optimize builds the program (not the tests) with -O2 and no
+	// sanitizers, for lessons that measure speed.
+	Optimize bool `yaml:"optimize"`
 }
 
 type Link struct {

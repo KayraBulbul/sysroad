@@ -219,7 +219,9 @@ The course lives in `internal/course/content/` and is embedded in the binary:
 
 - `course.yaml`: phases → chapters → lessons. A lesson without a folder shows as "soon".
 - `lessons/<id>/lesson.md`: front matter (`title`, `minutes`, `xp`, `files` you edit,
-  an optional `run:` sample, `deeper:` links) and the brief, ending in `## Assignment`.
+  an optional `run:` sample, `deeper:` links, and `optimize: true` for lessons that time
+  things, which builds the program with -O2 and no sanitizers) and the brief, ending in
+  `## Assignment`.
 - `starter/` and `solution/`: the files. `make test` checks that every starter fails Run
   and every solution passes Submit.
 - `tests/visible_*.cpp` (Run and Submit) and `tests/hidden_*.cpp` (Submit only): doctest

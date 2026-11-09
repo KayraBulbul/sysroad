@@ -1,0 +1,39 @@
+- name: the top 5 of a poem
+  args: ["-n", "5", "poem.txt"]
+  files:
+    poem.txt: "The fog comes\non little cat feet.\n\nIt sits looking\nover harbor and city\non silent haunches\nand then moves on.\n"
+  stdout: "      3 on\n      2 and\n      1 cat\n      1 city\n      1 comes\n"
+- name: standard input, top 10
+  stdin: "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity, it was the season of Light, it was the season of Darkness.\n"
+  stdout: "      8 it\n      8 of\n      8 the\n      8 was\n      2 age\n      2 epoch\n      2 season\n      2 times\n      1 belief\n      1 best\n"
+- name: two files add up
+  args: ["a.txt", "b.txt"]
+  files:
+    a.txt: "red green red\n"
+    b.txt: "green red blue\n"
+  stdout: "      3 red\n      2 green\n      1 blue\n"
+  hidden: true
+- name: a missing file is reported, the rest still count
+  args: ["a.txt", "nope.txt"]
+  files:
+    a.txt: "one one two\n"
+  stdout: "      2 one\n      1 two\n"
+  exit: 1
+  hidden: true
+- name: -n 0
+  args: ["-n", "0"]
+  stdin: "anything at all\n"
+  stdout: ""
+  hidden: true
+- name: a bad -n
+  args: ["-n", "lots"]
+  stdin: "x\n"
+  stdout: ""
+  exit: 2
+  hidden: true
+- name: -n with nothing after it
+  args: ["-n"]
+  stdin: "x\n"
+  stdout: ""
+  exit: 2
+  hidden: true
