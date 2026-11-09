@@ -26,7 +26,18 @@
     return () => clearInterval(t);
   });
 
-  const html = $derived(result?.output ? ansiToHtml(result.output.replace(/\s+$/, "")) : "");
+  // The engine starts each block of output (sample run, tests, …) with a dim,
+  // underlined title and optional dim notes; draw those as a heading row.
+  const sectionRE =
+    /<span class="ansi-bright-black ansi-underline">([^<]*)<\/span>(?:<span class="ansi-bright-black">([^<]*)<\/span>)?\n/g;
+  const html = $derived(
+    result?.output
+      ? ansiToHtml(result.output.replace(/\s+$/, "")).replace(
+          sectionRE,
+          (_, title, notes = "") => `<div class="sec"><span>${title}</span><span>${notes.trim()}</span></div>`,
+        )
+      : "",
+  );
 
   function ago(at: string) {
     const s = Math.max(0, (now - new Date(at).getTime()) / 1000);
@@ -219,5 +230,28 @@
   }
   .body :global(.ansi-underline) {
     text-decoration: underline;
+  }
+  /* The part of a value that differs from what the test expected. */
+  .body :global(.ansi-bg-red) {
+    background: color-mix(in oklab, var(--red) 30%, transparent);
+    color: var(--bright-red);
+    border-radius: 2px;
+  }
+  .body :global(.ansi-bg-green) {
+    background: color-mix(in oklab, var(--green) 28%, transparent);
+    color: var(--bright-green);
+    border-radius: 2px;
+  }
+  .body :global(.sec) {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--fg-dim);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 3px;
+    margin-bottom: 6px;
   }
 </style>
