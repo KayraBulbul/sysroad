@@ -33,6 +33,7 @@ After the move, the slot in the vector holds a null pointer, which
 For `print_tree`, a recursive helper takes the prefix built so far. The
 last child gets `└── ` and passes `prefix + "    "` down. The others get
 `├── ` and pass `prefix + "│   "`. Count an entry as a directory if it
-has children and as a file otherwise. The summary is
+has children and as a file otherwise, and count the root as a directory
+too (start `dirs` at 1), as `tree` does. The summary is
 `"\n" + dirs + " directories, " + files + " files"`, with
 `directory` and `file` when the count is 1.

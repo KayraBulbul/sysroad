@@ -26,4 +26,5 @@ void add_path(Entry& root, std::string_view path);
 std::unique_ptr<Entry> detach(Entry& parent, std::string_view name);
 
 // root's name, the tree under it, a blank line and "N directories, M files".
+// root itself counts as a directory, as it does in tree.
 void print_tree(const Entry& root, std::ostream& out);

@@ -25,3 +25,12 @@ which destroy theirs: the destructor recurses as deep as the tree. A
 directory tree is shallow, so that's fine. A linked list of a million
 `unique_ptr` nodes is a million-deep "tree", and its destructor
 overflows the stack. Lesson 2.2.6 meets that problem.
+
+**How close is this to the real `tree`?** Feed both the same list
+(`tree --fromfile .` reads paths from standard input) and the output
+matches, with two small exceptions. Real `tree` draws `│` followed by
+two *non-breaking* spaces (U+00A0) so the drawing survives being
+pasted into places that squash spaces. Yours uses ordinary spaces,
+which look the same. And real `tree` treats a trailing slash, as in
+`build/`, as an empty directory, where yours only counts an entry as a
+directory once something is inside it.

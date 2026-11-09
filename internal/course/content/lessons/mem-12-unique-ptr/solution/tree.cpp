@@ -56,7 +56,7 @@ static void print_children(const Entry& e, const std::string& prefix, std::ostre
 }
 
 void print_tree(const Entry& root, std::ostream& out) {
-    int dirs = 0;
+    int dirs = 1;  // the root counts too, as in tree
     int files = 0;
     out << root.name << '\n';
     print_children(root, "", out, dirs, files);

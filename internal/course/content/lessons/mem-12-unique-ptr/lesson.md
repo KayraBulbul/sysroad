@@ -39,7 +39,7 @@ $ printf 'src/main.cpp\nsrc/util/str.cpp\nREADME.md\n' | ./tree
     └── util
         └── str.cpp
 
-2 directories, 3 files
+3 directories, 3 files
 ```
 
 Each `Entry` holds its children as `std::vector<std::unique_ptr<Entry>>`.

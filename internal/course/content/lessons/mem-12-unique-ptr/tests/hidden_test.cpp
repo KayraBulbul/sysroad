@@ -65,20 +65,20 @@ TEST_CASE("print_tree: singular counts and │ prefixes") {
                        "│       └── deep\n"
                        "└── b\n"
                        "\n"
-                       "2 directories, 3 files\n");
+                       "3 directories, 3 files\n");
 
     Entry single;
     single.name = ".";
     add_path(single, "d/f");
     std::ostringstream o2;
     print_tree(single, o2);
-    CHECK(o2.str() == ".\n└── d\n    └── f\n\n1 directory, 1 file\n");
+    CHECK(o2.str() == ".\n└── d\n    └── f\n\n2 directories, 1 file\n");
 
     Entry empty;
     empty.name = ".";
     std::ostringstream o3;
     print_tree(empty, o3);
-    CHECK(o3.str() == ".\n\n0 directories, 0 files\n");
+    CHECK(o3.str() == ".\n\n1 directory, 0 files\n");
 }
 
 TEST_CASE("names sort by bytes") {

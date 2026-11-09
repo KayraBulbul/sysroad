@@ -42,5 +42,5 @@ TEST_CASE("print_tree") {
                        "    └── util\n"
                        "        └── str.cpp\n"
                        "\n"
-                       "2 directories, 3 files\n");
+                       "3 directories, 3 files\n");
 }
