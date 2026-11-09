@@ -1,0 +1,30 @@
+program: wc
+tests_link: [textutil]
+targets:
+  - name: textutil
+    type: library
+    flags: [-Wall, -Wextra, -Wpedantic]
+  - name: wc
+    type: executable
+    links: [textutil]
+    flags: [-Wall, -Wextra, -Wpedantic]
+variants:
+  - name: "with no build type, it builds as Debug"
+    define: {CMAKE_BUILD_TYPE: ""}
+    config: Debug
+  - name: "-DSANITIZE=ON compiles and links with the sanitizers"
+    define: {SANITIZE: "ON"}
+    targets:
+      - name: wc
+        flags: [-fsanitize=address, -fsanitize=undefined]
+        link_flags: [-fsanitize=address, -fsanitize=undefined]
+      - name: textutil
+        flags: [-fsanitize=address, -fsanitize=undefined]
+  - name: "SANITIZE is off unless you ask"
+    define: {CMAKE_BUILD_TYPE: Debug}
+    targets:
+      - name: wc
+        not_flags: [-fsanitize=address, -fsanitize=undefined]
+      - name: textutil
+        not_flags: [-fsanitize=address, -fsanitize=undefined]
+    hidden: true

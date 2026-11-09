@@ -1,0 +1,5 @@
+program: hello
+targets:
+  - name: hello
+    type: executable
+    std: 20

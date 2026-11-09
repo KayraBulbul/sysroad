@@ -1,0 +1,10 @@
+program: wc
+tests_link: [textutil]
+targets:
+  - name: textutil
+    type: library
+    std: 20
+  - name: wc
+    type: executable
+    links: [textutil]
+    std: 20

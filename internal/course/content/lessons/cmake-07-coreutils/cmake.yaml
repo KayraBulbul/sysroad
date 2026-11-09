@@ -1,0 +1,22 @@
+program: cat
+tests_link: [coreutils]
+targets:
+  - name: coreutils
+    type: library
+    std: 20
+    flags: [-Wall, -Wextra]
+  - name: echo
+    type: executable
+    links: [coreutils]
+    flags: [-Wall, -Wextra]
+  - name: cat
+    type: executable
+    links: [coreutils]
+    flags: [-Wall, -Wextra]
+  - name: wc
+    type: executable
+    links: [coreutils]
+    flags: [-Wall, -Wextra]
+ctest:
+  min: 3
+install: [bin/echo, bin/cat, bin/wc]

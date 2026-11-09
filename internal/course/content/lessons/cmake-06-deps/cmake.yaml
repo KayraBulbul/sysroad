@@ -1,0 +1,8 @@
+program: wc
+tests_link: [textutil]
+targets:
+  - name: textutil_tests
+    type: executable
+    links: [textutil, "doctest::doctest_with_main"]
+ctest:
+  min: 3

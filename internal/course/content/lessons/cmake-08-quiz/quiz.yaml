@@ -1,0 +1,98 @@
+- q: "In a make-style build, `app` links `main.o` and `util.o`, and both include `util.hpp`. You edit `util.hpp`. What runs?"
+  options:
+  - "Only the link, since no `.cpp` changed"
+  - "Both compiles, then the link"
+  - "Only `util.o`'s compile, then the link"
+  - "Nothing until you run a clean build"
+  answer: 1
+  why: |
+    Both objects depend on the header, so both are older than it now
+    and get rebuilt. Then `app` is older than its freshly built
+    objects, so it's linked again.
+
+- q: Which two commands configure and then build a CMake project into `build/`?
+  options:
+  - "`cmake build` then `make`"
+  - "`cmake --build build` then `cmake -S . -B build`"
+  - "`cmake -S . -B build` then `cmake --build build`"
+  - "`cmake --install build` then `cmake --build build`"
+  answer: 2
+  why: |
+    Configure first: `-S` is the source folder with `CMakeLists.txt`,
+    `-B` the build folder to write. Then `--build` runs whichever tool
+    CMake generated for, Ninja or make, so you never call it yourself.
+
+- q: "`geo`'s header is in `geo/include`, and programs that link `geo` include it. Which line is right?"
+  options:
+  - "`target_include_directories(geo PRIVATE include)`"
+  - "`include_directories(include)`"
+  - "`target_include_directories(geo INTERFACE include)`"
+  - "`target_include_directories(geo PUBLIC include)`"
+  answer: 3
+  why: |
+    `geo`'s own `.cpp` files include the header, and so does everyone
+    who links it: that's PUBLIC. PRIVATE would hide it from users,
+    INTERFACE from `geo` itself, and `include_directories` hands it to
+    every target in the folder, wanted or not.
+
+- q: "A library is header-only: no `.cpp` files at all. How do you make it a target?"
+  options:
+  - "`add_library(geo INTERFACE)`, with its settings marked INTERFACE"
+  - "`add_library(geo STATIC)` with no sources"
+  - "You can't; list its folder with `include_directories`"
+  - "`add_executable(geo)`"
+  answer: 0
+  why: |
+    An INTERFACE library builds nothing. It's a bundle of usage
+    requirements (include folders, compile features, flags) that
+    targets pick up by linking it. Your `project_warnings` target was
+    one.
+
+- q: "You run `cmake -S . -B build` with no `-DCMAKE_BUILD_TYPE`, and the project doesn't set a default. With a Ninja or Makefile build, what do you get?"
+  options:
+  - "A Debug build"
+  - "A Release build"
+  - "No optimisation and no debug info"
+  - "An error asking for a build type"
+  answer: 2
+  why: |
+    An empty build type adds neither `-g` nor `-O2`. That's why
+    projects set a default themselves when the cache variable is empty
+    and the generator isn't multi-config.
+
+- q: What makes a CTest test pass, out of the box?
+  options:
+  - "It prints nothing to stderr"
+  - "Its command exits with status 0"
+  - "Its output matches a file next to it"
+  - "It finishes within a second"
+  answer: 1
+  why: |
+    A test is any command, and exit status 0 is a pass. Properties
+    change the rule: `WILL_FAIL` flips it, `PASS_REGULAR_EXPRESSION`
+    judges the output instead, and `TIMEOUT` sets a time limit.
+
+- q: Why pin `GIT_TAG v2.4.11` in `FetchContent_Declare` rather than `GIT_TAG master`?
+  options:
+  - "FetchContent only accepts tags"
+  - "Branches are slower to download"
+  - "`master` doesn't exist on GitHub"
+  - "A branch moves, so the same build could get different code tomorrow"
+  answer: 3
+  why: |
+    Reproducible builds: anyone who configures your project, today or
+    in a year, should compile the same dependency. A release tag (or
+    better, a commit hash, or a URL with `URL_HASH`) fixes that.
+
+- q: "Why link `fmt::fmt` rather than `fmt`?"
+  options:
+  - "`::` makes the link static"
+  - "`fmt::fmt` is an alias target, so a typo is an error when you configure instead of a strange link failure"
+  - "Plain names only work for system libraries"
+  - "`::` makes CMake download it"
+  answer: 1
+  why: |
+    A plain name that isn't a target is passed to the linker as
+    `-lfmt`, so `fmt` misspelled shows up much later as "library not
+    found". A name with `::` must be a target, and CMake says so
+    immediately.

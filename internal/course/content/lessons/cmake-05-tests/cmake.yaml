@@ -1,0 +1,9 @@
+program: wc
+tests_link: [textutil]
+targets:
+  - name: textutil_tests
+    type: executable
+    links: [textutil]
+ctest:
+  min: 3
+  properties: [PASS_REGULAR_EXPRESSION, WILL_FAIL]

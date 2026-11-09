@@ -298,9 +298,12 @@ func (e *Engine) Run(ctx context.Context, l *Lesson, mode Mode) (*Result, error)
 	}
 	var r *Result
 	var err error
-	if l.Meta.Check != "" {
+	switch {
+	case l.Meta.Check != "":
 		r, err = e.builtinCheck(ctx, l, mode)
-	} else {
+	case l.Meta.Build == "cmake":
+		r, err = e.runCMake(ctx, l, mode)
+	default:
 		r, err = e.runCode(ctx, l, mode)
 	}
 	if err != nil {
@@ -438,47 +441,75 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		out.WriteString(w + "\n\n")
 	}
 
-	r := &Result{}
+	return e.grade(ctx, l, mode, &out, graded{prog: pathIf(needProg, prog), testBin: pathIf(len(testFiles) > 0, testBin), r: &Result{}}), nil
+}
+
+func pathIf(ok bool, p string) string {
+	if ok {
+		return p
+	}
+	return ""
+}
+
+// graded is a built lesson, ready for the sample run, the tests and the checks.
+type graded struct {
+	prog    string            // what Run shows and checks.yaml runs; "" if none
+	progs   map[string]string // CMake: each program target, for checks with program:
+	testBin string            // the doctest binary; "" if the lesson has no tests
+	r       *Result           // results so far (a CMake project's own checks)
+}
+
+// grade runs a built lesson: the sample run, the unit tests, then the
+// program checks, and sums it all up. out already holds what came before.
+func (e *Engine) grade(ctx context.Context, l *Lesson, mode Mode, out *strings.Builder, g graded) *Result {
+	r := g.r
+	work, testsDir := e.WorkDir(l), filepath.Join(e.buildDir(l), "tests")
+	allOK := r.Stage == ""
+	stopped := !allOK && mode == ModeRun
 	// Sample run first, like seeing your program's output before the tests.
-	if mode == ModeRun && l.Meta.Run != nil {
+	if mode == ModeRun && l.Meta.Run != nil && g.prog != "" && !stopped {
 		s := l.Meta.Run
 		if s.Interactive {
-			cmd := exec.Command(prog, s.Args...)
+			cmd := exec.Command(g.prog, s.Args...)
 			cmd.Dir = work
 			cmd.Env = sanitizerEnv()
 			r.Interactive = cmd
 		} else {
-			res := e.exec(ctx, prog, s.Args, s.Stdin, s.Files, checkTimeout)
-			out.WriteString(dim("$ "+shellLine(l, s.Args, s.Stdin)) + "\n")
+			res := e.exec(ctx, g.prog, s.Args, s.Stdin, s.Files, checkTimeout)
+			out.WriteString(dim("$ "+shellLine(progName(l, ""), s.Args, s.Stdin)) + "\n")
 			out.WriteString(res.stdout)
 			if res.stdout != "" && !strings.HasSuffix(res.stdout, "\n") {
 				out.WriteString(dim("⏎ (no newline at end)") + "\n")
 			}
 			if res.stderr != "" {
-				out.WriteString(red(tidySanitizer(res.stderr, work, filepath.Join(build, "tests"))))
+				out.WriteString(red(tidySanitizer(res.stderr, work, testsDir)))
 			}
 			out.WriteString(dim(fmt.Sprintf("exit %d%s", res.code, res.note)) + "\n\n")
 		}
 	}
 
-	allOK := true
-	if len(testFiles) > 0 {
+	if g.testBin != "" && !stopped {
 		args := []string{"--no-version", "--no-intro", "--no-path-filenames", "--force-colors"}
 		if mode == ModeRun {
 			args = append(args, "--abort-after=1")
 		}
-		res := e.exec(ctx, testBin, args, "", nil, testTimeout)
+		res := e.exec(ctx, g.testBin, args, "", nil, testTimeout)
 		passed, total := doctestCounts(res.stdout + res.stderr)
 		r.Passed += passed
 		r.Total += total
 		if res.code != 0 {
 			allOK = false
 			r.Stage = "tests"
-			out.WriteString(cleanDoctest(tidySanitizer(res.stdout+"\n"+res.stderr, work, filepath.Join(build, "tests"))) + "\n")
+			out.WriteString(cleanDoctest(tidySanitizer(res.stdout+"\n"+res.stderr, work, testsDir)) + "\n")
 			if res.note != "" {
 				out.WriteString(red(res.note) + "\n")
 			}
 		}
+	}
+	checks, err := l.Checks()
+	if err != nil {
+		allOK, r.Stage = false, "checks"
+		out.WriteString(red(err.Error()) + "\n")
 	}
 	// Submit runs the program checks even after a failed unit test, so you
 	// see everything that's left in one go.
@@ -486,7 +517,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		if !allOK {
 			out.WriteString("\n")
 		}
-		ok, passed, total, text := e.runChecks(ctx, l, prog, checks, mode)
+		ok, passed, total, text := e.runChecks(ctx, l, g, checks, mode)
 		r.Passed += passed
 		r.Total += total
 		out.WriteString(text)
@@ -495,7 +526,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 			r.Stage = "checks"
 		}
 	}
-	r.Output = out.String()
+	r.Output = strings.TrimRight(out.String(), "\n") + "\n"
 	r.OK = allOK
 	switch {
 	case allOK && mode == ModeSubmit:
@@ -507,7 +538,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	default:
 		r.Summary = fmt.Sprintf("✗ %d/%d passed", r.Passed, r.Total)
 	}
-	return r, nil
+	return r
 }
 
 // cleanDoctest drops doctest's noise lines.
@@ -572,15 +603,25 @@ func doctestCounts(s string) (passed, total int) {
 	return passed, total
 }
 
-func (e *Engine) runChecks(ctx context.Context, l *Lesson, prog string, checks []Check, mode Mode) (ok bool, passed, total int, text string) {
+func (e *Engine) runChecks(ctx context.Context, l *Lesson, g graded, checks []Check, mode Mode) (ok bool, passed, total int, text string) {
 	var b strings.Builder
 	ok = true
-	shown := 0
+	shown, unbuilt := 0, 0
 	for _, c := range checks {
 		if mode == ModeRun && c.Hidden {
 			continue
 		}
 		total++
+		prog := g.prog
+		if c.Program != "" {
+			prog = g.progs[c.Program]
+		}
+		if prog == "" {
+			// The project checks above already say the program is missing.
+			ok = false
+			unbuilt++
+			continue
+		}
 		res := e.exec(ctx, prog, c.Args, c.Stdin, c.Files, checkTimeout)
 		var problems []string
 		if c.Stdout != nil && res.stdout != *c.Stdout {
@@ -605,7 +646,7 @@ func (e *Engine) runChecks(ctx context.Context, l *Lesson, prog string, checks [
 				name += dim(" (hidden)")
 			}
 			b.WriteString(red("✗ ") + name + "\n")
-			b.WriteString(dim("  $ "+shellLine(l, c.Args, c.Stdin)) + "\n")
+			b.WriteString(dim("  $ "+shellLine(progName(l, c.Program), c.Args, c.Stdin)) + "\n")
 			if c.Stdout != nil && res.stdout != *c.Stdout {
 				b.WriteString("  expected stdout: " + green(visible(*c.Stdout)) + "\n")
 				b.WriteString("  your stdout:     " + red(visible(res.stdout)) + "\n")
@@ -621,18 +662,37 @@ func (e *Engine) runChecks(ctx context.Context, l *Lesson, prog string, checks [
 			break // like boot.dev's Run: stop at the first failure
 		}
 	}
-	if !ok && shown < total-passed {
-		b.WriteString(dim(fmt.Sprintf("… and %d more failing", total-passed-shown)) + "\n")
+	if more := total - passed - shown - unbuilt; !ok && more > 0 {
+		b.WriteString(dim(fmt.Sprintf("… and %d more failing", more)) + "\n")
+	}
+	if unbuilt > 0 {
+		what := fmt.Sprintf("%d program checks wait", unbuilt)
+		if unbuilt == 1 {
+			what = "1 program check waits"
+		}
+		b.WriteString(dim(what+" for programs your project doesn't build yet") + "\n")
 	}
 	return ok, passed, total, b.String()
 }
 
-// shellLine renders an invocation like `$ ./echo -n hi < input`.
-func shellLine(l *Lesson, args []string, stdin string) string {
-	name := "./prog"
-	if len(l.Meta.Files) > 0 {
-		name = "./" + strings.TrimSuffix(filepath.Base(l.Meta.Files[0]), filepath.Ext(l.Meta.Files[0]))
+// progName is how a check shows the program it runs: the CMake target, or
+// else the lesson's first file without its extension.
+func progName(l *Lesson, program string) string {
+	switch {
+	case program != "":
+		return "./" + program
+	case l.Meta.Build == "cmake":
+		if spec, err := l.CMake(); err == nil && spec.Program != "" {
+			return "./" + spec.Program
+		}
+	case len(l.Meta.Files) > 0:
+		return "./" + strings.TrimSuffix(filepath.Base(l.Meta.Files[0]), filepath.Ext(l.Meta.Files[0]))
 	}
+	return "./prog"
+}
+
+// shellLine renders an invocation like `$ ./echo -n hi < input`.
+func shellLine(name string, args []string, stdin string) string {
 	parts := []string{name}
 	for _, a := range args {
 		parts = append(parts, quote(a))
@@ -724,6 +784,12 @@ func (e *Engine) checkToolchain(ctx context.Context) (*Result, error) {
 		}
 		_, _, derr := e.doctest(ctx, cxx)
 		item(derr == nil, true, "test framework (doctest) builds", firstLine(errString(derr)))
+	}
+	// CMake is only needed from phase 3 on, so it's a warning here.
+	if v, err := cmakeVersion(ctx); err == nil {
+		item(true, false, "cmake (phase 3 on)", v+" · generator: "+generator())
+	} else {
+		item(false, false, "cmake (phase 3 on)", err.Error())
 	}
 	dbg := "gdb"
 	if runtime.GOOS == "darwin" {

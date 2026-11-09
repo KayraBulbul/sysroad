@@ -1,0 +1,35 @@
+- name: echo
+  program: echo
+  args: [hello, world]
+  stdout: "hello world\n"
+- name: cat -n
+  program: cat
+  args: [-n, a.txt]
+  files:
+    a.txt: "one\ntwo\n"
+  stdout: "     1\tone\n     2\ttwo\n"
+- name: wc on standard input
+  program: wc
+  stdin: "a b\nc\n"
+  stdout: "      2       3       6\n"
+- name: echo -n
+  program: echo
+  args: [-n, x]
+  stdout: "x"
+  hidden: true
+- name: cat with a missing file in the middle
+  program: cat
+  args: [a.txt, nope.txt, a.txt]
+  files:
+    a.txt: "A\n"
+  stdout: "A\nA\n"
+  exit: 1
+  hidden: true
+- name: wc on two files
+  program: wc
+  args: [a.txt, b.txt]
+  files:
+    a.txt: "1 2 3\n"
+    b.txt: "4\n"
+  stdout: "      1       3       6 a.txt\n      1       1       2 b.txt\n      2       4       8 total\n"
+  hidden: true
