@@ -324,7 +324,10 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		if err := os.WriteFile(p, tests[name], 0o644); err != nil {
 			return nil, err
 		}
-		testFiles = append(testFiles, p)
+		// Headers in tests/ are shared helpers the test files include.
+		if strings.HasSuffix(name, ".cpp") {
+			testFiles = append(testFiles, p)
+		}
 	}
 	needProg := len(checks) > 0 || l.Meta.Run != nil
 	flags, sanNote := e.flags(ctx, cxx)

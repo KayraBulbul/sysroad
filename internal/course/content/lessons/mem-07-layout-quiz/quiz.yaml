@@ -1,0 +1,113 @@
+- q: What's `sizeof(Item)` on your machine?
+  code: |
+    struct Item {
+        char tag;
+        double price;
+        int count;
+    };
+  options:
+  - "13"
+  - "16"
+  - "24"
+  - "32"
+  answer: 2
+  why: |
+    `tag` is at 0, then 7 bytes of padding so `price` lands on 8.
+    `count` is at 16 and ends at 20, and the size rounds up to a
+    multiple of 8 (the largest alignment): 24. Ordering the fields
+    `price, count, tag` gives 16.
+
+- q: Why does a struct get padding *after* its last field?
+  options:
+  - So every element of an array of them is aligned too
+  - To leave room for fields added later
+  - Because `sizeof` must be a power of two
+  - It doesn't; only gaps between fields count
+  answer: 0
+  why: |
+    In `Item items[2]`, `items[1]` starts exactly `sizeof(Item)` bytes
+    after `items[0]`. If the size weren't a multiple of the alignment,
+    the second element's `double` would be misaligned.
+
+- q: On your little-endian machine, what does this print?
+  code: |
+    std::uint32_t n = 0x11223344;
+    auto* p = reinterpret_cast<const unsigned char*>(&n);
+    std::printf("%02x\n", p[0]);
+  options:
+  - "11"
+  - "22"
+  - "00"
+  - "44"
+  answer: 3
+  why: |
+    Little-endian puts the least significant byte at the lowest address,
+    so `p[0]` is `0x44`. Reading through `unsigned char*` is allowed for
+    any object.
+
+- q: A file format stores a 32-bit big-endian length at `p`. Which line reads it correctly on any machine?
+  options:
+  - "`std::uint32_t n; std::memcpy(&n, p, 4);`"
+  - "`std::uint32_t n = std::uint32_t(p[0]) << 24 | std::uint32_t(p[1]) << 16 | std::uint32_t(p[2]) << 8 | p[3];`"
+  - "`std::uint32_t n = *reinterpret_cast<const std::uint32_t*>(p);`"
+  - "`std::uint32_t n = p[0] + p[1] + p[2] + p[3];`"
+  answer: 1
+  why: |
+    Shifts place each byte by its meaning, not by the machine's byte
+    order. `memcpy` gives the machine's order (wrong on yours), and the
+    `reinterpret_cast` read is both machine-order and possibly a
+    misaligned, type-punned read, which is undefined behaviour.
+
+- q: What does `count` print?
+  code: |
+    void count(int values[10]) {
+        std::printf("%zu\n", sizeof values / sizeof values[0]);
+    }
+  options:
+  - "10"
+  - "2"
+  - "40"
+  - It doesn't compile
+  answer: 1
+  why: |
+    The parameter is really `int*`, so `sizeof values` is 8, the size
+    of a pointer. 8 / 4 is 2. The array's length was lost when it
+    decayed. Pass a `std::span<int>` and ask for `.size()` instead.
+
+- q: "`int a[4]` is at address 0x1000. Which of these is undefined behaviour?"
+  options:
+  - Computing `a + 4`
+  - Comparing `a + 4 == a + 4`
+  - Computing `a + 5`
+  - Computing `&a[3] - &a[0]`
+  answer: 2
+  why: |
+    One past the end (`a + 4`) is a valid pointer to compute and
+    compare, just never to dereference. Going further, even without
+    reading, is undefined. That's why bounds checks compare lengths
+    (`n > size - pos`), not pointers.
+
+- q: What does `std::span<const unsigned char>` own?
+  options:
+  - Nothing. It points at bytes someone else owns, plus a length
+  - A copy of the bytes it was made from
+  - The bytes, until the last span pointing at them is destroyed
+  - The vector it was made from
+  answer: 0
+  why: |
+    A span is a view: a pointer and a size, like `std::string_view`.
+    It's cheap to pass by value, and it dangles if the buffer it points
+    at goes away first.
+
+- q: Why does the BMP lesson compute `row_size * height` in `std::uint64_t`?
+  options:
+  - BMP files store sizes as 64-bit numbers
+  - 64-bit maths is faster on a 64-bit CPU
+  - "`std::span` only accepts 64-bit sizes"
+  - The file can claim sizes whose product doesn't fit in 32 bits, and a wrapped product would pass the size check
+  answer: 3
+  why: |
+    A width and height near 2³¹ multiply to far more than 4 GB. In
+    32 bits the product wraps to something small, the "does it fit in
+    the file?" check passes, and later reads go out of bounds. It's a
+    classic way image parsers get exploited.

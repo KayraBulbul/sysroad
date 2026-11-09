@@ -1,0 +1,72 @@
+- name: the summary
+  args: ["flag.bmp"]
+  files:
+    flag.bmp: !!binary "Qk1mAAAAAAAAADYAAAAoAAAABQAAAAMAAAABABgAAAAAADAAAAATCwAAEwsAAAAAAAAAAAAApjkApjkApjkApjkApjkAAP///////////////////wAeK9UeK9UeK9UeK9UeK9UA"
+  stdout: "flag.bmp: 5 x 3, 24-bit, bottom-up, 16 bytes per row (1 of padding)\n"
+- name: one pixel
+  args: ["flag.bmp", "2", "0"]
+  files:
+    flag.bmp: !!binary "Qk1mAAAAAAAAADYAAAAoAAAABQAAAAMAAAABABgAAAAAADAAAAATCwAAEwsAAAAAAAAAAAAApjkApjkApjkApjkApjkAAP///////////////////wAeK9UeK9UeK9UeK9UeK9UA"
+  stdout: "#d52b1e\n"
+- name: not a BMP
+  args: ["notes.txt"]
+  files:
+    notes.txt: "just some text\n"
+  stdout: ""
+  exit: 1
+- name: a top-down 32-bit image
+  args: ["top.bmp"]
+  files:
+    top.bmp: !!binary "Qk1SAAAAAAAAAEIAAAAoAAAAAgAAAP7///8BACAAAwAAABAAAAATCwAAEwsAAAAAAAAAAAAAAAD/AAD/AAD/AAAAAwIB/wYFBP8JCAf/DAsK/w=="
+  stdout: "top.bmp: 2 x 2, 32-bit, top-down, 8 bytes per row (0 of padding)\n"
+  hidden: true
+- name: a top-down pixel
+  args: ["top.bmp", "1", "1"]
+  files:
+    top.bmp: !!binary "Qk1SAAAAAAAAAEIAAAAoAAAAAgAAAP7///8BACAAAwAAABAAAAATCwAAEwsAAAAAAAAAAAAAAAD/AAD/AAD/AAAAAwIB/wYFBP8JCAf/DAsK/w=="
+  stdout: "#0a0b0c\n"
+  hidden: true
+- name: the bottom-right pixel of a V5 BMP
+  args: ["grad.bmp", "3", "2"]
+  files:
+    grad.bmp: !!binary "Qk2uAAAAAAAAAIoAAAB8AAAABAAAAAMAAAABABgAAAAAACQAAAATCwAAEwsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgKAAgKA8gKB4gKC0gFAAgFA8gFB4gFC0gAAAgAA8gAB4gAC0"
+  stdout: "#b4a080\n"
+  hidden: true
+- name: an 8-bit palette image
+  args: ["pal.bmp"]
+  files:
+    pal.bmp: !!binary "Qk1OAAAAAAAAAEYAAAAoAAAAAgAAAAIAAAABAAgAAAAAAAgAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAFBQUACgoKAA8PDwAAABAAACAwAA"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: a truncated image
+  args: ["cut.bmp", "0", "0"]
+  files:
+    cut.bmp: !!binary "Qk1mAAAAAAAAADYAAAAoAAAABQAAAAMAAAABABgAAAAAADAAAAATCwAAEwsAAAAAAAAAAAAApjkApjkApjkApjkApjkAAP///////////////////wAeK9UeK9UeK9UeK9U="
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: a pixel outside the image
+  args: ["flag.bmp", "5", "0"]
+  files:
+    flag.bmp: !!binary "Qk1mAAAAAAAAADYAAAAoAAAABQAAAAMAAAABABgAAAAAADAAAAATCwAAEwsAAAAAAAAAAAAApjkApjkApjkApjkApjkAAP///////////////////wAeK9UeK9UeK9UeK9UeK9UA"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: a missing file
+  args: ["nope.bmp"]
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: X without Y
+  args: ["flag.bmp", "1"]
+  stdout: ""
+  exit: 2
+  hidden: true
+- name: X that isn't a number
+  args: ["flag.bmp", "one", "0"]
+  files:
+    flag.bmp: !!binary "Qk1mAAAAAAAAADYAAAAoAAAABQAAAAMAAAABABgAAAAAADAAAAATCwAAEwsAAAAAAAAAAAAApjkApjkApjkApjkApjkAAP///////////////////wAeK9UeK9UeK9UeK9UeK9UA"
+  stdout: ""
+  exit: 2
+  hidden: true

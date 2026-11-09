@@ -223,9 +223,10 @@ The course lives in `internal/course/content/` and is embedded in the binary:
 - `starter/` and `solution/`: the files. `make test` checks that every starter fails Run
   and every solution passes Submit.
 - `tests/visible_*.cpp` (Run and Submit) and `tests/hidden_*.cpp` (Submit only): doctest
-  test cases. If your file has a `main`, it's renamed so doctest's runs instead.
+  test cases. If your file has a `main`, it's renamed so doctest's runs instead. Headers in
+  `tests/` are shared helpers that the test files include; only `.cpp` files are compiled.
 - `checks.yaml`: program-level tests (args, stdin, files → expected stdout and exit code);
-  `hidden: true` ones run on Submit only.
+  `hidden: true` ones run on Submit only. Binary files use YAML's `!!binary` (base64).
 - `hints.md` (split on `---`) and `under_the_hood.md`.
 - Quizzes have `kind: quiz` and a `quiz.yaml` instead of code: a list of `q` (markdown),
   optional `code`, `options`, `answer` (0-based) and `why`. Answering every question
