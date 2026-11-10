@@ -1,0 +1,123 @@
+- q: In the AT&T syntax that clang and gdb print for x86-64, what does this instruction do?
+  code: |
+    subq %rsi, %rax
+  options:
+  - "`rsi = rsi - rax`"
+  - "`rax = rax - rsi`"
+  - "`rax = rsi - rax`"
+  - It compares the two and only sets the flags
+  answer: 1
+  why: |
+    The destination is the last operand, and it's also the left side
+    of the subtraction: `rax = rax - rsi`. The one that only sets
+    flags is `cmpq`. On arm64 the same thing is `sub x0, x0, x1`,
+    destination first.
+
+- q: "A function is declared `long f(long a, long b, long c)`. Where is `c` when the function starts?"
+  options:
+  - "`rdx` on x86-64, `x2` on arm64"
+  - "`rcx` on x86-64, `x3` on arm64"
+  - "`rsi` on x86-64, `x1` on arm64"
+  - On the stack, on both
+  answer: 0
+  why: |
+    x86-64 passes arguments in `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`,
+    so the third is in `rdx`. arm64 uses `x0` to `x7`, so the third is
+    in `x2`. The stack is only used once the registers run out.
+
+- q: What does this instruction do?
+  code: |
+    leaq 8(%rdi,%rsi,4), %rax
+  options:
+  - "It loads the 8 bytes at address `rdi + rsi*4 + 8` into `rax`"
+  - "It stores `rax` at address `rdi + rsi*4 + 8`"
+  - "It sets `rax` to `rdi + rsi*4 + 8` and touches no memory"
+  - "It sets `rax` to `(rdi + rsi) * 4 + 8`"
+  answer: 2
+  why: |
+    `lea` works out the address and stops there. Nothing is loaded or
+    stored. With `movq` in its place, the same operand would be a
+    load. Only the index, `rsi`, is multiplied by the scale.
+
+- q: When does this jump?
+  code: |
+    cmpq %rsi, %rdi
+    jge  .LBB0_2
+  options:
+  - "When `rsi >= rdi`, as signed numbers"
+  - "When `rdi >= rsi`, as unsigned numbers"
+  - "When `rdi == rsi`"
+  - "When `rdi >= rsi`, as signed numbers"
+  answer: 3
+  why: |
+    `cmpq B, A` followed by a jump tests `A` against `B`, so this is
+    `rdi >= rsi`. The letters `g` and `l` are for signed comparisons.
+    The unsigned version would be `jae`, "above or equal". On arm64
+    it's `cmp x0, x1` and `b.ge`.
+
+- q: "`p` points at one of these. Which field does `movl 20(%rdi), %eax` (on arm64, `ldr w0, [x0, #20]`) load?"
+  code: |
+    struct S {
+        int a;
+        char b;
+        long c;
+        int d;
+        int e;
+    };
+  options:
+  - "`b`"
+  - "`c`"
+  - "`d`"
+  - "`e`"
+  answer: 3
+  why: |
+    `a` is at 0 and `b` at 4. `c` needs 8-byte alignment, so it goes
+    at 8 after three bytes of padding. `d` is at 16 and `e` at 20.
+    The instruction loads 4 bytes, which fits an `int`.
+
+- q: A function needs a value to still be there after it calls another function. Which register can it keep the value in?
+  options:
+  - "`rax` (on arm64, `x0`)"
+  - "`rdi` (on arm64, `x1`)"
+  - "`rbx` (on arm64, `x19`)"
+  - "`rcx` (on arm64, `x9`)"
+  answer: 2
+  why: |
+    `rbx` and `x19` are among the registers a call must preserve. The
+    others may all be overwritten by the function being called. In
+    return, a function that uses `rbx` or `x19` has to save the old
+    value first and restore it before it returns, which is the
+    `pushq %rbx` … `popq %rbx` you saw.
+
+- q: At `-O2` the compiler produced this for a one-line function. What was the line?
+  code: |
+    leal    3(%rdi), %eax
+    testl   %edi, %edi
+    cmovnsl %edi, %eax
+    sarl    $2, %eax
+    retq
+  options:
+  - "`return x >> 2;` with `int x`"
+  - "`return x / 4;` with `int x`"
+  - "`return x / 4;` with `unsigned x`"
+  - "`return (x + 3) % 4;` with `int x`"
+  answer: 1
+  why: |
+    It's a signed division by 4. `sarl $2` alone would round negative
+    numbers down, and C++ division rounds toward zero, so the code
+    adds 3 first when `x` is negative. `x >> 2` would be the `sarl`
+    with no correction, and an unsigned division would be a plain
+    `shrl $2`.
+
+- q: You're in a debugger, in a program with no debug info, stopped at the instruction right after `callq compute`. How do you see what `compute` returned?
+  options:
+  - "`p $rax` (on arm64, `p $x0`)"
+  - "`info locals`"
+  - "`p compute`"
+  - "`x/s $rsp`"
+  answer: 0
+  why: |
+    A function leaves its result in `rax` (`x0` on arm64), and it's
+    still there right after the call. `info locals` needs debug info,
+    `p compute` prints the function's address, and `x/s $rsp` would
+    show the top of the stack as if it were a string.
