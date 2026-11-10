@@ -1,5 +1,7 @@
-The constructor needs `(size + 63) / 64` words, all zero. That's
-"divide by 64, rounding up".
+The constructor needs `size / 64` words, plus one more if `size % 64`
+isn't 0, all zero. That's "divide by 64, rounding up". The shorter
+`(size + 63) / 64` does the same, except near `SIZE_MAX`, where
+`size + 63` wraps around (lesson 4.1.3) and you'd get almost no words.
 
 Write the bounds check once and call it from `test`, `set` and `flip`:
 

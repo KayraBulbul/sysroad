@@ -50,10 +50,11 @@ You write each input as hex bytes in a text file, and `hex2raw` turns
 them into raw bytes. That's why `answer.txt` holds text like
 `30 31 32 …`, not characters.
 
-**The five phases**, per the writeup. Phases 1–3 use `ctarget` and
+**The five phases**, per the writeup. Phases 1–3 use `ctarget`.
+Phase 1 only changes where `getbuf` returns to, and phases 2–3 also
 put your own code on the stack. Phases 4–5 use `rtarget`, which
-doesn't allow that, so you chain together short pieces of code
-already in the program. These are listed in `farm.c`. Work through
+doesn't allow running code from the stack, so you chain together
+short pieces of code already in the program. These are listed in `farm.c`. Work through
 them in order. Each one adds a single idea to the last.
 
 **Useful moves.**
