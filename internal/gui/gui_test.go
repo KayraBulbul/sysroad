@@ -182,3 +182,60 @@ func TestRunReportsFailures(t *testing.T) {
 		t.Fatal("a failed run was reported as stopped")
 	}
 }
+
+// Lessons can list files in subfolders (cmake-05: tests/CMakeLists.txt). An
+// edit made outside the app to one of those must reach the editor too, even
+// when the folders only appear after the watch started (the first save).
+func TestWatchSeesNestedLessonFiles(t *testing.T) {
+	dir := t.TempDir()
+	if err := app.Seed(dir); err != nil {
+		t.Fatal(err)
+	}
+	a, err := app.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := make(chan FileEvent, 16)
+	s := New(a, func(name string, data any) {
+		if ev, ok := data.(FileEvent); ok && name == EvFile {
+			events <- ev
+		}
+	}, func(string) error { return nil })
+	defer Stop(s)
+
+	const id, nested = "cmake-05-tests", "tests/CMakeLists.txt"
+	files, err := s.OpenFiles(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Watch(id) // before the lesson folder exists
+	var top File
+	for _, f := range files {
+		if f.Name == "CMakeLists.txt" {
+			top = f
+		}
+	}
+	if _, err := s.SaveFile(id, top.Name, top.Content+"# mine\n", top.Hash); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	for len(events) > 0 { // the folder appearing may report the starter files
+		<-events
+	}
+
+	path := filepath.Join(a.Engine.WorkDir(a.Lesson(id)), nested)
+	if err := os.WriteFile(path, []byte("# from nvim\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Name == nested && ev.Content == "# from nvim\n" {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("no event for an outside edit to %s", nested)
+		}
+	}
+}
