@@ -124,11 +124,11 @@ int run_wc(const std::vector<std::string_view>& args, std::istream& in, std::ost
         err << "wc: invalid option -- '" << o.bad << "'\n";
         return 1;
     }
+    int width = column_width(o);
     if (o.files.empty()) {
-        out << format_counts(count_stream(in), o, column_width(o)) << '\n';
+        out << format_counts(count_stream(in), o, width) << '\n';
         return 0;
     }
-    int width = column_width(o);
     Counts total;
     int status = 0;
     for (std::string_view name : o.files) {

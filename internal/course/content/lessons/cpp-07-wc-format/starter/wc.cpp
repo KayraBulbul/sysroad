@@ -98,11 +98,11 @@ int run_wc(const std::vector<std::string_view>& args, std::istream& in, std::ost
         err << "wc: invalid option -- '" << o.bad << "'\n";
         return 1;
     }
+    int width = 7;  // TODO: work out the width once, from column_width
     if (o.files.empty()) {
-        out << format_counts(count_stream(in), o, 7) << '\n';
+        out << format_counts(count_stream(in), o, width) << '\n';
         return 0;
     }
-    // TODO: work out the width once, and pass it to every format_counts
     Counts total;
     int status = 0;
     for (std::string_view name : o.files) {
@@ -118,13 +118,13 @@ int run_wc(const std::vector<std::string_view>& args, std::istream& in, std::ost
             }
             c = count_stream(f);
         }
-        out << format_counts(c, o, 7) << ' ' << name << '\n';
+        out << format_counts(c, o, width) << ' ' << name << '\n';
         total.lines += c.lines;
         total.words += c.words;
         total.bytes += c.bytes;
     }
     if (o.files.size() > 1) {
-        out << format_counts(total, o, 7) << " total\n";
+        out << format_counts(total, o, width) << " total\n";
     }
     return status;
 }

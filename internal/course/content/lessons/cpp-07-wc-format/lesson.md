@@ -61,4 +61,4 @@ std::format("{:>{}}", n, width)  // n, right-aligned, width wide
 
 - [ ] Implement `column_width` with the four rules
 - [ ] Make `format_counts` use the width it's given
-- [ ] Compute the width once in `run_wc` and use it for every line, total included
+- [ ] Compute the width once in `run_wc`, where the TODO is
