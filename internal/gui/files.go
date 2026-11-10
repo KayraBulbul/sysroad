@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -222,9 +223,21 @@ func newFileWatcher(e *course.Engine, notify func(FileEvent)) *fileWatcher {
 	return fw
 }
 
+// dirs is every folder to watch: data/, work/, the lesson folder, and each
+// subfolder that holds one of the lesson's files (tests/ for
+// tests/CMakeLists.txt). fsnotify isn't recursive, and a file is only
+// reported by its own folder's watch.
 func (fw *fileWatcher) dirs() []string {
 	work := fw.engine.WorkDir(fw.lesson)
-	return []string{fw.engine.DataDir, filepath.Dir(work), work}
+	out := []string{fw.engine.DataDir, filepath.Dir(work), work}
+	for _, name := range fw.lesson.Meta.Files {
+		for d := filepath.Dir(filepath.Join(work, name)); d != work && strings.HasPrefix(d, work+string(filepath.Separator)); d = filepath.Dir(d) {
+			if !slices.Contains(out, d) {
+				out = append(out, d)
+			}
+		}
+	}
+	return out
 }
 
 // rewatch (re)adds the chain; a folder that doesn't exist yet is skipped
@@ -305,18 +318,19 @@ func (fw *fileWatcher) event(ev fsnotify.Event) {
 		return
 	}
 	work := fw.engine.WorkDir(l)
-	if ev.Name == work || ev.Name == filepath.Dir(work) { // a folder in the chain appeared or was replaced
+	if slices.Contains(fw.dirs(), ev.Name) { // a watched folder appeared or was replaced
 		fw.rewatch()
 		for _, name := range l.Meta.Files {
 			fw.later(l, filepath.Join(work, name), name)
 		}
 		return
 	}
-	if filepath.Dir(ev.Name) != work {
+	// Files are named relative to the lesson folder: tests/CMakeLists.txt.
+	rel, err := filepath.Rel(work, ev.Name)
+	if err != nil {
 		return
 	}
-	name := filepath.Base(ev.Name)
-	if slices.Contains(l.Meta.Files, name) {
+	if name := filepath.ToSlash(rel); slices.Contains(l.Meta.Files, name) {
 		fw.later(l, ev.Name, name)
 	}
 }
