@@ -40,7 +40,9 @@ make
 `bits/libc-header-start.h` or `-lgcc`, either install the 32-bit
 libraries (`sudo pacman -S lib32-glibc lib32-gcc-libs` with the
 `multilib` repo on) or delete `-m32` from the `Makefile`. `int` is 32
-bits either way, so the puzzles behave the same.
+bits either way, so the puzzles behave the same. Only `btest`, `fshow`
+and `ishow` are built here. `dlc` comes prebuilt as a 64-bit program,
+so it runs with or without the 32-bit libraries.
 
 **The loop.** Read the rules at the top of `bits.c` first. Then, for
 each puzzle:

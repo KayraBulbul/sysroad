@@ -76,9 +76,11 @@ ldr   x9, [x8, _counter@PAGEOFF]   because an instruction is only 4 bytes
 ```
 
 That's also your first look at **memory operands**. On x86-64,
-`movq` with a memory operand loads or stores. On arm64 only two
-instructions touch memory: `ldr` loads and `str` stores, and the
-address goes in square brackets.
+`movq` with a memory operand loads or stores. On arm64 only load and
+store instructions touch memory, and the address goes in square
+brackets. The common ones are `ldr` (load) and `str` (store). Later
+lessons add variants such as `ldp`/`stp` for a pair of registers and
+`ldrsw` for a sign-extending load.
 
 The two listings are the raw output for a file `puzzle.cpp` that you
 don't have. Five questions about it are in `answers.hpp`. `try.cpp`
