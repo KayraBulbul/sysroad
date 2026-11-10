@@ -1,0 +1,77 @@
+// The source of the vault in this lesson. It isn't shipped to the learner,
+// who gets only starter/vault-x86-64.s and starter/vault-arm64.s. To rebuild
+// those after a change (rename this file to vault.cpp first):
+//
+//   F="-std=c++20 -O1 -S -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-stack-protector -fno-ident -fno-addrsig"
+//   clang++ $F vault.cpp -o vault-x86-64.s                                 (on x86-64 Linux)
+//   clang++ $F --target=arm64-apple-macos14 vault.cpp -o vault-arm64.s
+//
+// (.prefalign lines, which only clang 23 knows, are replaced with .p2align 4.)
+//
+// The answers (nightjar, 3758085031, 4) are hashed in tests/.
+extern "C" {
+int puts(const char*);
+int strcmp(const char*, const char*);
+long strtol(const char*, char**, int);
+
+unsigned char sealed[] = {0x34, 0x33, 0x3d, 0x32, 0x2e, 0x30, 0x3b, 0x28, 0};
+long table[8] = {3, 6, 0, 7, 1, 2, 5, 4};
+
+__attribute__((noinline)) int phase_1(const char* word, int key) {
+    char secret[16];
+    int i = 0;
+    for (; sealed[i] != 0; ++i) {
+        secret[i] = static_cast<char>(sealed[i] ^ key);
+    }
+    secret[i] = '\0';
+    return strcmp(word, secret) == 0;
+}
+
+__attribute__((noinline)) long forge(long seed) {
+    long x = seed;
+    for (long i = 0; i < 6; ++i) {
+        x = x * 31 + i + 7;
+    }
+    return x;
+}
+
+__attribute__((noinline)) int phase_2(long guess, long seed) {
+    return forge(seed) == guess;
+}
+
+__attribute__((noinline)) int phase_3(long index) {
+    if (index < 0 || index > 7) {
+        return 0;
+    }
+    long at = index;
+    for (int i = 0; i < 3; ++i) {
+        at = table[at];
+    }
+    return at == 5;
+}
+
+}  // extern "C"
+
+int main(int argc, char** argv) {
+    if (argc != 4) {
+        puts("usage: vault WORD NUMBER INDEX");
+        return 2;
+    }
+    if (!phase_1(argv[1], argc * 22 + 2)) {
+        puts("phase 1: locked");
+        return 1;
+    }
+    puts("phase 1: open");
+    if (!phase_2(strtol(argv[2], nullptr, 10), argc)) {
+        puts("phase 2: locked");
+        return 1;
+    }
+    puts("phase 2: open");
+    if (!phase_3(strtol(argv[3], nullptr, 10))) {
+        puts("phase 3: locked");
+        return 1;
+    }
+    puts("phase 3: open");
+    puts("The vault is open.");
+    return 0;
+}

@@ -1,0 +1,18 @@
+- name: 200 in 8 bits
+  args: ["8", "200"]
+  stdout: "200 in 8 bits is 1100 1000\nunsigned 200, signed -56\n"
+- name: an addition that overflows
+  args: ["add", "2147483647", "1"]
+  stdout: "2147483647 + 1 overflows 32 bits\nit wraps to -2147483648 and saturates at 2147483647\n"
+- name: -1 in 12 bits
+  args: ["12", "-1"]
+  stdout: "-1 in 12 bits is 1111 1111 1111\nunsigned 4095, signed -1\n"
+  hidden: true
+- name: an addition that fits
+  args: ["add", "-5", "12"]
+  stdout: "-5 + 12 = 7\n"
+  hidden: true
+- name: overflow at the bottom
+  args: ["add", "-2147483648", "-10"]
+  stdout: "-2147483648 + -10 overflows 32 bits\nit wraps to 2147483638 and saturates at -2147483648\n"
+  hidden: true

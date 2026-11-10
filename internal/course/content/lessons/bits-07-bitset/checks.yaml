@@ -1,0 +1,19 @@
+- name: primes below 50
+  args: ["50"]
+  stdout: |
+    2 3 5 7 11 13 17 19 23 29 31 37 41 43 47
+    15 primes below 50
+- name: primes below 2
+  args: ["2"]
+  stdout: "0 primes below 2\n"
+  hidden: true
+- name: primes below 3
+  args: ["3"]
+  stdout: "2\n1 prime below 3\n"
+  hidden: true
+- name: primes below 130
+  args: ["130"]
+  stdout: |
+    2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71 73 79 83 89 97 101 103 107 109 113 127
+    31 primes below 130
+  hidden: true

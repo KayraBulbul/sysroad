@@ -247,7 +247,7 @@ phases:
 
   - id: p4
     title: Data & machine code
-    summary: Bits, integers, floats, and reading x86-64 and arm64 from clang's output.
+    summary: Bits, integers, floats, reading x86-64 and arm64 from clang's output, and CMU's three machine-code labs.
     chapters:
       - id: data-bits
         title: Bits, integers & floats
@@ -296,12 +296,18 @@ phases:
           - id: lab-data
             title: "CS:APP Data Lab"
             kind: lab
+            platform: PC
+            url: http://csapp.cs.cmu.edu/3e/datalab.pdf
           - id: lab-bomb
             title: "CS:APP Bomb Lab"
             kind: lab
+            platform: PC
+            url: http://csapp.cs.cmu.edu/3e/bomblab.pdf
           - id: lab-attack
             title: "CS:APP Attack Lab"
             kind: lab
+            platform: PC
+            url: http://csapp.cs.cmu.edu/3e/attacklab.pdf
 
   - id: p5
     title: Performance, caches & linking
