@@ -1,0 +1,44 @@
+- name: 0.1 isn't exactly 0.1
+  args: ["0.1"]
+  stdout: |
+    0.1 is stored as 0x3dcccccd
+    sign 0  exponent 123  fraction 0x4ccccd
+    normal: 1.60000002384185791015625 x 2^-4
+    exactly 0.100000001490116119384765625
+- name: 16777217 doesn't fit
+  args: ["int", "16777217"]
+  stdout: |
+    16777217 as a float is 0x4b800000
+    exactly 16777216
+- name: a negative number
+  args: ["-6.5"]
+  stdout: |
+    -6.5 is stored as 0xc0d00000
+    sign 1  exponent 129  fraction 0x500000
+    normal: 1.625 x 2^2
+    exactly -6.5
+  hidden: true
+- name: a subnormal
+  args: ["1e-40"]
+  stdout: |
+    1e-40 is stored as 0x000116c2
+    sign 0  exponent 0  fraction 0x0116c2
+    subnormal: 0.0085070133209228515625 x 2^-126
+    exactly 9.99994610111475958152591905227349949604220526961919185041279068749432712426283842432894743978977203369140625e-41
+  hidden: true
+- name: negative zero
+  args: ["-0"]
+  stdout: |
+    -0 is stored as 0x80000000
+    sign 1  exponent 0  fraction 0x000000
+    zero
+    exactly -0
+  hidden: true
+- name: infinity
+  args: ["inf"]
+  stdout: |
+    inf is stored as 0x7f800000
+    sign 0  exponent 255  fraction 0x000000
+    infinity
+    exactly inf
+  hidden: true

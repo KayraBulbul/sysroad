@@ -1,0 +1,17 @@
+- name: an orange pixel
+  args: ["rgb", "0xfd20"]
+  stdout: "r 255  g 166  b 0\n"
+- name: packing it again
+  args: ["pack", "255", "166", "0"]
+  stdout: "0xfd20\n"
+- name: chmod 754
+  args: ["mode", "754"]
+  stdout: "rwxr-xr--\n"
+- name: a grey pixel
+  args: ["rgb", "0x8410"]
+  stdout: "r 132  g 130  b 132\n"
+  hidden: true
+- name: chmod 600
+  args: ["mode", "600"]
+  stdout: "rw-------\n"
+  hidden: true

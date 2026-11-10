@@ -1,0 +1,111 @@
+- q: What is `0b1011'0110` in hex?
+  options:
+  - "`0xb6`"
+  - "`0x6b`"
+  - "`0xa6`"
+  - "`0x182`"
+  answer: 0
+  why: |
+    One hex digit is four bits. `1011` is 11, which is `b`, and `0110`
+    is `6`. So it's `0xb6`, 182 in decimal.
+
+- q: Which expression clears bit 3 of `x` and leaves every other bit alone?
+  options:
+  - "`x | (1u << 3)`"
+  - "`x ^ (1u << 3)`"
+  - "`x & ~(1u << 3)`"
+  - "`x & (1u << 3)`"
+  answer: 2
+  why: |
+    `~(1u << 3)` has a 0 at bit 3 and 1s everywhere else, so ANDing
+    with it keeps everything except bit 3. OR sets the bit, XOR
+    toggles it, and AND with the plain mask keeps *only* bit 3.
+
+- q: What does this print?
+  code: |
+    std::uint8_t byte = 0xf0;
+    auto value = static_cast<std::int8_t>(byte);
+    std::cout << int(value) << '\n';
+  options:
+  - "240"
+  - "-240"
+  - "-112"
+  - "-16"
+  answer: 3
+  why: |
+    The bits are `1111 0000`. Read as two's complement, the top bit
+    counts as -128, and the others add 64 + 32 + 16 = 112. That's -16.
+    Another way to get there is 240 - 256.
+
+- q: What does this print?
+  code: |
+    std::vector<int> v = {1, 2, 3};
+    int limit = -1;
+    std::cout << (limit < v.size() ? "yes" : "no") << '\n';
+  options:
+  - "yes"
+  - "no"
+  - It doesn't compile
+  - It's undefined behaviour
+  answer: 1
+  why: |
+    `v.size()` is unsigned, so `limit` is converted to unsigned before
+    the comparison and becomes 18446744073709551615. That isn't less
+    than 3. The compiler warns about it with `-Wall`, and
+    `std::cmp_less(limit, v.size())` compares them as numbers.
+
+- q: What is `r`?
+  code: |
+    std::uint32_t a = 3'000'000'000;
+    std::uint64_t r = a + a;
+  options:
+  - "6000000000"
+  - "1705032704"
+  - "4294967295"
+  - Nothing. It's undefined behaviour
+  answer: 1
+  why: |
+    Both operands are 32 bits, so the addition is done in 32 bits and
+    wraps: 6000000000 - 4294967296 = 1705032704. Only then is the
+    result widened to 64 bits. Unsigned wrapping is defined, so there's
+    no undefined behaviour. `std::uint64_t{a} + a` gives 6000000000.
+
+- q: A `float` has the bits `0x40400000`, which is sign 0, exponent field 128 and fraction `100 0000 …`. What number is it?
+  options:
+  - "1.5"
+  - "2.5"
+  - "3.0"
+  - "4.0"
+  answer: 2
+  why: |
+    The exponent is 128 - 127 = 1. The fraction's top bit is worth one
+    half, so the number in front is 1.5. And 1.5 × 2^1 is 3.0.
+
+- q: How many times does the body of this loop run?
+  code: |
+    for (double x = 0; x != 1.0; x += 0.1) {
+        // ...
+    }
+  options:
+  - "9"
+  - "10"
+  - It never stops
+  - "11"
+  answer: 2
+  why: |
+    0.1 isn't exact, so adding it ten times gives 0.9999999999999999
+    and not 1.0. The `!=` test is still true there, and `x` sails
+    past 1 for good. Count with an integer instead, and compute
+    `x = i / 10.0` from the count.
+
+- q: "`x` is a `double` that holds NaN. Which of these is true?"
+  options:
+  - "`x == x`"
+  - "`x != x`"
+  - "`x < 0.0 || x >= 0.0`"
+  - "`x == std::numeric_limits<double>::quiet_NaN()`"
+  answer: 1
+  why: |
+    Every ordered comparison with NaN is false, and so is `==`, even
+    against itself or another NaN. `!=` is the one comparison that's
+    true. `x != x` was the classic NaN test before `std::isnan`.
