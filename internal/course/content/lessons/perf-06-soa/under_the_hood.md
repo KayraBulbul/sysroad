@@ -1,9 +1,10 @@
 **Counting the bytes.** `count_below` over a million AoS particles
 touches every one of the 1.25 million lines they fill: 80 MB of
-traffic. The
-SoA version reads 4 MB. The 15-20× you see is mostly that ratio. The
-step gains less because it needs 28 of every 80 bytes in AoS, so the
-waste is under 3×, plus what SIMD adds.
+traffic. The SoA version reads 4 MB. The 10-20× you see is mostly that
+ratio. `step` needs 24 of every 80 bytes (position and velocity), so
+AoS moves about 3.3× the memory, and SIMD adds the rest.
+`kinetic_energy` needs even less, 16 bytes (velocity and mass), yet
+gains the least: its sum is one chain of `double` adds, as below.
 
 **Why the compiler vectorises SoA and not AoS.** To do 8 particles'
 `z += vz * dt` at once, the CPU loads 8 consecutive floats into one

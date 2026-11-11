@@ -13,7 +13,7 @@ deeper:
 ---
 The natural way to store a million particles is a
 `std::vector<Particle>`: an **array of structs** (AoS). Each `Particle`
-is 80 bytes. The physics step reads and writes 28 of them, and
+is 80 bytes. The physics step reads and writes 24 of them, and
 `count_below` reads only `z`, 4 bytes. But the cache moves whole
 64-byte lines, so a loop over `z` drags in every particle's name,
 colour and timestamp too: 80 bytes of memory traffic for 4 useful
@@ -31,7 +31,7 @@ SoA:  x:  [x x x x x x x x x x x x x x x x …]
 ```
 
 Now `count_below` reads one dense array of floats, 16 per cache line,
-every byte of which it uses. The step reads seven arrays, but only
+every byte of which it uses. The step reads six arrays, but only
 the bytes it needs from each. As a bonus, `z_[i] += vz_[i] * dt` over
 consecutive `i` is exactly the shape the compiler can turn into SIMD
 instructions, doing 4 or 8 particles per instruction.

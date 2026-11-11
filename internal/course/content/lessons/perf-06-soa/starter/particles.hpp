@@ -6,7 +6,7 @@
 #include <vector>
 
 // One particle, as a game or a simulation might store it. The physics
-// reads the first eight fields every frame. The rest is for drawing it and
+// works on position, velocity and mass. The rest is for drawing it and
 // debugging, and the physics never touches them.
 struct Particle {
     float x, y, z;     // position, in metres
