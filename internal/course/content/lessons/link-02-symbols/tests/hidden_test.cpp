@@ -10,6 +10,8 @@ TEST_CASE("each file's less_than is its own") {
     CHECK(smallest({2.001, 2.0}) == 2.0);
     // report.cpp compares at two decimals: they look the same.
     CHECK(report({2.0, 2.001}) == "mean 2.00, all equal");
+    // But it compares numbers, not text: "10.00" sorts before "2.00".
+    CHECK(report({2, 10}) == "mean 6.00, range 2.00 to 10.00");
 }
 
 TEST_CASE("report of nothing, and of one value") {
