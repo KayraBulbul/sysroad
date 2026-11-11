@@ -1,0 +1,26 @@
+- name: two files
+  args: ["a.txt", "b.txt"]
+  files:
+    a.txt: "hello world\n"
+    b.txt: "one\ntwo three\n"
+  stdout: " 1  2 12 a.txt\n 2  3 14 b.txt\n 3  5 26 total\n"
+- name: stdin
+  stdin: "hello world\n"
+  stdout: "      1       2      12\n"
+- name: -l on one file
+  args: ["-l", "a.txt"]
+  files:
+    a.txt: "a\nb\nc\n"
+  stdout: "3 a.txt\n"
+  hidden: true
+- name: every kind of whitespace
+  stdin: "a\tb\vc\fd\re  f\n\n g"
+  stdout: "      2       7      16\n"
+  hidden: true
+- name: a missing file
+  args: ["nope.txt", "a.txt"]
+  files:
+    a.txt: "hello world\n"
+  stdout: " 1  2 12 a.txt\n 1  2 12 total\n"
+  exit: 1
+  hidden: true

@@ -1,0 +1,40 @@
+program: brighten
+tests_link: [pixel]
+targets:
+  - name: pixel
+    type: library
+    std: 20
+  - name: brighten
+    type: executable
+    links: [pixel]
+variants:
+  - name: "with no build type, it builds as RelWithDebInfo"
+    define: {CMAKE_BUILD_TYPE: ""}
+    config: RelWithDebInfo
+    targets:
+      - name: brighten
+        flags: [-O2, -g]
+  - name: "-DPROFILING=ON compiles everything with -fno-omit-frame-pointer"
+    define: {CMAKE_BUILD_TYPE: RelWithDebInfo, PROFILING: "ON"}
+    targets:
+      - name: brighten
+        flags: [-fno-omit-frame-pointer]
+      - name: pixel
+        flags: [-fno-omit-frame-pointer]
+  - name: "-DLTO=ON compiles and links everything with -flto=thin"
+    define: {CMAKE_BUILD_TYPE: Release, LTO: "ON"}
+    targets:
+      - name: brighten
+        flags: [-flto=thin]
+        link_flags: [-flto=thin]
+      - name: pixel
+        flags: [-flto=thin]
+  - name: "LTO and PROFILING are off unless you ask"
+    define: {CMAKE_BUILD_TYPE: Release}
+    targets:
+      - name: brighten
+        flags: [-O3]
+        not_flags: [-flto=thin, -fno-omit-frame-pointer]
+      - name: pixel
+        not_flags: [-flto=thin, -fno-omit-frame-pointer]
+    hidden: true
