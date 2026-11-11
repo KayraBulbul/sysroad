@@ -1,15 +1,14 @@
 #include "report.hpp"
 
-#include <cmath>
 #include <format>
 
 #include "stats.hpp"
 
 namespace {
 
-// A helper for this file only: a < b, once both are rounded to two decimals.
+// A helper for this file only: a < b, as far as two decimals can show.
 bool less_than(double a, double b) {
-    return std::round(a * 100) < std::round(b * 100);
+    return a < b && std::format("{:.2f}", a) != std::format("{:.2f}", b);
 }
 
 }  // namespace

@@ -1,7 +1,8 @@
-**Counting the bytes.** `count_below` over a million AoS particles
-touches every one of the 1.25 million lines they fill: 80 MB of
-traffic. The SoA version reads 4 MB. The 10-20× you see is mostly that
-ratio. `step` needs 24 of every 80 bytes (position and velocity), so
+**Counting the bytes.** The million AoS particles fill 1.25 million
+lines. With 80 bytes between one `z` and the next, `count_below` lands
+in 4 lines out of every 5 and skips the fifth: 64 MB of traffic, more
+if the prefetcher fetches the skipped lines too. The SoA version reads
+4 MB. The 10-20× you see is mostly that ratio. `step` needs 24 of every 80 bytes (position and velocity), so
 AoS moves about 3.3× the memory, and SIMD adds the rest.
 `kinetic_energy` needs even less, 16 bytes (velocity and mass), yet
 gains the least: its sum is one chain of `double` adds, as below.

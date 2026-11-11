@@ -12,6 +12,8 @@ TEST_CASE("each file's less_than is its own") {
     CHECK(report({2.0, 2.001}) == "mean 2.00, all equal");
     // But it compares numbers, not text: "10.00" sorts before "2.00".
     CHECK(report({2, 10}) == "mean 6.00, range 2.00 to 10.00");
+    // And it agrees with what's printed: both of these show as 1.12.
+    CHECK(report({1.1249, 1.125}) == "mean 1.12, all equal");
 }
 
 TEST_CASE("report of nothing, and of one value") {
