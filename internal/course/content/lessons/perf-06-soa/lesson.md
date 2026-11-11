@@ -15,9 +15,10 @@ The natural way to store a million particles is a
 `std::vector<Particle>`: an **array of structs** (AoS). Each `Particle`
 is 80 bytes. The physics step reads and writes 24 of them, and
 `count_below` reads only `z`, 4 bytes. But the cache moves whole
-64-byte lines, so a loop over `z` drags in every particle's name,
-colour and timestamp too: 80 bytes of memory traffic for 4 useful
-ones.
+64-byte lines, so a loop over `z` drags in names, colours and
+timestamps too: a whole line for every 4 useful bytes. The `z`s are
+80 bytes apart, so it touches 4 lines in every 5, and a million
+particles cost 64 MB of memory traffic to read 4 MB of `z`.
 
 A **struct of arrays** (SoA) turns the layout sideways: one vector per
 field.
