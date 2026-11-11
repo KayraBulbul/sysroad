@@ -36,8 +36,9 @@ int main(int argc, char** argv) {
     }
 
     // The fastest of 3 samples, each at least 1 ms.
-    Mountain m = build_mountain(data, sizes, strides,
-                                [](const std::function<void()>& f) { return measure(f, 3, 1e6).min; });
+    Mountain m = build_mountain(data, sizes, strides, [](const std::function<void()>& f) {
+        return measure(f, 3, 1e6).min;
+    });
 
     std::printf(csv ? "size" : "GB/s  ");
     for (std::size_t s : m.strides) {

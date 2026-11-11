@@ -1,0 +1,105 @@
+- q: "The build fails with `undefined reference to 'parse(std::string const&)'`. Which stage failed, and what's the likely cause?"
+  options:
+  - "The preprocessor couldn't find a header"
+  - "The compiler: `parse` was never declared"
+  - "The linker: no object file defines `parse` with that exact signature"
+  - "The assembler ran out of memory"
+  answer: 2
+  why: |
+    "Undefined reference" (or "Undefined symbols" on the Mac) is the
+    linker. A file used `parse` and none defined it, often because the
+    `.cpp` that defines it isn't in the build, or the definition's
+    parameters differ from the declaration's, which changes the
+    mangled name.
+
+- q: "A header defines `int helper(int x) { return x * 2; }` and three `.cpp` files include it. What happens?"
+  options:
+  - "Nothing, `#pragma once` stops it being defined twice"
+  - "A compile error in the second file that includes it"
+  - "The linker silently keeps the first copy"
+  - "A `multiple definition of 'helper(int)'` link error, unless it's marked `inline`"
+  answer: 3
+  why: |
+    `#pragma once` only works within one translation unit. Each of the
+    three object files defines `helper`, which breaks the
+    one-definition rule. `inline` tells the linker the copies are the
+    same and it may keep one; that's what it does for templates too.
+
+- q: "In `nm -C` output, what does a lower-case `t` before a function name mean?"
+  options:
+  - "The function is defined in this file, in `.text`, with internal linkage"
+  - "The function is a template"
+  - "The function is undefined here"
+  - "The function is thread-local"
+  answer: 0
+  why: |
+    `T` is a function defined in this file's code. Lower case means
+    local: `static`, or in an anonymous namespace. The linker never
+    matches it against other files, so two files can each have their
+    own.
+
+- q: "Why does `clang++ -lmath main.o -o prog` fail with GNU `ld` when `clang++ main.o -lmath -o prog` works?"
+  options:
+  - "`-l` flags must always come last on the command line"
+  - "`ld` only pulls members out of an archive for symbols that are undefined when it reaches the archive, and nothing is undefined yet"
+  - "`libmath.a` can only be linked once"
+  - "The first command builds a shared library instead"
+  answer: 1
+  why: |
+    GNU `ld` reads its inputs left to right and keeps a list of
+    undefined symbols. Reaching `libmath.a` first, it has nothing to
+    look for, so it takes nothing, and then `main.o` needs `add`.
+    `lld` and Apple's linker are more forgiving.
+
+- q: "What's the main reason shared libraries are compiled with `-fPIC`?"
+  options:
+  - "It makes the code faster"
+  - "It lets the library use `dlopen`"
+  - "It's required by the C++ standard"
+  - "The library can be loaded at any address, so its code can't contain absolute addresses"
+  answer: 3
+  why: |
+    The loader maps each library wherever there's room, which differs
+    between programs and runs. Position-independent code reaches its
+    own data relative to the instruction pointer, and other
+    libraries' symbols through the GOT, so the same pages work at any
+    address and can be shared between processes.
+
+- q: "In an ELF file, what's the difference between sections and segments?"
+  options:
+  - "They're two names for the same thing"
+  - "Sections are for the linker (named pieces like `.text`); segments are for the loader (what to map where, with which permissions)"
+  - "Segments only exist in object files"
+  - "Sections hold code, segments hold data"
+  answer: 1
+  why: |
+    The section header table describes the file in the linker's
+    terms. The program header table describes it in the loader's: a
+    few `LOAD` segments, each covering several sections, mapped with
+    one `mmap` each. A `.o` has no segments; a stripped executable can
+    lose its section headers and still run.
+
+- q: "You read the bytes `2a 01 00 00` as a little-endian 32-bit number. What is it?"
+  options:
+  - "`0x0000012a`, which is 298"
+  - "`0x2a010000`"
+  - "`0x012a`, which is 298, but only on x86-64"
+  - "42, the first byte"
+  answer: 0
+  why: |
+    Little-endian puts the least significant byte first: `0x2a` +
+    `0x01 << 8` = 42 + 256 = 298. ELF says its byte order in its
+    header; x86-64 and arm64 files are both little-endian.
+
+- q: "What does `dlsym(handle, \"plugin_apply\")` need from the plugin's source for the lookup to find the function?"
+  options:
+  - "The function must be `static`"
+  - "The function must be in a header"
+  - "The function must be declared `extern \"C\"`, so its symbol is the plain name"
+  - "Nothing, `dlsym` demangles names"
+  answer: 2
+  why: |
+    `dlsym` looks up a symbol by its exact name. A C++ function's
+    symbol is mangled (`_Z12plugin_applyPc`), so either you ask for
+    that, or you declare the function `extern "C"` to turn mangling
+    off. `static` would hide it from `dlsym` entirely.

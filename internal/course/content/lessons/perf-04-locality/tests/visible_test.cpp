@@ -46,8 +46,10 @@ TEST_CASE("transpose_blocked misses less than half as often") {
 
 TEST_CASE("multiply_ikj misses at most a quarter as often") {
     Cache ijk(tiny), ikj(tiny);
-    TracedMatrix a1(48, 48, ijk, 1ull << 32), b1(48, 48, ijk, 2ull << 32), c1(48, 48, ijk, 3ull << 32);
-    TracedMatrix a2(48, 48, ikj, 1ull << 32), b2(48, 48, ikj, 2ull << 32), c2(48, 48, ikj, 3ull << 32);
+    TracedMatrix a1(48, 48, ijk, 1ull << 32), b1(48, 48, ijk, 2ull << 32),
+        c1(48, 48, ijk, 3ull << 32);
+    TracedMatrix a2(48, 48, ikj, 1ull << 32), b2(48, 48, ikj, 2ull << 32),
+        c2(48, 48, ikj, 3ull << 32);
     multiply_ijk(a1, b1, c1);
     multiply_ikj(a2, b2, c2);
     CAPTURE(ijk.misses());

@@ -36,7 +36,8 @@ TEST_CASE("count_chunk in pieces of every size") {
 }
 
 TEST_CASE("long runs overflow nothing") {
-    for (std::string s : {std::string(70'000, '\n'), std::string(70'000, 'x'), std::string(70'000, ' ')}) {
+    for (std::string s :
+         {std::string(70'000, '\n'), std::string(70'000, 'x'), std::string(70'000, ' ')}) {
         std::string alternating;
         CountState st;
         count_chunk(st, s.data(), s.size());

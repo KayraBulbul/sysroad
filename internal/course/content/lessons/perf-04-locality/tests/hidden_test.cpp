@@ -83,8 +83,10 @@ TEST_CASE("blocking beats power-of-two conflicts") {
 
 TEST_CASE("multiply_ikj keeps its advantage on a bigger matrix") {
     Cache ijk(tiny), ikj(tiny);
-    TracedMatrix a1(72, 72, ijk, 1ull << 32), b1(72, 72, ijk, 2ull << 32), c1(72, 72, ijk, 3ull << 32);
-    TracedMatrix a2(72, 72, ikj, 1ull << 32), b2(72, 72, ikj, 2ull << 32), c2(72, 72, ikj, 3ull << 32);
+    TracedMatrix a1(72, 72, ijk, 1ull << 32), b1(72, 72, ijk, 2ull << 32),
+        c1(72, 72, ijk, 3ull << 32);
+    TracedMatrix a2(72, 72, ikj, 1ull << 32), b2(72, 72, ikj, 2ull << 32),
+        c2(72, 72, ikj, 3ull << 32);
     multiply_ijk(a1, b1, c1);
     multiply_ikj(a2, b2, c2);
     CAPTURE(ijk.misses());

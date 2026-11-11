@@ -90,7 +90,8 @@ std::string generate_text(std::size_t words, std::size_t vocabulary) {
         state ^= state >> 7;
         state ^= state << 17;
         double u = static_cast<double>(state >> 11) / 9007199254740992.0 * total;
-        std::size_t r = std::lower_bound(cumulative.begin(), cumulative.end(), u) - cumulative.begin();
+        std::size_t r =
+            std::lower_bound(cumulative.begin(), cumulative.end(), u) - cumulative.begin();
         text += made_up_word(std::min(r, vocabulary - 1));
         text += n % 12 == 11 ? ".\n" : " ";
     }

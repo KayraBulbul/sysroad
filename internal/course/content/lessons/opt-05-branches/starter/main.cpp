@@ -66,12 +66,14 @@ int main() {
     std::sort(sorted.begin(), sorted.end());
     std::vector<int> out1(n), out2(n);
 
-    for (const auto& [what, data] : {std::pair{"filter 1M, sorted", &sorted}, std::pair{"filter 1M, shuffled", &shuffled}}) {
+    for (const auto& [what, data] :
+         {std::pair{"filter 1M, sorted", &sorted}, std::pair{"filter 1M, shuffled", &shuffled}}) {
         const int* in = data->data();
         std::size_t k1 = 0, k2 = 0;
         double before = best_ms([&] { k1 = original::filter_above(in, n, 127, out1.data()); });
         double after = best_ms([&] { k2 = filter_above(in, n, 127, out2.data()); });
-        race(what, before, after, k1 == k2 && std::equal(out1.begin(), out1.begin() + k1, out2.begin()));
+        race(what, before, after,
+             k1 == k2 && std::equal(out1.begin(), out1.begin() + k1, out2.begin()));
     }
 
     std::vector<int> table(1 << 16);

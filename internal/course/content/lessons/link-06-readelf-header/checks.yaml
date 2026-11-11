@@ -1,0 +1,18 @@
+- name: the built-in executable
+  args: ["x86-64-exe"]
+  stdout: "ELF Header:\n  Class:                              ELF64\n  Data:                               2's complement, little endian\n  OS/ABI:                             0\n  Type:                               EXEC (Executable file)\n  Machine:                            Advanced Micro Devices X86-64\n  Entry point address:                0x201160\n  Start of program headers:           64 (bytes into file)\n  Start of section headers:           608 (bytes into file)\n  Flags:                              0x0\n  Size of this header:                64 (bytes)\n  Size of program headers:            56 (bytes)\n  Number of program headers:          5\n  Size of section headers:            64 (bytes)\n  Number of section headers:          8\n  Section header string table index:  6\n\nProgram Headers:\n  Type           Offset   VirtAddr           FileSiz  MemSiz   Flg Align\n  PHDR           0x000040 0x0000000000200040 0x000118 0x000118 R   0x8\n  LOAD           0x000000 0x0000000000200000 0x00015e 0x00015e R   0x1000\n  LOAD           0x000160 0x0000000000201160 0x000011 0x000011 R E 0x1000\n  LOAD           0x000174 0x0000000000202174 0x000004 0x000004 RW  0x1000\n  GNU_STACK      0x000000 0x0000000000000000 0x000000 0x000000 RW  0x0\n"
+- name: the x86-64 object file
+  args: ["x86-64.o"]
+  stdout: "ELF Header:\n  Class:                              ELF64\n  Data:                               2's complement, little endian\n  OS/ABI:                             0\n  Type:                               REL (Relocatable file)\n  Machine:                            Advanced Micro Devices X86-64\n  Entry point address:                0x0\n  Start of program headers:           0 (bytes into file)\n  Start of section headers:           648 (bytes into file)\n  Flags:                              0x0\n  Size of this header:                64 (bytes)\n  Size of program headers:            0 (bytes)\n  Number of program headers:          0\n  Size of section headers:            64 (bytes)\n  Number of section headers:          9\n  Section header string table index:  1\n\nThere are no program headers in this file.\n"
+  hidden: true
+- name: the arm64 object file
+  args: ["arm64.o"]
+  stdout: "ELF Header:\n  Class:                              ELF64\n  Data:                               2's complement, little endian\n  OS/ABI:                             0\n  Type:                               REL (Relocatable file)\n  Machine:                            AArch64\n  Entry point address:                0x0\n  Start of program headers:           0 (bytes into file)\n  Start of section headers:           872 (bytes into file)\n  Flags:                              0x0\n  Size of this header:                64 (bytes)\n  Size of program headers:            0 (bytes)\n  Number of program headers:          0\n  Size of section headers:            64 (bytes)\n  Number of section headers:          9\n  Section header string table index:  1\n\nThere are no program headers in this file.\n"
+  hidden: true
+- name: not an ELF file
+  args: ["notes.txt"]
+  files:
+    notes.txt: "just text, no magic number here\n"
+  stdout: ""
+  exit: 1
+  hidden: true

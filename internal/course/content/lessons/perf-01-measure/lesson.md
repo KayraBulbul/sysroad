@@ -62,4 +62,4 @@ calibrate(f, 1000, fake);       // 16: the first batch of at least 1000 ns
 - [ ] `summarize` sorts the per-call times and fills in `min`, `median`, `max` and `samples`
 - [ ] `calibrate` times batches of 1, 2, 4, … calls and returns the first `reps` whose batch takes at least `target_ns`, or `max_reps`
 - [ ] `measure` calibrates, then times `samples` batches of that many calls and summarizes the time per call, with `reps` filled in
-- [ ] Run it, and compare the first and second `memset` of the same 256 MB
+- [ ] Run it, and compare the first and second `memset` of the same 256 MB, and the list rows at the bottom

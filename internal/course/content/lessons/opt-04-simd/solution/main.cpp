@@ -35,8 +35,8 @@ static void race(const char* what, double before, double after, bool same) {
         return;
     }
     // 16 MB in `after` milliseconds; bytes per nanosecond is GB/s.
-    std::printf("%-26s %8.2f ms %8.2f ms   %.1fx  (%.1f GB/s)\n", what, before, after, before / after,
-                (16u << 20) / (after * 1e6));
+    std::printf("%-26s %8.2f ms %8.2f ms   %.1fx  (%.1f GB/s)\n", what, before, after,
+                before / after, (16u << 20) / (after * 1e6));
 }
 
 int main() {
@@ -50,7 +50,8 @@ int main() {
 
     std::printf("%-26s %11s %11s\n", "16 MB of text", "plain", "yours");
     race("is_ascii", best_ms([&] { do_not_optimize(original::is_ascii(s, n)); }),
-         best_ms([&] { do_not_optimize(is_ascii(s, n)); }), is_ascii(s, n) == original::is_ascii(s, n));
+         best_ms([&] { do_not_optimize(is_ascii(s, n)); }),
+         is_ascii(s, n) == original::is_ascii(s, n));
     race("count_byte '\\n'", best_ms([&] { do_not_optimize(original::count_byte(s, n, '\n')); }),
          best_ms([&] { do_not_optimize(count_byte(s, n, '\n')); }),
          count_byte(s, n, '\n') == original::count_byte(s, n, '\n'));

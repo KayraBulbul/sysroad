@@ -1,0 +1,7 @@
+- name: three numbers
+  args: ["3", "1", "2"]
+  stdout: "mean 2.00, range 1.00 to 3.00\n"
+- name: quiet
+  args: ["-q", "3", "1", "2"]
+  stdout: "mean 2.00\n"
+  hidden: true

@@ -7,7 +7,8 @@
 #include "wordfreq.hpp"
 
 static std::vector<WordCount> sorted(std::vector<WordCount> v) {
-    std::sort(v.begin(), v.end(), [](const WordCount& a, const WordCount& b) { return a.word < b.word; });
+    std::sort(v.begin(), v.end(),
+              [](const WordCount& a, const WordCount& b) { return a.word < b.word; });
     return v;
 }
 

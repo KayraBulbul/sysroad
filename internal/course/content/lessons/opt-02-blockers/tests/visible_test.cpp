@@ -31,7 +31,8 @@ static double lowercase_seconds(std::size_t n) {
         std::string s(n, 'Q');
         auto start = std::chrono::steady_clock::now();
         lowercase(s.data());
-        best = std::min(best, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+        best = std::min(
+            best, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
     }
     return best;
 }

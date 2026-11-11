@@ -43,5 +43,6 @@ int main(int argc, char** argv) {
     for (const WordCount& wc : top) {
         std::printf("%8ld  %s\n", wc.count, wc.word.c_str());
     }
-    std::printf("%zu words, %zu different, in %.0f ms\n", words.size(), counts.size(), took.count());
+    std::printf("%zu words, %zu different, in %.0f ms\n", words.size(), counts.size(),
+                took.count());
 }

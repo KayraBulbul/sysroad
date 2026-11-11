@@ -1,7 +1,11 @@
 // Measures a few things with your harness. You won't need to change this file.
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <functional>
+#include <list>
 #include <memory>
 #include <numeric>
 #include <vector>
@@ -42,7 +46,8 @@ int main() {
     std::memset(buf.get(), 2, big);
     double t2 = steady_ns();
     do_not_optimize(buf[big - 1]);
-    std::printf("memset 256 MB: first %.1f ms, second %.1f ms\n\n", (t1 - t0) / 1e6, (t2 - t1) / 1e6);
+    std::printf("memset 256 MB: first %.1f ms, second %.1f ms\n\n", (t1 - t0) / 1e6,
+                (t2 - t1) / 1e6);
 
     std::printf("%-26s %9s %9s %9s %8s %9s\n", "ns per call", "min", "median", "max", "spread",
                 "reps");
@@ -59,16 +64,57 @@ int main() {
     // The same loop over 4 KB and over 64 MB, per element.
     std::vector<int> small(1024, 1);
     std::vector<int> large(16u << 20, 1);
-    row("sum 4 KB, per int", measure(
-                                 [&] {
-                                     do_not_optimize(std::accumulate(small.begin(), small.end(), 0));
-                                 },
-                                 9),
+    row("sum 4 KB, per int",
+        measure([&] { do_not_optimize(std::accumulate(small.begin(), small.end(), 0)); }, 9),
         small.size());
-    row("sum 64 MB, per int", measure(
-                                  [&] {
-                                      do_not_optimize(std::accumulate(large.begin(), large.end(), 0));
-                                  },
-                                  5, 2e7),
+    row("sum 64 MB, per int",
+        measure([&] { do_not_optimize(std::accumulate(large.begin(), large.end(), 0)); }, 5, 2e7),
         large.size());
+
+    // Two measurements promised back in phase 2. Your harness's numbers
+    // are only as good as the code it times, so these print milliseconds.
+    auto ms = [](const std::function<void()>& f) { return measure(f, 3).min / 1e6; };
+    const int n = 1'000'000;
+    std::vector<int> vec(n, 1);
+    std::list<int> in_order(vec.begin(), vec.end());
+    // The same values, but each node allocated in a random order relative
+    // to the list order, as happens after a program has run a while.
+    std::vector<std::list<int>::iterator> nodes;
+    std::list<int> scattered;
+    for (int i = 0; i < n; ++i) {
+        nodes.push_back(scattered.insert(scattered.end(), 1));
+    }
+    std::uint32_t seed = 7;
+    for (int i = n - 1; i > 0; --i) {
+        seed = seed * 1664525 + 1013904223;
+        std::swap(nodes[i], nodes[seed % static_cast<std::uint32_t>(i + 1)]);
+    }
+    std::list<int> shuffled;
+    for (auto it : nodes) {
+        shuffled.splice(shuffled.end(), scattered, it);
+    }
+    std::printf("\nsumming 1M ints (lesson 2.2.6):\n");
+    std::printf("  %-28s %8.2f ms\n", "std::vector",
+                ms([&] { do_not_optimize(std::accumulate(vec.begin(), vec.end(), 0)); }));
+    std::printf("  %-28s %8.2f ms\n", "std::list, nodes in order",
+                ms([&] { do_not_optimize(std::accumulate(in_order.begin(), in_order.end(), 0)); }));
+    std::printf("  %-28s %8.2f ms\n", "std::list, nodes scattered",
+                ms([&] { do_not_optimize(std::accumulate(shuffled.begin(), shuffled.end(), 0)); }));
+
+    std::printf("\nbuilding 20,000 ints in reverse order (lesson 2.4.3):\n");
+    std::printf("  %-28s %8.2f ms\n", "insert at begin()", ms([] {
+                    std::vector<int> v;
+                    for (int i = 0; i < 20'000; ++i) {
+                        v.insert(v.begin(), i);
+                    }
+                    do_not_optimize(v.data());
+                }));
+    std::printf("  %-28s %8.2f ms\n", "push_back, then reverse", ms([] {
+                    std::vector<int> v;
+                    for (int i = 0; i < 20'000; ++i) {
+                        v.push_back(i);
+                    }
+                    std::reverse(v.begin(), v.end());
+                    do_not_optimize(v.data());
+                }));
 }

@@ -12,7 +12,8 @@ TEST_CASE("filter_above keeps the order, and handles nothing to keep") {
     }
     for (int limit : {-1000, -1, 0, 250, 499, 1000}) {
         std::vector<int> want;
-        std::copy_if(in.begin(), in.end(), std::back_inserter(want), [&](int x) { return x > limit; });
+        std::copy_if(in.begin(), in.end(), std::back_inserter(want),
+                     [&](int x) { return x > limit; });
         std::vector<int> out(in.size());
         std::size_t k = filter_above(in.data(), in.size(), limit, out.data());
         out.resize(k);
@@ -30,7 +31,8 @@ TEST_CASE("lower_bound_index matches std::lower_bound for every size") {
             a[i] = static_cast<int>(3 * i);
         }
         for (int x = -2; x <= static_cast<int>(3 * n + 2); ++x) {
-            std::size_t want = static_cast<std::size_t>(std::lower_bound(a.begin(), a.end(), x) - a.begin());
+            std::size_t want =
+                static_cast<std::size_t>(std::lower_bound(a.begin(), a.end(), x) - a.begin());
             CAPTURE(n);
             CAPTURE(x);
             CHECK(lower_bound_index(a.data(), n, x) == want);

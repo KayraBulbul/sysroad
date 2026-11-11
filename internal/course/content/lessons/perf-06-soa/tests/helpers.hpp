@@ -23,8 +23,7 @@ inline Particle sample_particle(std::uint32_t i) {
 }
 
 inline bool same(const Particle& a, const Particle& b) {
-    return a.x == b.x && a.y == b.y && a.z == b.z && a.vx == b.vx && a.vy == b.vy &&
-           a.vz == b.vz && a.mass == b.mass && a.id == b.id &&
-           std::memcmp(a.name, b.name, sizeof a.name) == 0 &&
+    return a.x == b.x && a.y == b.y && a.z == b.z && a.vx == b.vx && a.vy == b.vy && a.vz == b.vz &&
+           a.mass == b.mass && a.id == b.id && std::memcmp(a.name, b.name, sizeof a.name) == 0 &&
            std::memcmp(a.color, b.color, sizeof a.color) == 0 && a.spawned_at == b.spawned_at;
 }

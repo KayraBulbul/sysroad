@@ -37,8 +37,9 @@ static int race(std::size_t mb) {
         return 1;
     }
     // Lines of 0 to 14 short words, from a fixed sequence of numbers.
-    static const char* words[] = {"the", "quick", "brown", "fox", "jumps", "over", "a", "lazy",
-                                  "dog", "cache", "line", "memory", "systems", "I", "branch"};
+    static const char* words[] = {"the",  "quick",  "brown",   "fox", "jumps",
+                                  "over", "a",      "lazy",    "dog", "cache",
+                                  "line", "memory", "systems", "I",   "branch"};
     std::string text;
     std::uint32_t s = 1;
     auto next = [&] { return s = s * 1664525 + 1013904223, s >> 16; };
@@ -69,8 +70,8 @@ static int race(std::size_t mb) {
             count_fd(f, c);
             close(f);
         });
-        std::printf("wc %-3s  system %7.1f ms   yours %7.1f ms  (%.1f GB/s)\n", flags, theirs, yours,
-                    static_cast<double>(text.size()) / (yours * 1e6));
+        std::printf("wc %-3s  system %7.1f ms   yours %7.1f ms  (%.1f GB/s)\n", flags, theirs,
+                    yours, static_cast<double>(text.size()) / (yours * 1e6));
     }
     std::printf("(the system's time includes starting a process, about 1 ms)\n");
     unlink(path);

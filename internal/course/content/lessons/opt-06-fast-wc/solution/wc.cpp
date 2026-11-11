@@ -94,7 +94,8 @@ std::string format_counts(const Counts& c, const Options& o, int width) {
     return out;
 }
 
-int run_wc(const std::vector<std::string_view>& args, int in_fd, std::ostream& out, std::ostream& err) {
+int run_wc(const std::vector<std::string_view>& args, int in_fd, std::ostream& out,
+           std::ostream& err) {
     Options o = parse_options(args);
     if (o.bad != 0) {
         err << "wc: invalid option -- '" << o.bad << "'\n";

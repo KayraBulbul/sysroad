@@ -22,4 +22,5 @@ int column_width(const Options& o);
 std::string format_counts(const Counts& c, const Options& o, int width);
 
 // The whole program, reading stdin from in_fd. Returns the exit status.
-int run_wc(const std::vector<std::string_view>& args, int in_fd, std::ostream& out, std::ostream& err);
+int run_wc(const std::vector<std::string_view>& args, int in_fd, std::ostream& out,
+           std::ostream& err);

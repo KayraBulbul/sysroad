@@ -34,3 +34,15 @@ different order, changed the speed of the same program by up to 10%
 by moving code and the stack to different addresses. When a change
 makes code 3% faster, be suspicious. When it makes it 3× faster, it
 probably did.
+
+**The rows at the bottom.** Summing a `std::vector` of a million ints
+takes about 0.05 ms: the loop is vectorised and the prefetcher
+streams the memory in. A `std::list` with its nodes allocated one
+after another takes 30 times longer, because each step waits for the
+pointer to the next node. Scatter the same nodes around the heap, as
+happens to a long-lived program's lists, and every step is a cache
+miss: over 1000 times slower than the vector. Inserting at the front
+of a vector moves every element each time, so building 20,000
+elements that way does 200 million moves; `push_back` then
+`std::reverse` does under 100,000. Chapter 1 explains the first result, and
+lesson 2.4.3 the second.
