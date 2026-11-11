@@ -41,7 +41,8 @@ static std::size_t find_from(const std::vector<std::uint64_t>& words, std::size_
     }
 }
 
-Bitset::Bitset(std::size_t size) : size_(size), words_(size / kWordBits + (size % kWordBits != 0), 0) {}
+Bitset::Bitset(std::size_t size)
+    : size_(size), words_(size / kWordBits + (size % kWordBits != 0), 0) {}
 
 bool Bitset::test(std::size_t i) const {
     check(i, size_);

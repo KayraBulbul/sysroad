@@ -1,0 +1,7 @@
+- name: a 1 MB image
+  args: ["1"]
+  stdout: "checksum 174998bc\n"
+- name: a 3 MB image
+  args: ["3"]
+  stdout: "checksum 6d771dde\n"
+  hidden: true
