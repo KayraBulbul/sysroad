@@ -72,6 +72,10 @@ BSD "__.SYMDEF":  n (4 bytes, little-endian), then n / 8 pairs of
 Both point at a member by the offset of its *header* in the file, so
 remember where each header started.
 
+On the Mac, libraries that come with Xcode are often **universal**,
+with an archive per CPU inside (`lipo -info libfoo.a` says). Take one
+out with `lipo -thin arm64 libfoo.a -output thin.a` before reading it.
+
 ## Assignment
 
 - [ ] Check the magic, then walk the headers, keeping members at even offsets

@@ -13,7 +13,9 @@ result feeds a load address, because a correct prediction lets the
 next load start early, while a `cmov` makes it wait for the
 comparison. That's a good bet for predictable branches and a bad one
 for binary search. `__builtin_unpredictable` switches it off for that
-condition. On arm64 there's no such pass, and the `csel` stays.
+condition. On arm64 there's no such pass, and clang turns even the
+plain `if`/`else` search into a `csel`, so on the Mac both searches run
+at the same speed: the compiler already did your job there.
 
 **How predictors work.** Modern predictors (TAGE and its relatives)
 keep tables indexed by the branch's address combined with the

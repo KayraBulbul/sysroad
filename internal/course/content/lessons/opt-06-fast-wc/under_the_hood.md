@@ -20,6 +20,10 @@ GNU's in a UTF-8 locale. Matching it exactly needs a UTF-8 decoder
 that can tell where a multibyte space starts, which SIMD can do too:
 simdutf validates and transcodes UTF-8 at many gigabytes per second.
 
+**On the Mac,** `wc` is the BSD version, and its `wc -l` has no SIMD
+loop, so it takes about as long as a full count. Your version beats
+both by about 10×.
+
 **Bigger vectors.** With AVX2 the same loop takes 32 bytes per step,
 and the bottleneck moves even more firmly to memory. On the Mac, NEON
 stays at 16, but the M-series cores run four of these instructions
