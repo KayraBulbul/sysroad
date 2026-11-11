@@ -12,15 +12,18 @@ deeper:
   - title: "Predefined macros (cppreference)"
     url: https://en.cppreference.com/w/cpp/preprocessor/replace#Predefined_macros
 ---
-`clang++ main.cpp util.cpp -o prog` looks like one step. It's four,
+`clang++ -std=c++20 main.cpp -o stages` looks like one step. It's four,
 and you can stop after any of them:
 
 ```sh
-clang++ -E main.cpp -o main.ii   # 1. preprocess: C++ source, with #includes pasted in
-clang++ -S main.ii  -o main.s    # 2. compile: assembly, as in phase 4
-clang++ -c main.s   -o main.o    # 3. assemble: an object file of machine code
-clang++ main.o util.o -o prog    # 4. link: object files and libraries into a program
+clang++ -std=c++20 -E main.cpp -o main.ii   # 1. preprocess: C++ source, with #includes pasted in
+clang++ -std=c++20 -S main.ii -o main.s     # 2. compile: assembly, as in phase 4
+clang++ -c main.s -o main.o                 # 3. assemble: an object file of machine code
+clang++ main.o -o stages                    # 4. link: object files and libraries into a program
 ```
+
+With more `.cpp` files, steps 1 to 3 happen once per file, and step 4
+takes all the `.o` files together.
 
 Each `.cpp` file goes through the first three stages on its own, as a
 **translation unit**. Only the linker sees all of them together. So
