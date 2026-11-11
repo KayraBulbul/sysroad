@@ -1,0 +1,104 @@
+- q: You time a function that takes about 3 ns by calling it once, between two reads of `steady_clock`. What's wrong with that?
+  options:
+  - Nothing, as long as you build with `-O2`
+  - "The clock only ticks every 15-40 ns, so you mostly measure the clock"
+  - "`steady_clock` can jump backwards when the system time changes"
+  - The first call is always the fastest
+  answer: 1
+  why: |
+    One call is shorter than one tick of the clock. Time a batch of
+    calls long enough to be measured well (a millisecond is plenty)
+    and divide. `steady_clock` never jumps backwards; that's
+    `system_clock`. And the first call is usually the *slowest*.
+
+- q: "The same benchmark ran 9 times: min 10.1 ms, median 10.3 ms, max 31 ms. What's the best summary of the code's own cost?"
+  options:
+  - "The mean, about 12.6 ms"
+  - "The max, 31 ms, to be safe"
+  - "The min or the median, around 10.1-10.3 ms, with the 31 ms run put down to interference"
+  - The measurement is useless and has to be redone
+  answer: 2
+  why: |
+    Interference (other programs, the scheduler, a frequency change)
+    only ever makes a run slower. One slow outlier drags the mean but
+    not the min or the median. A spread that big is worth a second
+    look, but the low numbers agree.
+
+- q: "A cache is 32 KB with 64-byte lines and 8 ways. How many sets does it have, and which set does address 0x1040 go in?"
+  options:
+  - "512 sets; set 65"
+  - "64 sets; set 1"
+  - "64 sets; set 0x41"
+  - "8 sets; set 1"
+  answer: 1
+  why: |
+    32768 / (64 × 8) = 64 sets. The line number is 0x1040 / 64 = 0x41
+    (65), and 65 % 64 = 1. In bits: the low 6 bits are the offset, the
+    next 6 the set, and the rest the tag (here 1).
+
+- q: "You walk down a column of a 1024 × 1024 matrix of floats. A row is 4 KB. Your L1 has 64 sets of 64-byte lines and 8 ways. Why does every read miss?"
+  options:
+  - The matrix doesn't fit in the cache, so every line is evicted before it's reused
+  - Floats aren't aligned to cache lines
+  - "Every element of the column is 4 KB from the last, so they all map to the same set, and 8 ways can't hold 1024 lines"
+  - Columns can't be prefetched
+  answer: 2
+  why: |
+    64 sets × 64-byte lines repeats every 4 KB, so addresses 4 KB apart
+    share a set. That's a conflict miss: the rest of the cache sits
+    empty. Padding each row by one line spreads the column over every
+    set.
+
+- q: "On the memory mountain, throughput stops falling once the stride reaches 8 `long`s (64 bytes). Why?"
+  options:
+  - The prefetcher switches off
+  - "From there on every read is in a new line, so each read costs one miss at most, whatever the stride"
+  - The loop gets vectorised
+  - The working set fits in L1
+  answer: 1
+  why: |
+    Below a stride of 8, some reads share a line with the previous one
+    and are nearly free. At 8 and above, none do. A bigger stride
+    can't make a read cost more than a whole line. On a Mac, with
+    128-byte lines, the slope keeps going until 16.
+
+- q: "Which loop order multiplies n × n matrices stored row by row with the fewest cache misses?"
+  code: |
+    // c(i, j) += a(i, k) * b(k, j)
+  options:
+  - "`i, j, k`: the textbook dot product"
+  - "`j, k, i`"
+  - "`i, k, j`: the inner loop runs along a row of `b` and a row of `c`"
+  - They all touch the same elements, so they miss the same amount
+  answer: 2
+  why: |
+    The innermost loop decides the access pattern. With `j` innermost,
+    `b(k, j)` and `c(i, j)` both walk along rows, using every byte of
+    each line. With `k` innermost, `b(k, j)` walks down a column. With
+    `i` innermost (`jki`, `kji`), both `a` and `c` walk down columns:
+    the worst.
+
+- q: "A profile shows `parse` with 2% self time and 85% total (children) time. What does that tell you?"
+  options:
+  - "`parse` is the hotspot: optimise its loops"
+  - "`parse` itself is cheap; the time is in functions it calls, so expand it to find them"
+  - The profiler is broken
+  - "`parse` is called 85% of the time"
+  answer: 1
+  why: |
+    Self time is the function's own instructions. Children (total)
+    adds everything it calls. A big total with a tiny self means it's a
+    caller. Keep expanding until you reach code with a high self time.
+
+- q: "You sum one `float` field of a million 64-byte structs, then the same field stored as its own `std::vector<float>`. Roughly how many bytes does each loop pull from memory?"
+  options:
+  - 4 MB both times, since only the floats are used
+  - 64 MB and 4 MB
+  - 64 MB both times
+  - 4 MB and 64 MB
+  answer: 1
+  why: |
+    The cache moves whole lines. Every struct is its own 64-byte line,
+    so reading one float from each drags in all 64 MB. In the separate
+    vector the floats are packed 16 to a line, so 4 MB carries all of
+    them. That's the struct-of-arrays win.
