@@ -59,6 +59,8 @@ TEST_CASE("bad archives throw") {
     // Cut off in the middle of a header, and in the middle of a member.
     CHECK_THROWS_AS(parse_archive(whole.substr(0, 8 + 30)), std::runtime_error);
     CHECK_THROWS_AS(parse_archive(whole.substr(0, whole.size() - 2)), std::runtime_error);
+    // odd.txt is the last member, 3 bytes and a padding '\n'. Without it:
+    CHECK_THROWS_AS(parse_archive(whole.substr(0, whole.size() - 1)), std::runtime_error);
     // A header that doesn't end in `\n.
     std::string broken(whole);
     broken[8 + 58] = 'x';

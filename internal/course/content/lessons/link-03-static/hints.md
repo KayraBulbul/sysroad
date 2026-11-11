@@ -12,7 +12,8 @@ std::string_view field(std::string_view header, std::size_t at, std::size_t len)
 
 The name is `field(h, 0, 16)` and the size is `field(h, 48, 10)`,
 parsed as decimal. Check that `pos + 60 + size` fits before you take
-the data. After each member, `pos += 60 + size`, then `pos += pos % 2`.
+the data. After each member, `pos += 60 + size`, and if that's odd,
+skip the padding `'\n'`, which must be there.
 ---
 Deal with the special names first: `/` is the GNU index and `//` the
 long-name table (keep both as `string_view`s, they're not members),

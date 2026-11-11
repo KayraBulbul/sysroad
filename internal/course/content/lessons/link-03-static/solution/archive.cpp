@@ -123,7 +123,13 @@ Archive parse_archive(std::string_view bytes) {
             name_at[pos] = name;
         }
         pos += header_size + size;
-        pos += pos % 2;  // members start at even offsets
+        if (pos % 2 == 1) {
+            // Members start at even offsets, so an odd one is followed by '\n'.
+            if (pos == bytes.size()) {
+                bad("the last member's padding byte is missing");
+            }
+            ++pos;
+        }
     }
 
     auto member_name = [&](std::size_t offset) {
