@@ -1,0 +1,95 @@
+- q: "A program runs `printf(\"A\"); fork(); printf(\"B\\n\");` with stdout piped into `cat`. What does `cat` print?"
+  options:
+  - "`AB` and then `B`"
+  - "`AB` twice"
+  - "`AB` once: the child's output is lost"
+  - "`A`, then `B` twice"
+  answer: 1
+  why: |
+    stdout is fully buffered when it's a pipe, so "A" is still in the
+    buffer at the fork, and both processes have a copy. Each adds
+    "B\n" and flushes at exit. Flush before forking.
+
+- q: "Why should a forked child end with `_exit` rather than `exit` or a `return`?"
+  options:
+  - "`exit` doesn't pass the exit code to the parent"
+  - "`exit` would kill the parent too"
+  - "`exit` and returning run the parent's cleanup a second time: atexit handlers, static destructors, stdio flushing"
+  - "`_exit` is faster, but otherwise the same"
+  answer: 2
+  why: |
+    The child is a copy of the whole program. Returning carries on
+    running the parent's code, and `exit` runs its cleanup, including
+    flushing buffers the parent will flush too.
+
+- q: "After `execve` succeeds, which of these does the process still have?"
+  options:
+  - "Its PID and its open fds (those not marked close-on-exec)"
+  - "Its heap, but not its stack"
+  - "Its signal handlers"
+  - "Nothing: it's a new process"
+  answer: 0
+  why: |
+    exec replaces the program, not the process: same PID, parent,
+    fds, current folder and ignored signals. Memory and handlers are
+    gone, because the code they belonged to is gone.
+
+- q: "A command was killed by `SIGKILL` (9). What does a shell show in `$?`?"
+  options:
+  - "9"
+  - "-9"
+  - "255"
+  - "137"
+  answer: 3
+  why: |
+    128 plus the signal's number. `WIFSIGNALED` and `WTERMSIG` tell
+    you it was a signal; the shell folds that into one number.
+
+- q: "`cmd 2>&1 > log`: where does `cmd`'s stderr go?"
+  options:
+  - "To `log`, along with stdout"
+  - "To wherever stdout pointed before, usually the terminal"
+  - "Nowhere: it's closed"
+  - "To `log`, and stdout to the terminal"
+  answer: 1
+  why: |
+    Redirections apply left to right. `2>&1` copies where fd 1 points
+    *now* (the terminal), then `> log` moves only fd 1. For both in
+    the file, write `> log 2>&1`.
+
+- q: "Your program reads a child's output through a pipe, but `read` never returns 0, even after the child exits. The likeliest cause?"
+  options:
+  - "The pipe's 64 KB buffer is full"
+  - "You need to call `waitpid` first"
+  - "The parent still has the pipe's write end open"
+  - "The child forgot to flush stdout"
+  answer: 2
+  why: |
+    `read` sees end of file only when every write end is closed, in
+    every process. The parent's own copy counts. Calling `waitpid`
+    first is the *other* classic bug: it hangs once the child fills
+    the pipe.
+
+- q: "You write 1 MB to a child's stdin, then read its stdout. With `cat` as the child, it hangs. Why?"
+  options:
+  - "`cat` fills its output pipe while you're still writing, stops reading, and your write blocks"
+  - "`cat` waits for end of file before printing anything"
+  - "Pipes can't hold more than 64 KB in total"
+  - "`SIGPIPE` killed `cat`"
+  answer: 0
+  why: |
+    Each pipe holds about 64 KB. `cat` copies until its output pipe
+    is full, then blocks writing, so it stops reading, and you block
+    writing too. Read and write at the same time, with `poll`.
+
+- q: "In `yes | head -n 1`, why does `yes` stop?"
+  options:
+  - "`head` sends it `SIGTERM`"
+  - "The shell kills it when `head` exits"
+  - "It reads end of file"
+  - "Its next write, after `head` has exited, raises `SIGPIPE`, which kills it"
+  answer: 3
+  why: |
+    Writing to a pipe with no readers left raises SIGPIPE. That's why
+    children must have it set back to the default: an ignored SIGPIPE
+    survives exec, and `yes` would get EPIPE instead.

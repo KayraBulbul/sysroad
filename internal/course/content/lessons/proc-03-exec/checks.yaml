@@ -1,0 +1,38 @@
+- name: prints the new environment
+  args: ["-i", "A=1", "B=2"]
+  stdout: "A=1\nB=2\n"
+- name: runs a command with it
+  args: ["-i", "PATH=/usr/bin:/bin", "GREETING=hi", "sh", "-c", "echo \"$GREETING\""]
+  stdout: "hi\n"
+- name: finds env itself in the default PATH
+  args: ["-i", "A=1", "env"]
+  stdout: "A=1\n"
+- name: a command that doesn't exist
+  args: ["-i", "nosuchcommand"]
+  stdout: ""
+  exit: 127
+- name: a later NAME=VALUE replaces an earlier one in place
+  args: ["-i", "A=1", "B=2", "A=3"]
+  stdout: "A=3\nB=2\n"
+  hidden: true
+- name: -u removes a variable
+  args: ["-u", "HOME", "sh", "-c", "echo \"${HOME-unset}\""]
+  stdout: "unset\n"
+  hidden: true
+- name: an unknown option
+  args: ["-x"]
+  stdout: ""
+  exit: 125
+  hidden: true
+- name: a PATH without the command
+  args: ["-i", "PATH=/nowhere", "sh", "-c", "true"]
+  stdout: ""
+  exit: 127
+  hidden: true
+- name: a file that isn't executable
+  args: ["-i", "./script.sh"]
+  files:
+    script.sh: "echo hi\n"
+  stdout: ""
+  exit: 126
+  hidden: true
