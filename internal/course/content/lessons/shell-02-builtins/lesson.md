@@ -41,8 +41,9 @@ export NAME=VALUE... or NAME...
                 and _): complain, status 1
 unset NAME...   unsetenv each
 type NAME...    "NAME is a shell builtin", "NAME is /path/to/it" (the PATH
-                search from lesson 6.1.3), or "conch: type: NAME: not found"
-                on stderr with status 1
+                search from lesson 6.1.3; a NAME with a / is found only if
+                it's an executable file itself), or "conch: type: NAME:
+                not found" on stderr with status 1
 ```
 
 `exit` doesn't leave on the spot: it sets `sh.exiting` and

@@ -51,3 +51,8 @@
     sub/b.txt: ""
   stdout: "a.txt\nb.txt\n"
   hidden: true
+- name: type with a path
+  stdin: "type /bin/sh ./nothing-here\n"
+  stdout: "/bin/sh is /bin/sh\n"
+  exit: 1
+  hidden: true

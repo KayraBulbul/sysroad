@@ -122,6 +122,11 @@ static int builtin_unset(Shell& sh, const std::vector<std::string>& argv) {
     return 0;
 }
 
+static bool is_executable_file(const std::string& path) {
+    struct stat st;
+    return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode) && access(path.c_str(), X_OK) == 0;
+}
+
 static std::string find_in_path(const std::string& name) {
     const char* path = std::getenv("PATH");
     std::string p = path != nullptr ? path : "/usr/bin:/bin";
@@ -130,9 +135,7 @@ static std::string find_in_path(const std::string& name) {
         size_t colon = p.find(':', start);
         std::string dir = p.substr(start, colon - start);
         std::string candidate = (dir.empty() ? "." : dir) + "/" + name;
-        struct stat st;
-        if (stat(candidate.c_str(), &st) == 0 && S_ISREG(st.st_mode) &&
-            access(candidate.c_str(), X_OK) == 0) {
+        if (is_executable_file(candidate)) {
             return candidate;
         }
         if (colon == std::string::npos) {
@@ -150,7 +153,11 @@ static int builtin_type(Shell&, const std::vector<std::string>& argv) {
             std::cout << name << " is a shell builtin\n";
             continue;
         }
-        std::string path = name.find('/') == std::string::npos ? find_in_path(name) : "";
+        // A name with a / isn't searched for, as when running it: it's
+        // found if it's an executable file right there.
+        std::string path = name.find('/') == std::string::npos ? find_in_path(name)
+                           : is_executable_file(name)          ? name
+                                                               : "";
         if (!path.empty()) {
             std::cout << name << " is " << path << '\n';
         } else {
