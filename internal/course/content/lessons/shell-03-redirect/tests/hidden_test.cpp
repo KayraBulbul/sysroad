@@ -144,3 +144,16 @@ TEST_CASE("with fd 10 out of reach, a saved copy can't stand in for a closed fd"
     CHECK(access("lim2.txt", F_OK) == -1);
     CHECK(slurp("lim2-orig.txt") == "back\n");
 }
+
+TEST_CASE("a saved copy never lands on an fd the redirections name") {
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(10);
+        Shell sh;
+        run_line(sh, "pwd 1>&10 > out10.txt");  // 10 is closed: this must fail
+        bool ok = sh.last_status == 1 && access("out10.txt", F_OK) == -1 &&
+                  fcntl(10, F_GETFD) == -1;
+        _exit(ok ? 0 : 1);
+    }
+    CHECK(shell_status(wait_for(pid)) == 0);
+}

@@ -29,7 +29,8 @@ if not.
 ```cpp
 SavedFds::SavedFds(const std::vector<Redirect>& redirects) {
     for (const Redirect& r : redirects) {
-        // skip it if r.fd is already in saved_        int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 10);   // -1, EBADF if r.fd isn't open
+        // skip it if r.fd is already in saved_        // above: 1 + the highest fd any redirection names (r.fd or r.from)
+        int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, std::max(10, above));  // -1, EBADF: not open
         if (copy == -1 && errno != EBADF) {            copy = fcntl(r.fd, F_DUPFD_CLOEXEC, above);  // the limit is below 10:
                                                         // above every fd named
         }

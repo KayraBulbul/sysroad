@@ -56,11 +56,11 @@ SavedFds::SavedFds(const std::vector<Redirect>& redirects) {
         if (seen) {
             continue;
         }
-        // A copy at 10 or above, out of the way, closed if we exec. With an
-        // fd limit of 10 or less that fails with EINVAL: then take a free fd
-        // above every fd the redirections name, so a copy can't pose as
-        // one of them (1>&3 with 3 closed must still fail).
-        int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 10);
+        // A copy at 10 or above, out of the way, closed if we exec, and above
+        // every fd the redirections name, so a copy can't pose as one of
+        // them (1>&10 with 10 closed must still fail). With an fd limit of
+        // 10 or less that fails with EINVAL: then just above the named fds.
+        int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, std::max(10, above));
         if (copy == -1 && errno != EBADF) {
             copy = fcntl(r.fd, F_DUPFD_CLOEXEC, above);
         }

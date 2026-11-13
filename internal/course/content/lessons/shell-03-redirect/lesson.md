@@ -40,9 +40,11 @@ redirection changes the shell's own stdout, and it has to be put back
 afterwards or every later command writes to `t.txt`. That's
 `SavedFds`: before applying, it copies each fd the redirections will
 touch somewhere out of the way, and its destructor puts them back.
-Copy with `fcntl(fd, F_DUPFD_CLOEXEC, 10)`: the copy lands at fd 10 or
-above, away from fds a user might name, and it's close-on-exec, so no
-command the shell runs later inherits it. If an fd wasn't open at all
+Copy with `fcntl(fd, F_DUPFD_CLOEXEC, n)`: the copy lands at fd `n` or
+above, and it's close-on-exec, so no command the shell runs later
+inherits it. Make `n` at least 10, out of the way, and above every fd
+the redirections name, so a copy can never stand in for one of them:
+`pwd 1>&10` with fd 10 closed must still fail. If an fd wasn't open at all
 (`fcntl` fails with `EBADF`), remember that, and close it again at the
 end. Any other failure is different: with an fd limit of 10 or less,
 there's no fd 10 to be had, so try again with a minimum just above every
