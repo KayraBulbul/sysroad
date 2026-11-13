@@ -151,9 +151,15 @@ static void in_foreground(Job& job, int tty, bool resume) {
     bool have_modes = tcgetattr(tty, &shell_modes) == 0;
     tcsetpgrp(tty, job.pgid);
     if (resume) {
+        if (job.has_modes) {
+            tcsetattr(tty, TCSADRAIN, &job.modes);  // as it was when it stopped
+        }
         kill(-job.pgid, SIGCONT);
     }
     wait_for_job(job);
+    if (job.stopped) {
+        job.has_modes = tcgetattr(tty, &job.modes) == 0;  // keep them for later
+    }
     tcsetpgrp(tty, getpgrp());
     if (have_modes) {
         tcsetattr(tty, TCSADRAIN, &shell_modes);  // the job may have left raw mode on

@@ -2,6 +2,7 @@
 // Shared by your code and the tests. You won't need to change this file.
 
 #include <sys/types.h>
+#include <termios.h>
 
 #include <string>
 #include <vector>
@@ -18,6 +19,8 @@ struct Job {
     std::vector<Status> statuses;  // ...and how
     bool stopped = false;
     int stop_signal = 0;  // what stopped it: SIGTSTP, SIGTTIN, ...
+    bool has_modes = false;
+    termios modes{};  // the terminal as the job left it when it stopped
 
     bool done() const {
         for (bool e : ended) {
@@ -45,9 +48,11 @@ Job launch_job(const std::vector<Command>& commands, bool foreground, int tty);
 void wait_for_job(Job& job);
 
 // Gives the job the terminal, waits for it as wait_for_job does, then
-// takes the terminal back, with this process's own terminal modes.
+// takes the terminal back, with this process's own terminal modes. A job
+// that stopped keeps the modes it left in job.modes.
 void wait_foreground(Job& job, int tty);
 
 // Lets a stopped job carry on (SIGCONT). In the foreground, it gets the
-// terminal and is waited for as in wait_foreground.
+// terminal, with the modes it had when it stopped, and is waited for as
+// in wait_foreground.
 void continue_job(Job& job, int tty, bool foreground);

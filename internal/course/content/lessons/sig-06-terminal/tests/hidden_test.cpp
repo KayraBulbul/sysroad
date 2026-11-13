@@ -3,6 +3,7 @@
 #include <termios.h>
 
 #include <cstdio>
+#include <fstream>
 
 #include "jobctl.hpp"
 #include "pty.hpp"
@@ -172,4 +173,31 @@ TEST_CASE("started in the background, init_job_control waits instead of taking t
         return kept && WIFEXITED(st) && WEXITSTATUS(st) == 0 ? 0 : 2;
     });
     CHECK_MESSAGE(term.wait() == 0, term.output());
+}
+
+TEST_CASE("a job carried on in the foreground gets back the modes it stopped with") {
+    {
+        std::ofstream("modes.sh") << "stty -echo\n"
+                                     "kill -TSTP $$\n"
+                                     "if stty -a | grep -qw -- -echo; then echo kept-modes; "
+                                     "else echo lost-modes; fi\n"
+                                     "stty echo\n";
+    }
+    Pty term([] {
+        init_job_control(0);
+        Job job = launch_job({{"sh", "modes.sh"}}, true, 0);
+        wait_foreground(job, 0);
+        if (!job.stopped) {
+            return 1;
+        }
+        termios t{};
+        tcgetattr(0, &t);
+        if (!(t.c_lflag & ECHO)) {
+            return 2;  // the shell's own modes should be back while it's stopped
+        }
+        continue_job(job, 0, true);
+        return job.done() ? 0 : 3;
+    });
+    CHECK_MESSAGE(term.expect("kept-modes", 3000), term.output());
+    CHECK(term.wait() == 0);
 }

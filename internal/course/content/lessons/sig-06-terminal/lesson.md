@@ -65,7 +65,9 @@ Two more details make it solid:
 - **Terminal modes.** A program like `vim` switches the terminal to raw
   mode (phase 3) and might be killed before it switches back. Save the
   shell's modes with `tcgetattr` before the job runs and restore them
-  with `tcsetattr` once you have the terminal back.
+  with `tcsetattr` once you have the terminal back. And when a job
+  *stops*, save its modes in `job.modes` first: a stopped `vim` wants
+  raw mode back when it carries on.
 
 The tests run your code on a **pseudo-terminal**, a terminal made in
 software, the same kind your terminal emulator gives you. They type
