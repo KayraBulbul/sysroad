@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <system_error>
 
 #include "shell.hpp"
@@ -58,8 +59,9 @@ void run_line(Shell& sh, const std::string& line) {
 }
 
 int run_in_shell(Shell& sh, const Command& c) {
-    SavedFds saved(c.redirects);
+    std::optional<SavedFds> saved;
     try {
+        saved.emplace(c.redirects);
         apply_redirects(c.redirects);
     } catch (const std::system_error& e) {
         std::cerr << "conch: " << e.what() << '\n';

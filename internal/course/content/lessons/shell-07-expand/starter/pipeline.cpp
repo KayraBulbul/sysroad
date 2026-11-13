@@ -1,9 +1,13 @@
 // The course's version of this file. You won't need to change it.
 #include <fcntl.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <csignal>
 #include <cstdio>
+#include <iostream>
+#include <system_error>
 
 #include "shell.hpp"
 
@@ -42,8 +46,11 @@ static Pipeline expanded(const Pipeline& written, const Shell& sh) {
             }
         }
         c.argv = argv;
+        // Each assignment sees the ones before it: A=1 B=$A cmd gives B 1.
+        Shell scope = sh;
         for (auto& [name, value] : c.assignments) {
-            value = expand_word(value, sh).value_or("");
+            value = expand_word(value, scope).value_or("");
+            scope.vars[name] = value;
         }
         for (Redirect& r : c.redirects) {
             r.path = expand_word(r.path, sh).value_or("");
@@ -57,11 +64,37 @@ int run_pipeline(Shell& sh, const Pipeline& written) {
     if (runs_in_shell(p)) {
         return run_in_shell(sh, p.commands[0]);
     }
-    Job job = launch_job(sh, p);
+    Job job;
+    try {
+        job = launch_job(sh, p);
+    } catch (const std::system_error& e) {
+        std::cerr << "conch: " << e.what() << '\n';
+        return 1;
+    }
     if (p.background) {
         return start_background(sh, std::move(job));
     }
     return run_foreground(sh, std::move(job));
+}
+
+// Gives up on a pipeline that couldn't be started: ends the commands
+// already running (they'd wait forever on a half-built pipeline), takes
+// the terminal back and throws, naming the call that failed.
+[[noreturn]] static void abandon(Shell& sh, const Job& job, int prev_read, const char* what) {
+    int err = errno;
+    if (prev_read != -1) {
+        close(prev_read);
+    }
+    for (pid_t pid : job.pids) {
+        kill(pid, SIGKILL);
+    }
+    for (pid_t pid : job.pids) {
+        waitpid(pid, nullptr, 0);
+    }
+    if (sh.interactive) {
+        tcsetpgrp(sh.tty, getpgrp());
+    }
+    throw std::system_error(err, std::generic_category(), what);
 }
 
 Job launch_job(Shell& sh, const Pipeline& p) {
@@ -72,7 +105,7 @@ Job launch_job(Shell& sh, const Pipeline& p) {
     for (size_t i = 0; i < p.commands.size(); ++i) {
         int fds[2] = {-1, -1};
         if (i + 1 < p.commands.size() && pipe(fds) == -1) {
-            break;
+            abandon(sh, job, prev_read, "pipe");
         }
         std::fflush(nullptr);
         pid_t pid = fork();
@@ -112,7 +145,7 @@ Job launch_job(Shell& sh, const Pipeline& p) {
         }
         prev_read = fds[0];
         if (pid == -1) {
-            break;
+            abandon(sh, job, prev_read, "fork");
         }
         if (control) {
             if (job.pgid == 0) {

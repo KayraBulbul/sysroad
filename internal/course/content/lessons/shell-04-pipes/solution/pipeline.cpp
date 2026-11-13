@@ -1,7 +1,11 @@
+#include <sys/wait.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <csignal>
 #include <cstdio>
+#include <cstring>
+#include <iostream>
 
 #include "shell.hpp"
 
@@ -29,6 +33,24 @@ static bool runs_in_shell(const Pipeline& p) {
     return c.argv.empty() || find_builtin(c.argv[0]) != nullptr;
 }
 
+// Gives up on a pipeline that couldn't be started: ends the commands
+// already running (they'd wait forever on a half-built pipeline), says
+// why, and returns the status for it.
+static int abandon(const std::vector<pid_t>& pids, int prev_read, const char* what) {
+    int err = errno;
+    if (prev_read != -1) {
+        close(prev_read);
+    }
+    for (pid_t pid : pids) {
+        kill(pid, SIGKILL);
+    }
+    for (pid_t pid : pids) {
+        waitpid(pid, nullptr, 0);
+    }
+    std::cerr << "conch: " << what << ": " << std::strerror(err) << '\n';
+    return 1;
+}
+
 int run_pipeline(Shell& sh, const Pipeline& p) {
     if (runs_in_shell(p)) {
         return run_in_shell(sh, p.commands[0]);
@@ -38,7 +60,7 @@ int run_pipeline(Shell& sh, const Pipeline& p) {
     for (size_t i = 0; i < p.commands.size(); ++i) {
         int fds[2] = {-1, -1};
         if (i + 1 < p.commands.size() && pipe(fds) == -1) {
-            break;
+            return abandon(pids, prev_read, "pipe");
         }
         std::fflush(nullptr);
         pid_t pid = fork();
@@ -63,7 +85,7 @@ int run_pipeline(Shell& sh, const Pipeline& p) {
         }
         prev_read = fds[0];
         if (pid == -1) {
-            break;
+            return abandon(pids, prev_read, "fork");
         }
         pids.push_back(pid);
     }

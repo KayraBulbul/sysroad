@@ -77,7 +77,8 @@ int run_command(Shell& sh, const Command& c);
 void apply_redirects(const std::vector<Redirect>& redirects);
 
 // Saves every fd the redirections would change, and puts them back when
-// destroyed, so a builtin can be redirected inside the shell.
+// destroyed, so a builtin can be redirected inside the shell. Throws
+// std::system_error if an open fd can't be copied (no fds left).
 class SavedFds {
   public:
     explicit SavedFds(const std::vector<Redirect>& redirects);

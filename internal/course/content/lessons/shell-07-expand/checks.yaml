@@ -65,3 +65,7 @@
   stdin: "HOME=/ cd\npwd\nA=tmp type cd > /dev/null\necho [$A]\n"
   stdout: "/\n[]\n"
   hidden: true
+- name: each assignment sees the ones before it
+  stdin: "A=1 B=$A printenv B\necho [$A]\n"
+  stdout: "1\n[]\n"
+  hidden: true

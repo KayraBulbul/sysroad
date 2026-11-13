@@ -51,9 +51,22 @@ SavedFds::SavedFds(const std::vector<Redirect>& redirects) {
         if (seen) {
             continue;
         }
-        // A copy at 10 or above, out of the way, closed if we exec.
+        // A copy at 10 or above, out of the way, closed if we exec. With an
+        // fd limit of 10 or less that fails with EINVAL: take any free fd.
         int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 10);
-        saved_.emplace_back(r.fd, copy);
+        if (copy == -1 && errno != EBADF) {
+            copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 0);
+        }
+        if (copy == -1 && errno != EBADF) {
+            int err = errno;  // open, but no room to save it: don't touch anything
+            for (const auto& [fd, saved] : saved_) {
+                if (saved != -1) {
+                    close(saved);
+                }
+            }
+            throw std::system_error(err, std::generic_category(), std::to_string(r.fd));
+        }
+        saved_.emplace_back(r.fd, copy);  // -1 (EBADF): it wasn't open
     }
 }
 

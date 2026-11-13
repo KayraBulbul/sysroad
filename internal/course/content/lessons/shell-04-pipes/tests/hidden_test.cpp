@@ -1,9 +1,13 @@
 #include "doctest.h"
 
 #include <fcntl.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <chrono>
+#include <fstream>
+#include <iterator>
+#include <string>
 
 #include "shell.hpp"
 
@@ -61,4 +65,29 @@ TEST_CASE("no pipe ends leak") {
         run_list(sh, parse(tokenize("true | true | true")));
     }
     CHECK(lowest_free_fd() == before);
+}
+
+TEST_CASE("a pipeline that can't be started fails, and says why") {
+    pid_t pid = fork();
+    if (pid == 0) {
+        int out = open("pf-out.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        int err = open("pf-err.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        dup2(out, 1);
+        dup2(err, 2);
+        close(out);
+        close(err);
+        rlimit r{};
+        getrlimit(RLIMIT_NOFILE, &r);
+        r.rlim_cur = lowest_free_fd() + 2;  // room for one pipe, not two
+        setrlimit(RLIMIT_NOFILE, &r);
+        Shell sh;
+        run_line(sh, "true | true | true && echo not-here");
+        _exit(sh.last_status);
+    }
+    CHECK(shell_status(wait_for(pid)) == 1);
+    std::ifstream o("pf-out.txt"), e("pf-err.txt");
+    std::string out((std::istreambuf_iterator<char>(o)), std::istreambuf_iterator<char>());
+    std::string err((std::istreambuf_iterator<char>(e)), std::istreambuf_iterator<char>());
+    CHECK(out.empty());
+    CHECK_MESSAGE(err.find("pipe") != std::string::npos, err);
 }

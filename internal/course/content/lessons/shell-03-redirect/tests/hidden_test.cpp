@@ -1,6 +1,8 @@
 #include "doctest.h"
 
 #include <fcntl.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <fstream>
@@ -98,4 +100,24 @@ TEST_CASE("SavedFds: its copies aren't inherited by commands") {
             CHECK_MESSAGE((flags & FD_CLOEXEC) != 0, "a saved copy isn't close-on-exec");
         }
     }
+}
+
+TEST_CASE("SavedFds still saves stdout when fd 10 is past the limit") {
+    pid_t pid = fork();
+    if (pid == 0) {
+        int out = open("lim-orig.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        dup2(out, 1);
+        close(out);
+        rlimit r{};
+        getrlimit(RLIMIT_NOFILE, &r);
+        r.rlim_cur = 10;  // F_DUPFD with a minimum of 10 now fails
+        setrlimit(RLIMIT_NOFILE, &r);
+        Shell sh;
+        run_line(sh, "type cd > lim.txt");
+        write(1, "back\n", 5);
+        _exit(sh.last_status);
+    }
+    CHECK(shell_status(wait_for(pid)) == 0);
+    CHECK(slurp("lim.txt") == "cd is a shell builtin\n");
+    CHECK_MESSAGE(slurp("lim-orig.txt") == "back\n", "stdout wasn't put back");
 }

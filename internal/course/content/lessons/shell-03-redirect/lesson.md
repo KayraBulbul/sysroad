@@ -42,12 +42,15 @@ afterwards or every later command writes to `t.txt`. That's
 touch somewhere out of the way, and its destructor puts them back.
 Copy with `fcntl(fd, F_DUPFD_CLOEXEC, 10)`: the copy lands at fd 10 or
 above, away from fds a user might name, and it's close-on-exec, so no
-command the shell runs later inherits it. If an fd wasn't open at all,
-remember that, and close it again at the end.
+command the shell runs later inherits it. If an fd wasn't open at all
+(`fcntl` fails with `EBADF`), remember that, and close it again at the
+end. Any other failure is different: with an fd limit of 10 or less,
+there's no fd 10 to be had, so try again with a minimum of 0, and if
+there's still no room, throw, before anything has been changed.
 
 ## Assignment
 
 - [ ] `parse_command` collects words and redirections, with the right default fds, and throws `SyntaxError` for a missing or wrong target
 - [ ] `apply_redirects` applies them in order, throwing `std::system_error` named after the file or fd
-- [ ] `SavedFds` saves each affected fd once, as a close-on-exec copy at 10 or above, and restores (or closes) them in its destructor
+- [ ] `SavedFds` saves each affected fd once, as a close-on-exec copy at 10 or above (or anywhere, if the limit is lower), throws if it can't, and restores (or closes) them in its destructor
 - [ ] Run conch and try `ls > files.txt`, `cat < files.txt`, and `cat nothing 2>&1 > /dev/null`

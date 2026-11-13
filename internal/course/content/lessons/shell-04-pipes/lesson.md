@@ -38,7 +38,10 @@ single builtin (or a command with no words) runs in the shell, so
 `cd` still works. Anything else runs in children, connected by pipes:
 fork every command, giving each its pipe ends in the child, close
 every end in the parent, then wait for them all. The pipeline's status
-is the last command's. In the child, `exec_command` does the rest: it
+is the last command's. If a `pipe` or `fork` fails halfway (out of fds,
+say), don't run half a pipeline: kill and reap the commands already
+started, print `conch: pipe: <strerror>` and return 1. In the child,
+`exec_command` does the rest: it
 applies the command's redirections (after the pipes, so `cmd | cat >
 out` works) and runs it. That includes builtins, which in a pipeline
 run in their child: `exit 4 | cat` ends only that child, as in bash.
@@ -48,4 +51,4 @@ run in their child: `exit 4 | cat` ends only that child, as in bash.
 - [ ] `parse` splits commands at `|` and pipelines at `;`, `&&` and `||`, and throws `SyntaxError` for an empty command between operators
 - [ ] `run_list` runs each pipeline only when the operator before it allows, and stops when `exit` has run
 - [ ] `run_pipeline` runs a lone builtin in the shell, and anything else as concurrent children joined by pipes, returning the last one's status
-- [ ] No pipe end leaks, and `yes | head` finishes
+- [ ] No pipe end leaks, `yes | head` finishes, and a pipeline that can't be started returns 1 with a message
