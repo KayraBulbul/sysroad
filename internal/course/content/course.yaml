@@ -417,6 +417,7 @@ phases:
             kind: quiz
       - id: shell
         title: "Capstone: your shell"
+        project: "conch: builtins, redirection, pipelines, background jobs, job control, quoting, line editing"
         lessons:
           - id: shell-01-repl
             title: "Read, parse, run"

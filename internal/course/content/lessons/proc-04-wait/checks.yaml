@@ -1,0 +1,17 @@
+- name: gives up after the last attempt
+  args: ["-n", "2", "sh", "-c", "echo try; exit 1"]
+  stdout: "try\nretry: attempt 1 of 2: exited 1\ntry\nretry: attempt 2 of 2: exited 1\n"
+  exit: 1
+- name: stops when it succeeds
+  args: ["-n", "5", "sh", "-c", "test -e flag || { touch flag; exit 4; }"]
+  stdout: "retry: attempt 1 of 5: exited 4\nretry: attempt 2 of 5: exited 0\n"
+- name: a command killed by a signal
+  args: ["-n", "2", "sh", "-c", "kill -TERM $$"]
+  stdout: "retry: attempt 1 of 2: killed by SIGTERM\nretry: attempt 2 of 2: killed by SIGTERM\n"
+  exit: 143
+  hidden: true
+- name: a command that doesn't exist
+  args: ["-n", "1", "no-such-command"]
+  stdout: "retry: attempt 1 of 1: exited 127\n"
+  exit: 127
+  hidden: true

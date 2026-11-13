@@ -1,0 +1,31 @@
+- name: three commands
+  args: ["printf", "b\\na\\nc\\n", "|", "sort", "|", "head", "-n", "2"]
+  stdout: "a\nb\n"
+- name: yes stops when head does
+  args: ["yes", "|", "head", "-n", "3"]
+  stdout: "y\ny\ny\n"
+- name: one command, reading stdin
+  args: ["tr", "a-z", "A-Z"]
+  stdin: "abc\n"
+  stdout: "ABC\n"
+- name: the last command's status is the pipeline's
+  args: ["echo", "hi", "|", "sh", "-c", "exit 3"]
+  stdout: ""
+  exit: 3
+- name: an earlier failure doesn't count
+  args: ["sh", "-c", "exit 3", "|", "cat"]
+  stdout: ""
+  hidden: true
+- name: four commands
+  args: ["sh", "-c", "i=0; while [ $i -lt 1000 ]; do echo $i; i=$((i+1)); done", "|", "grep", "7", "|", "wc", "-l", "|", "tr", "-d", " "]
+  stdout: "271\n"
+  hidden: true
+- name: a command that isn't found
+  args: ["nosuchcommand", "|", "cat"]
+  stdout: ""
+  hidden: true
+- name: an empty command
+  args: ["|", "cat"]
+  stdout: ""
+  exit: 2
+  hidden: true

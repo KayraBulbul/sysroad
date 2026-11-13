@@ -1,0 +1,58 @@
+- name: cd and pwd
+  stdin: "cd sub\nls\ncd ..\nls\n"
+  files:
+    sub/inner.txt: ""
+  stdout: "inner.txt\nsub\n"
+- name: pwd prints the current folder
+  stdin: "cd /\npwd\n"
+  stdout: "/\n"
+- name: exit with a status
+  stdin: "exit 3\necho never\n"
+  stdout: ""
+  exit: 3
+- name: export puts a variable in the environment
+  stdin: "export GREETING=hi\nprintenv GREETING\n"
+  stdout: "hi\n"
+- name: type
+  stdin: "type cd exit\n"
+  stdout: "cd is a shell builtin\nexit is a shell builtin\n"
+- name: exit with no number uses $?
+  stdin: "false\nexit\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: unset removes it again
+  stdin: "export A=1\nunset A\nprintenv A\necho after\n"
+  stdout: "after\n"
+  hidden: true
+- name: cd to a folder that isn't there
+  stdin: "cd /no/such/folder\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: cd with no argument goes home
+  stdin: "export HOME=/\ncd\npwd\n"
+  stdout: "/\n"
+  hidden: true
+- name: a builtin's status is $?
+  stdin: "type no-such-command-anywhere\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: exit with a bad number
+  stdin: "exit lots\necho never\n"
+  stdout: ""
+  exit: 2
+  hidden: true
+- name: commands see the new folder
+  stdin: "cd sub\nls\n"
+  files:
+    sub/a.txt: ""
+    sub/b.txt: ""
+  stdout: "a.txt\nb.txt\n"
+  hidden: true
+- name: type with a path
+  stdin: "type /bin/sh ./nothing-here\n"
+  stdout: "/bin/sh is /bin/sh\n"
+  exit: 1
+  hidden: true

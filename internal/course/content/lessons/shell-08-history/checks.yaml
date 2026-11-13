@@ -1,0 +1,19 @@
+- name: history lists what was typed
+  stdin: "echo a\necho b\nhistory\n"
+  stdout: "a\nb\n    1  echo a\n    2  echo b\n    3  history\n"
+- name: history N shows the last N
+  stdin: "true\nfalse\nhistory 2\n"
+  stdout: "    2  false\n    3  history 2\n"
+  hidden: true
+- name: blank lines and repeats aren't kept
+  stdin: "true\n\ntrue\n   \nhistory\n"
+  stdout: "    1  true\n    2  history\n"
+  hidden: true
+- name: everything from earlier milestones still works
+  stdin: "X=1; echo \"$X\" | tr 1 2 > out.txt && cat < out.txt\n"
+  stdout: "2\n"
+  hidden: true
+- name: history with a count that isn't one
+  stdin: "history nope\nhistory 99999999999999999999\necho alive\n"
+  stdout: "alive\n"
+  hidden: true

@@ -1,0 +1,55 @@
+- name: a pipeline
+  stdin: "printf b\\na\\nc\\n | sort | head -n 2\n"
+  stdout: "a\nb\n"
+- name: "; runs one after another"
+  stdin: "echo one; echo two ;echo three\n"
+  stdout: "one\ntwo\nthree\n"
+- name: "&& and ||"
+  stdin: "false && echo no || echo yes\ntrue || echo no; echo end\ntrue && echo both\n"
+  stdout: "yes\nend\nboth\n"
+- name: yes stops when head does
+  stdin: "yes | head -n 2\n"
+  stdout: "y\ny\n"
+- name: the last command's status is the pipeline's
+  stdin: "true | false\n"
+  stdout: ""
+  exit: 1
+- name: a builtin in a pipeline
+  stdin: "type cd | tr a-z A-Z\n"
+  stdout: "CD IS A SHELL BUILTIN\n"
+  hidden: true
+- name: exit in a pipeline doesn't end the shell
+  stdin: "exit 4 | cat; echo still here\n"
+  stdout: "still here\n"
+  hidden: true
+- name: redirections in a pipeline
+  stdin: "echo hi | cat > out.txt; cat < out.txt | tr a-z A-Z\n"
+  stdout: "HI\n"
+  hidden: true
+- name: "cd with && stays in the shell"
+  stdin: "cd sub && ls\n"
+  files:
+    sub/x.txt: ""
+  stdout: "x.txt\n"
+  hidden: true
+- name: a chain of && stops at the first failure
+  stdin: "true && false && echo no\necho after\n"
+  stdout: "after\n"
+  hidden: true
+- name: syntax errors
+  stdin: "echo a |\necho | | cat\n; echo b\necho c &&\necho d\n"
+  stdout: "d\n"
+  hidden: true
+- name: a command that isn't found in the middle
+  stdin: "echo x | no-such-command-anywhere | cat; echo after\n"
+  stdout: "after\n"
+  hidden: true
+- name: exit ends the list
+  stdin: "exit 5; echo never\n"
+  stdout: ""
+  exit: 5
+  hidden: true
+- name: a long pipeline
+  stdin: "echo through | cat | cat | cat | cat | cat | cat | cat | cat | cat | cat | cat\n"
+  stdout: "through\n"
+  hidden: true

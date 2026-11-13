@@ -1,0 +1,26 @@
+- name: stdin from a file
+  args: ["<in.txt", "tr", "a-z", "A-Z"]
+  files:
+    in.txt: "hello\n"
+  stdout: "HELLO\n"
+- name: stderr into stdout
+  args: ["2>&1", "sh", "-c", "echo err >&2"]
+  stdout: "err\n"
+- name: "2>&1 >/dev/null: stderr goes where stdout was"
+  args: ["2>&1", ">/dev/null", "sh", "-c", "echo out; echo err >&2"]
+  stdout: "err\n"
+- name: ">/dev/null 2>&1: both go nowhere"
+  args: [">/dev/null", "2>&1", "sh", "-c", "echo out; echo err >&2"]
+  stdout: ""
+  hidden: true
+- name: a numbered fd
+  args: ["3<in.txt", "sh", "-c", "cat <&3"]
+  files:
+    in.txt: "through fd 3\n"
+  stdout: "through fd 3\n"
+  hidden: true
+- name: a missing input file
+  args: ["<missing.txt", "sh", "-c", "echo should not run"]
+  stdout: ""
+  exit: 1
+  hidden: true
