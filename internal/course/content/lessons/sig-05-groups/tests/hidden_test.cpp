@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include <fcntl.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <csignal>
@@ -80,4 +81,21 @@ TEST_CASE("no pipe ends leak") {
 TEST_CASE("start_detached: a command that isn't found exits 127") {
     Redirected err(2, "det-err.txt", O_WRONLY | O_CREAT | O_TRUNC);
     CHECK(wait_for(start_detached({"surely-not-a-command"})).code == 127);
+}
+
+TEST_CASE("a job that can't be fully started ends what it started, and throws") {
+    int r = within(3, [] {
+        rlimit lim{};
+        getrlimit(RLIMIT_NOFILE, &lim);
+        lim.rlim_cur = lowest_free_fd() + 2;  // room for one pipe, not two
+        setrlimit(RLIMIT_NOFILE, &lim);
+        try {
+            wait_job(launch({{"sleep", "5"}, {"sleep", "5"}, {"cat"}}));
+        } catch (const std::system_error&) {
+            return 0;
+        }
+        return 1;
+    });
+    CHECK_MESSAGE(r != -1, "it waited for the commands it had started instead of ending them");
+    CHECK(r == 0);
 }

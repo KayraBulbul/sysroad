@@ -1,5 +1,6 @@
 #include "job.hpp"
 
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -25,6 +26,23 @@ static std::vector<char*> c_args(const Command& command) {
     _exit(127);
 }
 
+// Gives up on a job that couldn't be started: ends and reaps the
+// commands already running (they'd wait forever on a half-built
+// pipeline), then throws.
+[[noreturn]] static void abandon(const Job& job, int prev_read, const char* what) {
+    int err = errno;
+    if (prev_read != -1) {
+        close(prev_read);
+    }
+    for (pid_t pid : job.pids) {
+        kill(pid, SIGKILL);
+    }
+    for (pid_t pid : job.pids) {
+        waitpid(pid, nullptr, 0);
+    }
+    throw std::system_error(err, std::generic_category(), what);
+}
+
 Job launch(const std::vector<Command>& commands) {
     Job job;
     int prev_read = -1;
@@ -32,7 +50,7 @@ Job launch(const std::vector<Command>& commands) {
         std::vector<char*> args = c_args(commands[i]);
         int p[2] = {-1, -1};
         if (i + 1 < commands.size() && pipe(p) == -1) {
-            break;
+            abandon(job, prev_read, "pipe");
         }
         std::fflush(nullptr);
         pid_t pid = fork();
@@ -59,7 +77,7 @@ Job launch(const std::vector<Command>& commands) {
         }
         prev_read = p[0];
         if (pid == -1) {
-            break;
+            abandon(job, prev_read, "fork");
         }
         if (job.pgid == 0) {
             job.pgid = pid;

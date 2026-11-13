@@ -65,8 +65,9 @@ void run_line(Shell& sh, const std::string& line) {
 // A variable as it was before a builtin's prefix assignment.
 struct SavedVar {
     std::string name;
-    std::optional<std::string> var;  // in sh.vars
-    std::optional<std::string> env;  // in the environment
+    std::string assigned;            // what the assignment set
+    std::optional<std::string> var;  // in sh.vars, before
+    std::optional<std::string> env;  // in the environment, before
 };
 
 // exit, export and unset are POSIX "special" builtins: assignments in
@@ -83,7 +84,7 @@ int run_in_shell(Shell& sh, const Command& c) {
             set_var(sh, name, value);
             continue;
         }
-        SavedVar old{name, std::nullopt, std::nullopt};
+        SavedVar old{name, value, std::nullopt, std::nullopt};
         if (auto it = sh.vars.find(name); it != sh.vars.end()) {
             old.var = it->second;
             sh.vars.erase(it);
@@ -99,6 +100,10 @@ int run_in_shell(Shell& sh, const Command& c) {
         std::vector<SavedVar>& vars;
         ~Restore() {
             for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
+                const char* now = std::getenv(it->name.c_str());
+                if (now == nullptr || it->assigned != now) {
+                    continue;  // the builtin changed it itself (cd sets PWD): keep that
+                }
                 if (it->env) {
                     setenv(it->name.c_str(), it->env->c_str(), 1);
                 } else {

@@ -55,4 +55,5 @@ chapter. Write it as if you'll use it there, because you will.
 - [ ] `run_pipeline` starts every command before it waits for any, connected by pipes
 - [ ] Each child resets `SIGPIPE` and exits with 127 if its command isn't found, while the rest carry on
 - [ ] No pipe end is left open: not in the parent afterwards, and not in any command
+- [ ] If a `pipe` or `fork` fails, the commands already started are killed and reaped before `run_pipeline` throws `std::system_error`
 - [ ] Run `pipeline yes '|' head -n 3`, then try forgetting one `close` and run it again

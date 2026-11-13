@@ -69,3 +69,7 @@
   stdin: "A=1 B=$A printenv B\necho [$A]\n"
   stdout: "1\n[]\n"
   hidden: true
+- name: a builtin's own change to a temporary variable stays
+  stdin: "PWD=bogus cd /\necho $PWD\n"
+  stdout: "/\n"
+  hidden: true

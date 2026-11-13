@@ -86,12 +86,20 @@ std::vector<Status> run_pipeline(const std::vector<Command>& commands) {
     if (prev_read != -1) {
         close(prev_read);
     }
+    if (error != 0) {
+        // Half a pipeline can wait forever (sleep | <nothing>): end what
+        // started, reap it, then report.
+        for (pid_t pid : pids) {
+            kill(pid, SIGKILL);
+        }
+        for (pid_t pid : pids) {
+            wait_for(pid);
+        }
+        throw std::system_error(error, std::generic_category(), "run_pipeline");
+    }
     std::vector<Status> statuses;
     for (pid_t pid : pids) {
         statuses.push_back(wait_for(pid));
-    }
-    if (error != 0) {
-        throw std::system_error(error, std::generic_category(), "run_pipeline");
     }
     return statuses;
 }

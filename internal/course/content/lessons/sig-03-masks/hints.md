@@ -25,7 +25,8 @@ while (noted == 0) {
 }
 ```
 ---
-Order matters at the end. Put the mask back first (end the
-`BlockSignals` scope), then the old actions. The other way round, a
-second signal that arrives in between would find its default action
-waiting, and for `SIGUSR1` that's death.
+Order matters at the end. Put the old actions back first, while the
+signals are still blocked, then the mask (end the `BlockSignals`
+scope). The other way round, a second signal that arrives in between
+would run `note` and vanish, when the caller's own handler (or default
+action) should have had it.

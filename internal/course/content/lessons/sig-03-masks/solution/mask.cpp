@@ -60,11 +60,13 @@ int await_signal(std::initializer_list<int> sigs) {
             sigsuspend(&during);  // unblocks and sleeps in one step: no gap
         }
         got = noted;
-    }
-    // The mask is back, so the actions can go back too.
-    for (const auto& [sig, before] : old) {
-        sigaction(sig, &before, nullptr);
-    }
+        // Put the old actions back while the signals are still blocked: one
+        // that arrives from here on waits, and then meets the caller's own
+        // action, instead of being swallowed by note.
+        for (const auto& [sig, before] : old) {
+            sigaction(sig, &before, nullptr);
+        }
+    }  // and now the old mask
     return got;
 }
 

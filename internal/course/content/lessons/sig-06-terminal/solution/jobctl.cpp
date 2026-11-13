@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include <system_error>
 
 // The signals a shell ignores, and its jobs must not.
 static const int kJobSignals[] = {SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
@@ -37,6 +38,23 @@ static std::vector<char*> c_args(const Command& command) {
     return args;
 }
 
+// Gives up on a job that couldn't be started: ends and reaps the
+// commands already running (they'd wait forever on a half-built
+// pipeline), then throws.
+[[noreturn]] static void abandon(const Job& job, int prev_read, const char* what) {
+    int err = errno;
+    if (prev_read != -1) {
+        close(prev_read);
+    }
+    for (pid_t pid : job.pids) {
+        kill(pid, SIGKILL);
+    }
+    for (pid_t pid : job.pids) {
+        waitpid(pid, nullptr, 0);
+    }
+    throw std::system_error(err, std::generic_category(), what);
+}
+
 Job launch_job(const std::vector<Command>& commands, bool foreground, int tty) {
     Job job;
     int prev_read = -1;
@@ -44,7 +62,7 @@ Job launch_job(const std::vector<Command>& commands, bool foreground, int tty) {
         std::vector<char*> args = c_args(commands[i]);
         int p[2] = {-1, -1};
         if (i + 1 < commands.size() && pipe(p) == -1) {
-            break;
+            abandon(job, prev_read, "pipe");
         }
         std::fflush(nullptr);
         pid_t pid = fork();
@@ -79,7 +97,7 @@ Job launch_job(const std::vector<Command>& commands, bool foreground, int tty) {
         }
         prev_read = p[0];
         if (pid == -1) {
-            break;
+            abandon(job, prev_read, "fork");
         }
         if (job.pgid == 0) {
             job.pgid = pid;

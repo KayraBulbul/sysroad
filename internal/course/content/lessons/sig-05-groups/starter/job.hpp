@@ -19,7 +19,8 @@ struct Job {
 // Starts commands as a pipeline, like last chapter's run_pipeline, but
 // in a new process group led by the first command, and without waiting.
 // Every process is in the group before its command runs, and by the time
-// launch returns.
+// launch returns. If a pipe or fork fails, it ends and reaps the commands
+// it had started, then throws std::system_error.
 Job launch(const std::vector<Command>& commands);
 
 // Sends sig to every process in the job at once. Throws std::system_error

@@ -36,7 +36,8 @@ void init_job_control(int tty);
 
 // Starts commands as a pipeline in a new process group, like 6.2.5's
 // launch. A foreground job is given the terminal. Every command starts
-// with default actions for the signals init_job_control ignored.
+// with default actions for the signals init_job_control ignored. Throws
+// std::system_error as launch does if a pipe or fork fails.
 Job launch_job(const std::vector<Command>& commands, bool foreground, int tty);
 
 // Waits until every process in the job has ended, or one has stopped,

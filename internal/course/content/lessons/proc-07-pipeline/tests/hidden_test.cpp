@@ -1,12 +1,14 @@
 #include "doctest.h"
 
 #include <fcntl.h>
+#include <sys/resource.h>
 
 #include <chrono>
 #include <csignal>
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <system_error>
 
 #include "helpers.hpp"
 #include "pipeline.hpp"
@@ -110,4 +112,21 @@ TEST_CASE("no pipe ends leak, here or into the commands") {
         CHECK_MESSAGE(inherited.count(fd) == 1, msg.c_str());
     }
     CHECK(lowest_free_fd() == before);
+}
+
+TEST_CASE("a pipeline that can't be fully started ends what it started, and throws") {
+    int r = within(3, [] {
+        rlimit lim{};
+        getrlimit(RLIMIT_NOFILE, &lim);
+        lim.rlim_cur = lowest_free_fd() + 2;  // room for one pipe, not two
+        setrlimit(RLIMIT_NOFILE, &lim);
+        try {
+            run_pipeline({{"sleep", "5"}, {"sleep", "5"}, {"cat"}});
+        } catch (const std::system_error&) {
+            return 0;
+        }
+        return 1;
+    });
+    CHECK_MESSAGE(r != -1, "it waited for the commands it had started instead of ending them");
+    CHECK(r == 0);
 }
