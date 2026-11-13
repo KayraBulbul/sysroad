@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <system_error>
 
@@ -43,6 +44,10 @@ void apply_redirects(const std::vector<Redirect>& redirects) {
 }
 
 SavedFds::SavedFds(const std::vector<Redirect>& redirects) {
+    int above = 0;
+    for (const Redirect& r : redirects) {
+        above = std::max({above, r.fd + 1, r.from + 1});
+    }
     for (const Redirect& r : redirects) {
         bool seen = false;
         for (const auto& [fd, copy] : saved_) {
@@ -52,10 +57,12 @@ SavedFds::SavedFds(const std::vector<Redirect>& redirects) {
             continue;
         }
         // A copy at 10 or above, out of the way, closed if we exec. With an
-        // fd limit of 10 or less that fails with EINVAL: take any free fd.
+        // fd limit of 10 or less that fails with EINVAL: then take a free fd
+        // above every fd the redirections name, so a copy can't pose as
+        // one of them (1>&3 with 3 closed must still fail).
         int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 10);
         if (copy == -1 && errno != EBADF) {
-            copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 0);
+            copy = fcntl(r.fd, F_DUPFD_CLOEXEC, above);
         }
         if (copy == -1 && errno != EBADF) {
             int err = errno;  // open, but no room to save it: don't touch anything

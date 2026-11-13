@@ -30,8 +30,8 @@ if not.
 SavedFds::SavedFds(const std::vector<Redirect>& redirects) {
     for (const Redirect& r : redirects) {
         // skip it if r.fd is already in saved_        int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 10);   // -1, EBADF if r.fd isn't open
-        if (copy == -1 && errno != EBADF) {
-            copy = fcntl(r.fd, F_DUPFD_CLOEXEC, 0);    // the limit is below 10
+        if (copy == -1 && errno != EBADF) {            copy = fcntl(r.fd, F_DUPFD_CLOEXEC, above);  // the limit is below 10:
+                                                        // above every fd named
         }
         // still -1 and not EBADF: close the copies so far and throw
         saved_.emplace_back(r.fd, copy);

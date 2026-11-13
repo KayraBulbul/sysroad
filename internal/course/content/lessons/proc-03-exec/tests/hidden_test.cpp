@@ -112,6 +112,14 @@ TEST_CASE("exec_with: returns with ENOENT when there's nothing to run") {
     CHECK(errno == ENOENT);
 }
 
+TEST_CASE("exec_with: found but not executable is EACCES, not ENOENT") {
+    ::mkdir("noexec", 0755);
+    write_file("noexec/tool", "echo hi\n", 0644);
+    errno = 0;
+    exec_with({"tool"}, {"PATH=noexec"});
+    CHECK(errno == EACCES);
+}
+
 TEST_CASE("exec_with: with no PATH, looks in /usr/bin and /bin") {
     int code = in_child([] { exec_with({"sh", "-c", "exit 5"}, {}); });
     CHECK(code == 5);

@@ -103,6 +103,25 @@ std::string find_in_path(const std::string& name, const std::string& path) {
     }
 }
 
+// Whether some folder on path has a regular file called name that we
+// may not run.
+static bool found_unrunnable(const std::string& name, const std::string& path) {
+    size_t start = 0;
+    for (;;) {
+        size_t colon = path.find(':', start);
+        std::string dir = path.substr(start, colon - start);
+        struct stat st;
+        std::string candidate = (dir.empty() ? "." : dir) + "/" + name;
+        if (::stat(candidate.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+            return true;  // regular, and find_in_path passed it over
+        }
+        if (colon == std::string::npos) {
+            return false;
+        }
+        start = colon + 1;
+    }
+}
+
 static std::vector<char*> c_strings(const std::vector<std::string>& v) {
     std::vector<char*> out;
     for (const auto& s : v) {
@@ -125,7 +144,9 @@ void exec_with(const std::vector<std::string>& argv, const std::vector<std::stri
     }
     std::string program = find_in_path(argv[0], path);
     if (program.empty()) {
-        errno = ENOENT;
+        // Found, but not executable, is a different failure (126, not 127),
+        // as execvp reports it.
+        errno = found_unrunnable(argv[0], path) ? EACCES : ENOENT;
         return;
     }
     std::vector<char*> args = c_strings(argv);

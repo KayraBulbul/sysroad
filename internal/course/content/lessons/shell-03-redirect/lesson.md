@@ -45,8 +45,9 @@ above, away from fds a user might name, and it's close-on-exec, so no
 command the shell runs later inherits it. If an fd wasn't open at all
 (`fcntl` fails with `EBADF`), remember that, and close it again at the
 end. Any other failure is different: with an fd limit of 10 or less,
-there's no fd 10 to be had, so try again with a minimum of 0, and if
-there's still no room, throw, before anything has been changed.
+there's no fd 10 to be had, so try again with a minimum just above every
+fd the redirections name (so a copy can't stand in for one of them),
+and if there's still no room, throw, before anything has been changed.
 
 ## Assignment
 

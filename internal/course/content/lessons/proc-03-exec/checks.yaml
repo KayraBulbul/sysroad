@@ -36,3 +36,10 @@
   stdout: ""
   exit: 126
   hidden: true
+- name: a match on PATH that isn't executable
+  args: ["-i", "PATH=bin", "tool"]
+  files:
+    bin/tool: "echo hi\n"
+  stdout: ""
+  exit: 126
+  hidden: true

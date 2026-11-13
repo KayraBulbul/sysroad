@@ -68,4 +68,4 @@ run, 126: the same codes your shell uses.
 - [ ] `parse_env_args` reads the options (`-i` or `-`, `-u NAME`, `--`), then the `NAME=VALUE`s, then the command
 - [ ] `build_environment` applies `-i`, then the `-u`s, then each `NAME=VALUE`, replacing in place or adding at the end
 - [ ] `find_in_path` returns the first executable regular file on the `PATH`, treating an empty entry as `.`
-- [ ] `exec_with` finds the program through the new environment's `PATH` (`/usr/bin:/bin` if it has none) and `execve`s it
+- [ ] `exec_with` finds the program through the new environment's `PATH` (`/usr/bin:/bin` if it has none) and `execve`s it; with no executable match it fails with `EACCES` if `PATH` had a regular file of that name, else `ENOENT`

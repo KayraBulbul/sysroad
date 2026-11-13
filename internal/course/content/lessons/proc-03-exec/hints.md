@@ -23,4 +23,6 @@ args.push_back(nullptr);
 
 `execve` takes `char* const[]` for historical reasons and never writes
 to the strings, so the `const_cast` is safe. If `find_in_path` comes
-back empty, set `errno = ENOENT` and return.
+back empty, set `errno` and return: `EACCES` if some folder on the
+`PATH` has a regular file of that name (one you passed over because it
+isn't executable), else `ENOENT`. That's what turns into 126 or 127.

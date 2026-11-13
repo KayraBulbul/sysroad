@@ -121,3 +121,26 @@ TEST_CASE("SavedFds still saves stdout when fd 10 is past the limit") {
     CHECK(slurp("lim.txt") == "cd is a shell builtin\n");
     CHECK_MESSAGE(slurp("lim-orig.txt") == "back\n", "stdout wasn't put back");
 }
+
+TEST_CASE("with fd 10 out of reach, a saved copy can't stand in for a closed fd") {
+    pid_t pid = fork();
+    if (pid == 0) {
+        int out = open("lim2-orig.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        dup2(out, 1);
+        close(out);
+        for (int fd = 3; fd < 10; ++fd) {
+            close(fd);  // so the lowest free fd is 3
+        }
+        rlimit r{};
+        getrlimit(RLIMIT_NOFILE, &r);
+        r.rlim_cur = 10;
+        setrlimit(RLIMIT_NOFILE, &r);
+        Shell sh;
+        run_line(sh, "pwd 1>&3 > lim2.txt");  // 3 is closed: this must fail
+        write(1, "back\n", 5);
+        _exit(sh.last_status);
+    }
+    CHECK(shell_status(wait_for(pid)) == 1);
+    CHECK(access("lim2.txt", F_OK) == -1);
+    CHECK(slurp("lim2-orig.txt") == "back\n");
+}
