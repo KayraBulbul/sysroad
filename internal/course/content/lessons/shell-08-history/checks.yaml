@@ -13,3 +13,7 @@
   stdin: "X=1; echo \"$X\" | tr 1 2 > out.txt && cat < out.txt\n"
   stdout: "2\n"
   hidden: true
+- name: history with a count that isn't one
+  stdin: "history nope\nhistory 99999999999999999999\necho alive\n"
+  stdout: "alive\n"
+  hidden: true

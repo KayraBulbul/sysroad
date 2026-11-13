@@ -19,7 +19,7 @@ static volatile sig_atomic_t reaped_count = 0;
 
 static void on_sigchld(int) {
     // TODO: save errno; waitpid(-1, ..., WNOHANG) until it returns 0 or
-    // -1, storing each one; restore errno.
+    // -1, or the arrays are full, storing each one; restore errno.
 }
 
 Reaper::Reaper() {
@@ -33,7 +33,8 @@ Reaper::~Reaper() {
 }
 
 void Reaper::collect() {
-    // TODO: move reaped_* into done_, erase them from running_, reset the count.
+    // TODO: move reaped_* into done_, erase them from running_, reset the
+    // count. If the arrays were full, reap the rest yourself.
     (void)reaped_pid;
     (void)reaped_status;
     (void)reaped_count;

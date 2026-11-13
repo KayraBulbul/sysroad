@@ -1,4 +1,5 @@
 // You won't need to change this file.
+#include <poll.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -68,6 +69,26 @@ int read_key(int fd, std::string& pending) {
         }
     }
     KeyPress k = decode_key(pending);
+    // An arrow key is several bytes (ESC [ D), and they can arrive in
+    // separate reads. If what's here so far decodes as a lone Escape, give
+    // the rest 50 ms to turn up before believing it.
+    while (k.key == kEsc && k.used == 1 && pending.size() < 8) {
+        pollfd p{fd, POLLIN, 0};
+        if (poll(&p, 1, 50) <= 0) {
+            break;
+        }
+        ssize_t n = read(fd, buf, sizeof buf);
+        if (n <= 0) {
+            break;
+        }
+        pending.append(buf, static_cast<size_t>(n));
+        KeyPress again = decode_key(pending);
+        if (again.key == kEsc && again.used == 1 && pending.size() > 1 && pending[1] != '[' &&
+            pending[1] != 'O') {
+            break;  // Escape followed by an ordinary key
+        }
+        k = again;
+    }
     if (k.used == 0) {
         k.used = 1;
     }

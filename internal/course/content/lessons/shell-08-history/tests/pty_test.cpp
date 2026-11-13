@@ -38,3 +38,20 @@ TEST_CASE("on a terminal: edit a line, recall it with Up, and keep the history")
     std::string all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     CHECK(all == "echo from last time\necho world\necho from last time\nexit\n");
 }
+
+TEST_CASE("an arrow key that arrives in two pieces is still an arrow key") {
+    std::string home = here() + "/home2";
+    mkdir(home.c_str(), 0755);
+    setenv("HOME", home.c_str(), 1);
+    Conch c;
+    REQUIRE(c.prompt());
+    c.send("echo ab");
+    c.send("\x1b");
+    usleep(10'000);
+    c.send("[D");  // the rest of Left
+    c.send("X\r");
+    CHECK_MESSAGE(c.expect("aXb"), c.output());
+    REQUIRE(c.prompt());
+    c.send("exit\r");
+    CHECK(c.wait() == 0);
+}

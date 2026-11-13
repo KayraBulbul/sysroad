@@ -27,7 +27,13 @@ void add_history(Shell& sh, const std::string& line) {
 int builtin_history(Shell& sh, const std::vector<std::string>& argv) {
     size_t from = 0;
     if (argv.size() > 1) {
-        size_t n = std::stoul(argv[1]);
+        const std::string& count = argv[1];
+        if (count.empty() || count.size() > 9 ||
+            count.find_first_not_of("0123456789") != std::string::npos) {
+            std::cerr << "conch: history: " << count << ": numeric argument required\n";
+            return 1;
+        }
+        size_t n = std::stoul(count);
         from = n < sh.history.size() ? sh.history.size() - n : 0;
     }
     for (size_t i = from; i < sh.history.size(); ++i) {

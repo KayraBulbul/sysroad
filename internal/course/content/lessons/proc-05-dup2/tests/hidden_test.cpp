@@ -1,5 +1,7 @@
 #include "doctest.h"
 
+#include <sys/resource.h>
+
 #include <cstring>
 #include <set>
 #include <sstream>
@@ -91,6 +93,18 @@ TEST_CASE("a failed redirection: exit 1, and the command doesn't run") {
     s = run_redirected({"sh", "-c", "touch ran.txt"}, parse_all({">no/such/dir/out.txt"}));
     CHECK(s.code == 1);
     s = run_redirected({"sh", "-c", "touch ran.txt"}, parse_all({"<&9"}));
+    CHECK(s.code == 1);
+    CHECK_FALSE(exists("ran.txt"));
+}
+
+TEST_CASE("an fd above the limit is an error, not ignored") {
+    rlimit old{};
+    getrlimit(RLIMIT_NOFILE, &old);
+    rlimit low = old;
+    low.rlim_cur = 64;
+    setrlimit(RLIMIT_NOFILE, &low);
+    Status s = run_redirected({"sh", "-c", "touch ran.txt"}, parse_all({"100>limit.txt"}));
+    setrlimit(RLIMIT_NOFILE, &old);
     CHECK(s.code == 1);
     CHECK_FALSE(exists("ran.txt"));
 }

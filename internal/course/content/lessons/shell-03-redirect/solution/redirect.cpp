@@ -11,8 +11,8 @@ static void apply(const Redirect& r) {
         if (fcntl(r.from, F_GETFD) == -1) {
             throw std::system_error(EBADF, std::generic_category(), std::to_string(r.from));
         }
-        if (r.from != r.fd) {
-            dup2(r.from, r.fd);
+        if (r.from != r.fd && dup2(r.from, r.fd) == -1) {
+            throw std::system_error(errno, std::generic_category(), std::to_string(r.fd));
         }
         return;
     }
@@ -27,8 +27,11 @@ static void apply(const Redirect& r) {
         throw std::system_error(errno, std::generic_category(), r.path);
     }
     if (fd != r.fd) {
-        dup2(fd, r.fd);
+        int err = dup2(fd, r.fd) == -1 ? errno : 0;  // e.g. an fd above the limit
         close(fd);
+        if (err != 0) {
+            throw std::system_error(err, std::generic_category(), std::to_string(r.fd));
+        }
     }
 }
 

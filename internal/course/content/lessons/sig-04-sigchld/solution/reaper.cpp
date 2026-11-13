@@ -19,18 +19,17 @@ static volatile sig_atomic_t reaped_count = 0;
 
 static void on_sigchld(int) {
     int saved = errno;
-    // One SIGCHLD can stand for many children: signals don't queue.
-    for (;;) {
+    // One SIGCHLD can stand for many children: signals don't queue. Stop
+    // when the arrays are full, leaving the rest unreaped for collect().
+    while (reaped_count < kMax) {
         int status = 0;
         pid_t pid = waitpid(-1, &status, WNOHANG);
         if (pid <= 0) {
             break;
         }
-        if (reaped_count < kMax) {
-            reaped_pid[reaped_count] = pid;
-            reaped_status[reaped_count] = status;
-            reaped_count = reaped_count + 1;
-        }
+        reaped_pid[reaped_count] = pid;
+        reaped_status[reaped_count] = status;
+        reaped_count = reaped_count + 1;
     }
     errno = saved;
 }
@@ -55,11 +54,21 @@ Reaper::~Reaper() {
 }
 
 void Reaper::collect() {
-    for (int i = 0; i < reaped_count; ++i) {
-        running_.erase(reaped_pid[i]);
-        done_.emplace_back(reaped_pid[i], decode(reaped_status[i]));
+    // If the handler's arrays filled up, some children are still waiting
+    // to be reaped: reap them here (SIGCHLD is blocked, so the handler
+    // can't run meanwhile), until a pass finds the arrays not full.
+    bool full = true;
+    while (full) {
+        full = reaped_count == kMax;
+        for (int i = 0; i < reaped_count; ++i) {
+            running_.erase(reaped_pid[i]);
+            done_.emplace_back(reaped_pid[i], decode(reaped_status[i]));
+        }
+        reaped_count = 0;
+        if (full) {
+            on_sigchld(SIGCHLD);
+        }
     }
-    reaped_count = 0;
 }
 
 pid_t Reaper::start(const std::vector<std::string>& argv) {

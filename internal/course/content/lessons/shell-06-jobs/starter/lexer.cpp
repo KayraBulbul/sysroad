@@ -20,8 +20,11 @@ static bool read_operator(const std::string& line, size_t& i, std::vector<Token>
     Token t;
     t.kind = Token::Op;
     if (j < n && (line[j] == '<' || line[j] == '>')) {
+        if (j - i > 9) {
+            throw SyntaxError("fd number too big: " + line.substr(i, j - i));
+        }
         if (j > i) {
-            t.fd = std::stoi(line.substr(i, j - i));
+            t.fd = std::stoi(line.substr(i, j - i));  // at most 9 digits: fits an int
         }
         bool two = j + 1 < n && (line[j + 1] == '&' || (line[j] == '>' && line[j + 1] == '>'));
         t.text = line.substr(j, two ? 2 : 1);

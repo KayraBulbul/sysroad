@@ -52,7 +52,7 @@ To wait for everything to finish, it's `sigsuspend` again: with
 
 ## Assignment
 
-- [ ] The handler reaps every finished child with `WNOHANG` in a loop, storing them in the static arrays, and keeps `errno`
+- [ ] The handler reaps finished children with `WNOHANG` in a loop, storing them in the static arrays, and keeps `errno`; if the arrays fill up it stops reaping, and `collect` reaps the rest after emptying them
 - [ ] `start` blocks `SIGCHLD` around the fork and recording the PID; the child restores the old mask before `exec`
 - [ ] `collect` moves the handler's entries into `done_` and out of `running_`, and `finished` and `running` call it with `SIGCHLD` blocked
 - [ ] `wait_all` sleeps in `sigsuspend` until nothing is running, and leaves the mask as it found it

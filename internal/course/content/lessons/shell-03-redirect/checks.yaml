@@ -47,3 +47,12 @@
   stdin: "echo x >& out\necho still here\n"
   stdout: "still here\n"
   hidden: true
+- name: an fd number the system can't have
+  stdin: "echo x 999999999>out.txt\ntype cd 999999999>out.txt\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: an fd number too big to be one
+  stdin: "echo x 99999999999>out.txt\necho after\n"
+  stdout: "after\n"
+  hidden: true
