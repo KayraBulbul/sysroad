@@ -32,18 +32,21 @@ Your part, in `jobs.cpp`:
 - **`run_foreground`** gives the job the terminal (when interactive),
   waits for its processes with `WUNTRACED`, then takes the terminal
   back with the shell's own terminal modes, as in 6.2.6. Wait for the
-  PIDs in order rather than for the group, since without job control
-  there's no group. If a process stops, the job is stopped: it goes in
+  PIDs in order rather than for the group, since without job control  there's no group. If a process stops, the job is stopped: it goes in
   the table with a number, `\n[n] Stopped  text` is printed, and `$?` is
-  128 plus the signal that stopped it.
+  128 plus the signal that stopped it. Save the terminal modes it left
+  (`tcgetattr` into `job.modes`) before putting the shell's back: a
+  stopped `vim` is in raw mode, and wants to be again when it resumes.
 - **`notify_jobs`** also passes `WUNTRACED | WCONTINUED`, so a
   background job that stops (say, `cat &` reading the terminal, which
   gets `SIGTTIN`) or is continued from elsewhere is noticed. `jobs` now
   says `Stopped` or `Running`.
 - **`fg [%n]`** (the newest job if no `%n`) takes the job out of the
-  table, prints its text, hands it the terminal, sends `SIGCONT` to its
-  group and waits as above. It may stop again, and go back in the
-  table under its old number.
+  table, prints its text, hands it the terminal and its saved modes,
+  sends `SIGCONT` to its group and waits as above. It may stop again,
+  and go back in the table under its old number. `wait %n` on a stopped
+  job returns 128 plus its stop signal at once: it can't end until it's
+  continued.
 - **`bg [%n]`** sends `SIGCONT` to the group, marks it running and
   prints `[n] text &`.
 - **`may_exit`**: `exit` with stopped jobs says `conch: there are

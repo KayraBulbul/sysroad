@@ -46,15 +46,16 @@ static int builtin_cd(Shell& sh, const std::vector<std::string>& argv) {
     }
     if (have_before) {
         setenv("OLDPWD", before, 1);
+        sh.builtin_set.push_back("OLDPWD");
     }
     char now[PATH_MAX];
     if (getcwd(now, sizeof now) != nullptr) {
         setenv("PWD", now, 1);
+        sh.builtin_set.push_back("PWD");
         if (show) {
             std::cout << now << '\n';
         }
     }
-    (void)sh;
     return 0;
 }
 

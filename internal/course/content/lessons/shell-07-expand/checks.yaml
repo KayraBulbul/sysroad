@@ -73,3 +73,7 @@
   stdin: "PWD=bogus cd /\necho $PWD\n"
   stdout: "/\n"
   hidden: true
+- name: cd's PWD stays even when it equals the temporary value
+  stdin: "export PWD=/bad\nPWD=/ cd /\necho $PWD\n"
+  stdout: "/\n"
+  hidden: true

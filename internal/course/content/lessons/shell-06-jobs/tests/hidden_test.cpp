@@ -130,3 +130,42 @@ TEST_CASE("conch started in the background waits for the foreground") {
     term.send("exit 7\n");
     CHECK(term.wait() == 7);
 }
+
+TEST_CASE("wait on a stopped job returns at once") {
+    Conch c;
+    REQUIRE(c.prompt());
+    c.line("sleep 5");
+    usleep(200'000);
+    c.send("\x1a");
+    REQUIRE(c.expect("[1] Stopped  sleep 5"));
+    REQUIRE(c.prompt());
+    c.line("wait %1");
+    CHECK_MESSAGE(c.prompt(), "wait %1 blocked on a job that can't end until it's continued");
+    c.line("fg");
+    REQUIRE(c.expect("sleep 5"));
+    usleep(200'000);
+    c.send("\x03");
+    REQUIRE(c.prompt());
+    c.line("exit 0");
+    CHECK(c.wait() == 0);
+}
+
+TEST_CASE("fg gives a stopped job back its own terminal settings") {
+    {
+        std::ofstream("modes.sh") << "stty -echo\n"
+                                     "kill -TSTP $$\n"
+                                     "if stty -a | grep -qw -- -echo; then echo kept-modes; "
+                                     "else echo lost-modes; fi\n"
+                                     "stty echo\n";
+    }
+    Conch c;
+    REQUIRE(c.prompt());
+    c.line("sh modes.sh");
+    REQUIRE_MESSAGE(c.expect("[1] Stopped  sh modes.sh"), c.output());
+    REQUIRE(c.prompt());
+    c.line("fg");
+    CHECK_MESSAGE(c.expect("kept-modes", 3000), c.output());
+    REQUIRE(c.prompt());
+    c.line("exit 0");
+    CHECK(c.wait() == 0);
+}

@@ -79,10 +79,17 @@ static void in_foreground(Shell& sh, Job& job, bool resume) {
         tcsetpgrp(sh.tty, job.pgid);
     }
     if (resume) {
+        if (sh.interactive && job.has_modes) {
+            tcsetattr(sh.tty, TCSADRAIN, &job.modes);  // as it was when it stopped
+        }
         kill(-job.pgid, SIGCONT);
     }
     wait_for_job(job);
     if (sh.interactive) {
+        if (job.stopped) {
+            // vim in raw mode, say: keep its settings for fg, then put ours back.
+            job.has_modes = tcgetattr(sh.tty, &job.modes) == 0;
+        }
         tcsetpgrp(sh.tty, getpgrp());
     }
     if (have_modes) {
@@ -217,6 +224,9 @@ int builtin_wait(Shell& sh, const std::vector<std::string>& argv) {
     Job* job = find_job(sh, argv, "wait");
     if (job == nullptr) {
         return 127;
+    }
+    if (job->stopped) {
+        return 128 + job->stop_signal;  // it won't end until it's continued
     }
     wait_for_job(*job);
     if (job->stopped) {

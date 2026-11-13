@@ -2,6 +2,7 @@
 // conch's shared types and functions. You won't need to change this file.
 
 #include <sys/types.h>
+#include <termios.h>
 
 #include <map>
 #include <optional>
@@ -23,6 +24,8 @@ struct Job {
     bool stopped = false;
     int stop_signal = 0;
     std::string text;  // the command line, for jobs and notifications
+    bool has_modes = false;
+    termios modes{};  // the terminal as a stopped job left it, for fg
 
     bool done() const {
         for (bool e : ended) {

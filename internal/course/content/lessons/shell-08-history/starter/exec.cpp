@@ -1,6 +1,7 @@
 // The course's version of this file. You won't need to change it.
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -65,7 +66,6 @@ void run_line(Shell& sh, const std::string& line) {
 // A variable as it was before a builtin's prefix assignment.
 struct SavedVar {
     std::string name;
-    std::string assigned;            // what the assignment set
     std::optional<std::string> var;  // in sh.vars, before
     std::optional<std::string> env;  // in the environment, before
 };
@@ -78,13 +78,14 @@ static bool keeps_assignments(const Command& c) {
 }
 
 int run_in_shell(Shell& sh, const Command& c) {
+    sh.builtin_set.clear();
     std::vector<SavedVar> saved_vars;
     for (const auto& [name, value] : c.assignments) {
         if (keeps_assignments(c)) {
             set_var(sh, name, value);
             continue;
         }
-        SavedVar old{name, value, std::nullopt, std::nullopt};
+        SavedVar old{name, std::nullopt, std::nullopt};
         if (auto it = sh.vars.find(name); it != sh.vars.end()) {
             old.var = it->second;
             sh.vars.erase(it);
@@ -100,9 +101,10 @@ int run_in_shell(Shell& sh, const Command& c) {
         std::vector<SavedVar>& vars;
         ~Restore() {
             for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
-                const char* now = std::getenv(it->name.c_str());
-                if (now == nullptr || it->assigned != now) {
-                    continue;  // the builtin changed it itself (cd sets PWD): keep that
+                bool set_by_builtin = std::find(sh.builtin_set.begin(), sh.builtin_set.end(),
+                                                it->name) != sh.builtin_set.end();
+                if (set_by_builtin) {
+                    continue;  // cd set PWD itself: keep that, not the old value
                 }
                 if (it->env) {
                     setenv(it->name.c_str(), it->env->c_str(), 1);
