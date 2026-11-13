@@ -11,5 +11,5 @@ keep the smaller byte. `total()` can add up the array, or you can keep a
 running total, as long as it's always right.
 ---
 `std::format("most common: 0x{:02x} ({} of {})\n", b, h.count(b), h.total())`.
-Pass `b` as an `int` (or `unsigned`), because `{:x}` on a `char` prints a
-character, not a number.
+`{:02x}` prints `b` as two lowercase hex digits, padding with a zero, so
+byte 5 prints as `05`.

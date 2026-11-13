@@ -1,6 +1,6 @@
 ---
 title: Structs and member functions
-minutes: 15
+minutes: 20
 files: [histogram.cpp]
 run:
   stdin: "hello, world\n"
@@ -41,6 +41,25 @@ formats. Its data is one fixed-size array, already in `histogram.hpp`:
 ```cpp
 std::array<std::size_t, 256> counts{};  // {} sets every count to 0
 ```
+
+**Bytes in hex.** Programmers write bytes in **hexadecimal**, base 16.
+The digits are 0–9, then a–f for 10–15, and a `0x` prefix marks the
+number as hex. One hex digit is 4 bits, so any byte (0–255) fits in
+exactly two digits: `0x6c` is 6×16 + 12 = 108, the code for `'l'`, and
+`0xff` is 255. Phase 4 covers binary and hex properly. For now, let
+`std::format` do the conversion:
+
+```cpp
+std::format("{:x}", 108);    // "6c"   x: lowercase hex
+std::format("{:02x}", 5);    // "05"   2: at least 2 wide, 0: pad with zeros
+std::format("{:02x}", 255);  // "ff"
+```
+
+It's Python's `f"{n:02x}"` and Go's `fmt.Sprintf("%02x", n)`. Without the
+`0`, the padding is spaces, so 5 would print as `" 5"`.
+
+Mind the type when you leave the `x` out: `{}` prints a `char` as a
+character (`l`), but an `unsigned char` as a number (`108`).
 
 **The spec**
 
