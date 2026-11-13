@@ -13,8 +13,8 @@ using Command = std::vector<std::string>;
 // A pipeline in a process group of its own, and what's known about it.
 struct Job {
     pid_t pgid = 0;
-    std::vector<pid_t> pids;      // one per command, in order
-    std::vector<bool> ended;      // which processes have ended...
+    std::vector<pid_t> pids;       // one per command, in order
+    std::vector<bool> ended;       // which processes have ended...
     std::vector<Status> statuses;  // ...and how
     bool stopped = false;
     int stop_signal = 0;  // what stopped it: SIGTSTP, SIGTTIN, ...

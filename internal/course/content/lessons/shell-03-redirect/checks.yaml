@@ -1,0 +1,49 @@
+- name: write a file, then read it
+  stdin: "echo hi > out.txt\ncat out.txt\n"
+  stdout: "hi\n"
+- name: with and without spaces, and appending
+  stdin: "echo a>f.txt\necho b >> f.txt\ncat <f.txt\n"
+  stdout: "a\nb\n"
+- name: stderr into a file
+  stdin: "cat no-such-file 2>err.txt\ncat err.txt\n"
+  stdout: "cat: no-such-file: No such file or directory\n"
+- name: a builtin's output into a file, and the shell's stdout comes back
+  stdin: "type cd > t.txt\necho back\ncat t.txt\n"
+  stdout: "back\ncd is a shell builtin\n"
+- name: a missing target is a syntax error
+  stdin: "echo >\n"
+  stdout: ""
+  exit: 2
+- name: 2>&1 sends stderr where stdout goes
+  stdin: "cat no-such-file > both.txt 2>&1\ncat both.txt\n"
+  stdout: "cat: no-such-file: No such file or directory\n"
+  hidden: true
+- name: order matters
+  stdin: "cat no-such-file 2>&1 > only-out.txt\n"
+  stdout: "cat: no-such-file: No such file or directory\n"
+  exit: 1
+  hidden: true
+- name: a file that can't be opened
+  stdin: "cat < missing.txt\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: a builtin with a file that can't be opened
+  stdin: "pwd > no/such/dir/x\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: numbered fds
+  stdin: "cat 3<in.txt <&3\n"
+  files:
+    in.txt: "through 3\n"
+  stdout: "through 3\n"
+  hidden: true
+- name: a redirection alone makes an empty file
+  stdin: "> empty.txt\nls empty.txt\n"
+  stdout: "empty.txt\n"
+  hidden: true
+- name: ">& needs a number"
+  stdin: "echo x >& out\necho still here\n"
+  stdout: "still here\n"
+  hidden: true

@@ -12,7 +12,7 @@ using Command = std::vector<std::string>;
 
 // A pipeline running in a process group of its own.
 struct Job {
-    pid_t pgid = 0;          // the group's ID: the first command's PID
+    pid_t pgid = 0;           // the group's ID: the first command's PID
     std::vector<pid_t> pids;  // one per command, in order
 };
 

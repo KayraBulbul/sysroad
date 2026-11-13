@@ -1,0 +1,59 @@
+// The course's version of this file. You won't need to change it.
+#include <cctype>
+#include <string>
+
+#include "shell.hpp"
+
+// Characters that end an unquoted word.
+static bool ends_word(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '<' || c == '>';
+}
+
+// Reads the redirection operator at line[i], if there is one.
+static bool read_operator(const std::string& line, size_t& i, std::vector<Token>& out) {
+    size_t n = line.size();
+    size_t j = i;
+    while (j < n && std::isdigit(static_cast<unsigned char>(line[j]))) {
+        ++j;
+    }
+    Token t;
+    t.kind = Token::Op;
+    if (j < n && (line[j] == '<' || line[j] == '>')) {
+        if (j > i) {
+            t.fd = std::stoi(line.substr(i, j - i));
+        }
+        bool two = j + 1 < n && (line[j + 1] == '&' || (line[j] == '>' && line[j + 1] == '>'));
+        t.text = line.substr(j, two ? 2 : 1);
+        i = j + t.text.size();
+        out.push_back(t);
+        return true;
+    }
+    return false;
+}
+
+std::vector<Token> tokenize(const std::string& line) {
+    std::vector<Token> out;
+    size_t i = 0;
+    size_t n = line.size();
+    while (i < n) {
+        char c = line[i];
+        if (c == ' ' || c == '\t' || c == '\n') {
+            ++i;
+            continue;
+        }
+        if (c == '#') {
+            break;  // a comment, to the end of the line
+        }
+        if (read_operator(line, i, out)) {
+            continue;
+        }
+        Token word;
+        size_t start = i;
+        while (i < n && !ends_word(line[i])) {
+            ++i;
+        }
+        word.text = line.substr(start, i - start);
+        out.push_back(word);
+    }
+    return out;
+}

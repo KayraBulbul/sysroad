@@ -8,10 +8,10 @@
 
 // env [-i] [-u NAME]... [NAME=VALUE]... [COMMAND [ARG]...]
 struct EnvCommand {
-    bool clear = false;                                     // -i
-    std::vector<std::string> unset;                         // -u NAME
+    bool clear = false;                                    // -i
+    std::vector<std::string> unset;                        // -u NAME
     std::vector<std::pair<std::string, std::string>> set;  // NAME=VALUE
-    std::vector<std::string> argv;                          // COMMAND [ARG]...
+    std::vector<std::string> argv;                         // COMMAND [ARG]...
 };
 
 // Parses env's arguments (without argv[0]). Throws std::invalid_argument

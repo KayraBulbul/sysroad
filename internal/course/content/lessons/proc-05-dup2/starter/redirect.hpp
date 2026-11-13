@@ -33,5 +33,4 @@ void apply_redirect(const Redirect& r);
 // Runs argv in a child with the redirections applied in order, and waits
 // for it. If one fails, the child prints "redir: <what()>" to stderr and
 // exits with 1, without running the command.
-Status run_redirected(const std::vector<std::string>& argv,
-                      const std::vector<Redirect>& redirects);
+Status run_redirected(const std::vector<std::string>& argv, const std::vector<Redirect>& redirects);

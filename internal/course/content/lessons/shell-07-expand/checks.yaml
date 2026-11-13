@@ -1,0 +1,59 @@
+- name: single quotes keep everything as it is
+  stdin: "echo 'single   $HOME | ;'\n"
+  stdout: "single   $HOME | ;\n"
+- name: double quotes expand variables
+  stdin: "X=world\necho \"hello $X\" ${X}s\n"
+  stdout: "hello world worlds\n"
+- name: $? after each command
+  stdin: "false; echo $?\ntrue; echo $?\n"
+  stdout: "1\n0\n"
+- name: a backslash quotes one character
+  stdin: "echo a\\ b \\$HOME c\\\\d\n"
+  stdout: "a b $HOME c\\d\n"
+- name: an assignment before a command is for that command only
+  stdin: "X=inner sh -c 'echo $X'\necho [$X]\n"
+  stdout: "inner\n[]\n"
+- name: export makes a shell variable an environment variable
+  stdin: "V=1\nsh -c 'echo [$V]'\nexport V\nsh -c 'echo [$V]'\n"
+  stdout: "[]\n[1]\n"
+  hidden: true
+- name: an empty quoted word is still a word
+  stdin: "printf '[%s]' '' \"\" x; echo\n"
+  stdout: "[][][x]\n"
+  hidden: true
+- name: a variable that isn't set disappears
+  stdin: "printf '[%s]' $NOPE x; echo\n"
+  stdout: "[x]\n"
+  hidden: true
+- name: no word splitting after expansion
+  stdin: "X='a b'\nprintf '[%s]' $X; echo\n"
+  stdout: "[a b]\n"
+  hidden: true
+- name: tilde
+  stdin: "export HOME=/home/test\necho ~ ~/x a~ '~'\n"
+  stdout: "/home/test /home/test/x a~ ~\n"
+  hidden: true
+- name: an unclosed quote
+  stdin: "echo 'oops\necho $?\n"
+  stdout: "2\n"
+  hidden: true
+- name: quoted operators are just text
+  stdin: "echo \"a|b\" 'c;d' e\\&f \"x > y\"\n"
+  stdout: "a|b c;d e&f x > y\n"
+  hidden: true
+- name: escapes inside double quotes
+  stdin: "echo \"\\$X \\\"q\\\" \\\\ \\n\"\n"
+  stdout: "$X \"q\" \\ \\n\n"
+  hidden: true
+- name: $! and $$
+  stdin: "sleep 0.1 &\ntest -n \"$!\" && echo bang\ntest \"$$\" -gt 1 && echo dollar\nwait\n"
+  stdout: "bang\ndollar\n"
+  hidden: true
+- name: a redirection target can be a variable
+  stdin: "F=out.txt\necho hi > \"$F\"\ncat out.txt\n"
+  stdout: "hi\n"
+  hidden: true
+- name: assignments see earlier ones on the same line
+  stdin: "A=1; B=$A$A\necho $B\n"
+  stdout: "11\n"
+  hidden: true
