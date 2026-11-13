@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include <sys/time.h>
+#include <unistd.h>
 
 #include <sstream>
 

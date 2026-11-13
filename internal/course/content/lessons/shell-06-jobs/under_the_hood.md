@@ -20,3 +20,10 @@ every command stays in the shell's own process group, so a Ctrl-C at
 the terminal reaches the script *and* the command it's running, and
 both stop. That's what you want: Ctrl-C ends the whole script.
 `set -m` turns job control on in a script, if you really need `fg`.
+
+**The Mac's `cat` gives up.** Run `cat &` then `fg` on macOS, in bash
+or conch, and `cat` prints `cat: stdin: Interrupted system call` and
+exits. The BSD terminal driver ends the stopped `read` with `EINTR`
+when the process continues, and BSD `cat` treats that as an error,
+where GNU `cat` and the shell's own `read` simply try again. That's
+lesson 6.2.1's `EINTR` in the wild: retrying is the robust choice.

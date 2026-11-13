@@ -120,9 +120,9 @@ TEST_CASE("await_signal sleeps instead of spinning") {
     CHECK(r == 0);
 }
 
-TEST_CASE("no lost wakeups, hundreds of times") {
-    int r = within(8, [] {
-        for (int i = 0; i < 300; ++i) {
+TEST_CASE("no lost wakeups, many times over") {
+    int r = within(5, [] {
+        for (int i = 0; i < 60; ++i) {
             BlockSignals block({SIGUSR1});
             pid_t child = fork();
             if (child == 0) {

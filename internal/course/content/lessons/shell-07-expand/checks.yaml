@@ -46,7 +46,7 @@
   stdout: "$X \"q\" \\ \\n\n"
   hidden: true
 - name: $! and $$
-  stdin: "sleep 0.1 &\ntest -n \"$!\" && echo bang\ntest \"$$\" -gt 1 && echo dollar\nwait\n"
+  stdin: "sleep 1 &\ntest -n \"$!\" && echo bang\ntest \"$$\" -gt 1 && echo dollar\nwait\n"
   stdout: "bang\ndollar\n"
   hidden: true
 - name: a redirection target can be a variable

@@ -91,11 +91,11 @@ TEST_CASE("no pipe ends leak, here or into the commands") {
     int before = lowest_free_fd();
     std::set<int> inherited;
     std::stringstream probe;
-    probe << "for f in";
+    probe << "open=; for f in";
     for (int fd = 3; fd < 64; ++fd) {
         probe << ' ' << fd;
     }
-    probe << "; do if (: <&$f) 2>/dev/null; then echo $f >> fds.txt; fi; done; cat";
+    probe << "; do [ -e /dev/fd/$f ] && open=\"$open $f\"; done; echo $open > fds.txt; cat";
     std::vector<Status> st;
     {
         Redirected out(1, "probe-out.txt", O_WRONLY | O_CREAT | O_TRUNC);

@@ -113,13 +113,13 @@ TEST_CASE("the child gets no extra fds, and the parent keeps its own") {
     write_file("x.txt", "x\n");
     std::set<int> before = inherited_fds();
     std::stringstream script;
-    script << "for f in";
+    script << "open=; for f in";
     for (int fd = 3; fd < 64; ++fd) {
         script << ' ' << fd;
     }
-    // Each fd is tried in a subshell, so the fds the shell saves for its own
-    // redirections are not in the way.
-    script << "; do if (: <&$f) 2>/dev/null; then echo $f >> fds.txt; fi; done";
+    // test -e runs in the shell itself and opens nothing, so only the fds
+    // the shell was given show up.
+    script << "; do [ -e /dev/fd/$f ] && open=\"$open $f\"; done; echo $open > fds.txt";
     Status s = run_redirected({"sh", "-c", script.str()}, parse_all({"<x.txt", ">o.txt", "2>e.txt"}));
     CHECK(s.ok());
     std::set<int> extra;

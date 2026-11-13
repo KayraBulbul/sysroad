@@ -1,5 +1,7 @@
 #include "doctest.h"
 
+#include <fstream>
+
 #include "conch_pty.hpp"
 
 TEST_CASE("Ctrl-C at the prompt doesn't end the shell") {
@@ -53,21 +55,22 @@ TEST_CASE("a whole pipeline stops, and comes back") {
 }
 
 TEST_CASE("a background job that reads the terminal is stopped") {
+    {
+        std::ofstream("reader.sh") << "read x\necho got $x\n";
+    }
     Conch c;
     REQUIRE(c.prompt());
-    c.line("cat &");
+    c.line("sh reader.sh &");
     REQUIRE(c.prompt());
     usleep(300'000);
     c.line("jobs");
-    CHECK_MESSAGE(c.expect("[1] Stopped  cat"), c.output());
+    CHECK_MESSAGE(c.expect("[1] Stopped  sh reader.sh"), c.output());
     REQUIRE(c.prompt());
     c.line("fg");
-    REQUIRE(c.expect("cat"));
+    REQUIRE(c.expect("sh reader.sh"));
     usleep(200'000);
-    c.line("typed to cat");
-    CHECK(c.expect("typed to cat"));  // the echo
-    CHECK(c.expect("typed to cat"));  // and cat's copy
-    c.send("\x04");
+    c.line("typed");
+    CHECK_MESSAGE(c.expect("got typed"), c.output());
     REQUIRE_MESSAGE(c.prompt(), c.output());
     c.line("exit");
     CHECK(c.wait() == 0);
