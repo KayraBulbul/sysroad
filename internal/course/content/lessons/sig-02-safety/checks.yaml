@@ -1,0 +1,14 @@
+- name: lines and signals, in order
+  stdin: "hello\nraise USR1\nbye\n"
+  stdout: "line: hello\nsignal: SIGUSR1\nline: bye\nend of input\n"
+- name: a handler that logs
+  stdin: "raise USR2\nraise USR2\n"
+  stdout: "in the handler: SIGUSR2 #1\nin the handler: SIGUSR2 #2\nend of input\n"
+- name: SIGTERM stops it
+  stdin: "a\nraise TERM\nb\n"
+  stdout: "line: a\nsignal: SIGTERM\nstopping\n"
+  hidden: true
+- name: SIGINT stops it
+  stdin: "raise USR1\nraise INT\nraise USR1\n"
+  stdout: "signal: SIGUSR1\nsignal: SIGINT\nstopping\n"
+  hidden: true

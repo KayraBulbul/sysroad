@@ -1,0 +1,93 @@
+- q: "Which of these is safe to call in a signal handler?"
+  options:
+  - "`printf`"
+  - "`write`"
+  - "`malloc`"
+  - "`std::string`'s constructor"
+  answer: 1
+  why: |
+    `write` is a plain system call and on POSIX's async-signal-safe
+    list. The others may take locks or change shared data that the
+    interrupted code was in the middle of using.
+
+- q: "Why should a handler save `errno` on the way in and restore it on the way out?"
+  options:
+  - "The handler might run between a failed call in the main program and the code that reads `errno`, and change it"
+  - "Handlers can't read `errno` otherwise"
+  - "The kernel clears `errno` before every handler"
+  - "So `SA_RESTART` knows which call to restart"
+  answer: 0
+  why: |
+    `errno` is one variable per thread. A handler's own failing call
+    (or `waitpid`'s final `ECHILD`) would overwrite the value the main
+    program is about to look at.
+
+- q: "Five children end at almost the same moment. How many times can your `SIGCHLD` handler run?"
+  options:
+  - "Exactly five"
+  - "Exactly once"
+  - "Anywhere from one to five, so it must reap in a loop"
+  - "None: SIGCHLD is ignored by default"
+  answer: 2
+  why: |
+    Pending is one bit per signal, so signals that arrive while one is
+    pending merge. Each run of the handler must reap with `WNOHANG`
+    until there's nothing left.
+
+- q: "What's wrong with `while (!flag) pause();`?"
+  options:
+  - "`pause` returns at once if the flag is set"
+  - "The signal can arrive after the check and before `pause`, which then sleeps forever"
+  - "`pause` can't be interrupted by a handler"
+  - "Nothing, if `flag` is `volatile sig_atomic_t`"
+  answer: 1
+  why: |
+    Block the signal, check the flag, and sleep with `sigsuspend`,
+    which unblocks and sleeps in one step.
+
+- q: "A shell forks a child for a job and calls `setpgid` on it. Why does the child call `setpgid` on itself too?"
+  options:
+  - "Only the child is allowed to change its own group"
+  - "The parent's call doesn't survive `exec`"
+  - "The kernel needs both calls to agree"
+  - "Either may run first after `fork`; both calling it means it's done before either side depends on it"
+  answer: 3
+  why: |
+    The child must be in the group before it execs; the parent must
+    see it in the group before it signals or waits on it. Whichever
+    call comes second finds the work done.
+
+- q: "You press Ctrl-C while `sleep 100 | cat` runs in the foreground. Who gets SIGINT?"
+  options:
+  - "Every process in the terminal's foreground process group: `sleep` and `cat`"
+  - "The shell, which passes it on"
+  - "Only `cat`, the last command"
+  - "Every process in the session"
+  answer: 0
+  why: |
+    The terminal driver signals its foreground group. The shell put
+    the job's processes in one group and gave it the terminal; the
+    shell itself is in the background and isn't touched.
+
+- q: "A background job runs `read` on the terminal. What happens?"
+  options:
+  - "It reads whatever you type, along with the shell"
+  - "The read fails with `EIO`"
+  - "The job gets `SIGTTIN`, which stops it until you bring it to the foreground"
+  - "The terminal ignores it"
+  answer: 2
+  why: |
+    Only the foreground group may read. That's why a background `cat`
+    shows up as `Stopped (tty input)`.
+
+- q: "Your shell ignores SIGINT, and forgets to reset it in the children it runs. What do you notice?"
+  options:
+  - "Nothing: `exec` resets every signal"
+  - "Ctrl-C does nothing to the commands you run"
+  - "Ctrl-C ends the shell"
+  - "The commands crash at start-up"
+  answer: 1
+  why: |
+    `exec` resets handled signals to their defaults, but ignored ones
+    stay ignored. Each child must set the job signals back to
+    `SIG_DFL` before exec.
