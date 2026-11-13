@@ -16,7 +16,9 @@ if (cursor_ < text_.size()) {
 }
 ```
 ---
-`save_history`: write every line to `path + ".tmp"`, close it, and
-`std::rename(tmp.c_str(), path.c_str())`. `load_history` reads with
+`save_history`: `open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0600)` (plus
+`fchmod(fd, 0600)`, in case an old `.tmp` had other bits), `write`
+every line, `close`, then `std::rename(tmp.c_str(), path.c_str())`. If
+a write fails, keep the old file. `load_history` reads with
 `std::getline` and calls `add_history` on each line, so the same rules
 apply.

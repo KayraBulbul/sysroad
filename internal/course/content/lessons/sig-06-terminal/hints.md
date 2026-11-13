@@ -1,4 +1,7 @@
 ```cpp
+while (tcgetpgrp(tty) != getpgrp()) {
+    kill(-getpgrp(), SIGTTIN);   // stops us until we're in the foreground
+}
 for (int sig : {SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU}) {
     signal(sig, SIG_IGN);
 }

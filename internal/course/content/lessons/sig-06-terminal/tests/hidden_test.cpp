@@ -145,3 +145,31 @@ TEST_CASE("a command that isn't found") {
     });
     CHECK_MESSAGE(term.wait() == 0, term.output());
 }
+
+TEST_CASE("started in the background, init_job_control waits instead of taking the terminal") {
+    Pty term([] {
+        pid_t kid = fork();
+        if (kid == 0) {
+            setpgid(0, 0);  // a background job of ours
+            init_job_control(0);
+            _exit(tcgetpgrp(0) == getpgrp() ? 0 : 1);
+        }
+        setpgid(kid, kid);
+        int st = 0;
+        waitpid(kid, &st, WUNTRACED);
+        bool waited = WIFSTOPPED(st) && WSTOPSIG(st) == SIGTTIN;
+        bool kept = tcgetpgrp(0) == getpgrp();
+        if (!waited) {
+            say("it didn't wait: %s\n", kept ? "" : "and it took the terminal");
+            return 1;
+        }
+        // Now bring it to the foreground, as fg would.
+        signal(SIGTTOU, SIG_IGN);
+        tcsetpgrp(0, kid);
+        kill(-kid, SIGCONT);
+        waitpid(kid, &st, 0);
+        tcsetpgrp(0, getpgrp());
+        return kept && WIFEXITED(st) && WEXITSTATUS(st) == 0 ? 0 : 2;
+    });
+    CHECK_MESSAGE(term.wait() == 0, term.output());
+}

@@ -14,6 +14,11 @@
 static const int kJobSignals[] = {SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU};
 
 void init_job_control(int tty) {
+    // In the background? Wait to be brought to the foreground rather than
+    // steal the terminal: SIGTTIN stops us until then.
+    for (pid_t fg = tcgetpgrp(tty); fg != -1 && fg != getpgrp(); fg = tcgetpgrp(tty)) {
+        kill(-getpgrp(), SIGTTIN);
+    }
     for (int sig : kJobSignals) {
         signal(sig, SIG_IGN);
     }

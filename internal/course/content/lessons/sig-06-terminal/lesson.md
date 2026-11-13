@@ -40,7 +40,11 @@ stops it, and one that tries to change the terminal's settings gets
 **`SIGTTOU`**. That includes calling `tcsetpgrp`, which is awkward
 for a shell, so shells ignore `SIGTTOU`. They ignore `SIGINT`,
 `SIGQUIT` and `SIGTSTP` too: Ctrl-C at the prompt shouldn't end your
-shell.
+shell. But ignoring `SIGTTOU` also lets a shell that was started in the
+background (`bash &`) grab the terminal from the shell that started it.
+So before anything else, a shell checks: while `tcgetpgrp(tty)` isn't
+its own group, it sends its group `SIGTTIN`, which stops it until
+someone brings it to the foreground.
 
 Ignored signals stay ignored across `exec` (lesson 6.1.6), so each
 child must set those signals back to `SIG_DFL` before it runs its
@@ -69,7 +73,7 @@ Ctrl-Z and Ctrl-C into it as you would.
 
 ## Assignment
 
-- [ ] `init_job_control` ignores `SIGINT SIGQUIT SIGTSTP SIGTTIN SIGTTOU`, makes this process lead its own group if it doesn't already, and takes the terminal
+- [ ] `init_job_control` first waits until its group is in the foreground (sending itself `SIGTTIN` until it is), then ignores `SIGINT SIGQUIT SIGTSTP SIGTTIN SIGTTOU`, leads its own group if it doesn't already, and takes the terminal
 - [ ] `launch_job` puts the job in a new group, gives a foreground job the terminal from both the child and the parent, and sets the job signals back to `SIG_DFL` in each child
 - [ ] `wait_for_job` waits on the group with `WUNTRACED` until every process has ended or one has stopped
 - [ ] `wait_foreground` and `continue_job` hand over the terminal and take it back with the shell's own modes; `continue_job` sends `SIGCONT` to the group

@@ -9,6 +9,12 @@
 #include "shell.hpp"
 
 void init_job_control(Shell& sh) {
+    // Started in the background (conch &)? Wait to be brought to the
+    // foreground: SIGTTIN stops us until then. Taking the terminal now
+    // would steal it from the shell that started us.
+    for (pid_t fg = tcgetpgrp(sh.tty); fg != -1 && fg != getpgrp(); fg = tcgetpgrp(sh.tty)) {
+        kill(-getpgrp(), SIGTTIN);
+    }
     for (int sig : {SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU}) {
         signal(sig, SIG_IGN);
     }

@@ -101,3 +101,32 @@ TEST_CASE("the terminal's settings come back after a job") {
     c.line("exit");
     CHECK(c.wait() == 0);
 }
+
+TEST_CASE("conch started in the background waits for the foreground") {
+    Pty term([] {
+        pid_t kid = fork();
+        if (kid == 0) {
+            setpgid(0, 0);  // like "conch &" from another shell
+            _exit(sysroad_student_main());
+        }
+        setpgid(kid, kid);
+        int st = 0;
+        waitpid(kid, &st, WUNTRACED);
+        bool waited = WIFSTOPPED(st) && WSTOPSIG(st) == SIGTTIN && tcgetpgrp(0) == getpgrp();
+        std::printf(waited ? "waited in the background\n" : "took the terminal\n");
+        std::fflush(stdout);
+        if (!waited) {
+            kill(kid, SIGKILL);
+            return 1;
+        }
+        signal(SIGTTOU, SIG_IGN);
+        tcsetpgrp(0, kid);  // fg
+        kill(-kid, SIGCONT);
+        waitpid(kid, &st, 0);
+        return WIFEXITED(st) ? WEXITSTATUS(st) : 2;
+    });
+    REQUIRE_MESSAGE(term.expect("waited in the background"), term.output());
+    REQUIRE(term.expect("conch$ "));
+    term.send("exit 7\n");
+    CHECK(term.wait() == 7);
+}

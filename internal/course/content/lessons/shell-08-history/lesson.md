@@ -49,10 +49,12 @@ the last N with `history N`. In interactive mode, `main` loads
 `~/.conch_history` at the start and saves it at the end: your
 `load_history` and `save_history`. Save to a temporary file and
 `rename` it over the old one, so a crash never leaves half a history.
+History is private (people paste passwords at prompts by mistake), so
+create the file with mode `0600`, owner only, as bash does.
 
 ## Assignment
 
 - [ ] `LineEditor::feed` handles every key in the table, and `render` draws the line and places the cursor
 - [ ] `add_history` skips blanks and repeats and keeps 1000; `history` and `history N` print them numbered
-- [ ] `load_history` and `save_history`, saving through a temporary file and `rename`
+- [ ] `load_history` and `save_history`, saving through a temporary file with mode `0600` and `rename`
 - [ ] Use conch for a while: it's a shell now

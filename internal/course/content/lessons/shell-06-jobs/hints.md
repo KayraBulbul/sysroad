@@ -1,6 +1,9 @@
 `init_job_control` is 6.2.6's, working on `sh.tty`:
 
 ```cpp
+while (tcgetpgrp(sh.tty) != getpgrp()) {
+    kill(-getpgrp(), SIGTTIN);
+}
 for (int sig : {SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU}) {
     signal(sig, SIG_IGN);
 }

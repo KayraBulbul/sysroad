@@ -13,11 +13,11 @@ hands it over, and get `SIGTTIN` for its trouble. Calling it in the
 child before `exec` closes that gap; the parent's call covers the case
 where the parent's next step needs the job in the foreground first.
 
-**Starting in the background.** If you start a shell with `bash &`,
-it finds it isn't the foreground group. Real shells loop on
-`kill(-getpgrp(), SIGTTIN)` until someone brings them to the
-foreground, rather than stealing the terminal. bash's `jobs.c` and the
-glibc manual's sample shell both do this.
+**Starting in the background.** The loop at the top of your
+`init_job_control` is straight from bash's `jobs.c` and the glibc
+manual's sample shell. Without it, `bash &` would take the terminal
+from the shell you typed it into, and both would fight over your
+keystrokes.
 
 **TOSTOP.** By default background jobs may *write* to the terminal,
 which is why a background job's output scrambles your prompt.

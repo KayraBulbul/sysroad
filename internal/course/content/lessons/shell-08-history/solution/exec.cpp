@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <system_error>
 
 #include "shell.hpp"
@@ -61,12 +62,54 @@ void run_line(Shell& sh, const std::string& line) {
     _exit(126);
 }
 
+// A variable as it was before a builtin's prefix assignment.
+struct SavedVar {
+    std::string name;
+    std::optional<std::string> var;  // in sh.vars
+    std::optional<std::string> env;  // in the environment
+};
+
+// exit, export and unset are POSIX "special" builtins: assignments in
+// front of them stay, as they do with no command at all. For the others
+// (X=1 cd ...) they last only as long as the builtin, as in bash.
+static bool keeps_assignments(const Command& c) {
+    return c.argv.empty() || c.argv[0] == "exit" || c.argv[0] == "export" || c.argv[0] == "unset";
+}
+
 int run_in_shell(Shell& sh, const Command& c) {
-    if (c.argv.empty()) {
-        for (const auto& [name, value] : c.assignments) {
+    std::vector<SavedVar> saved_vars;
+    for (const auto& [name, value] : c.assignments) {
+        if (keeps_assignments(c)) {
             set_var(sh, name, value);
+            continue;
         }
+        SavedVar old{name, std::nullopt, std::nullopt};
+        if (auto it = sh.vars.find(name); it != sh.vars.end()) {
+            old.var = it->second;
+            sh.vars.erase(it);
+        }
+        if (const char* e = std::getenv(name.c_str())) {
+            old.env = e;
+        }
+        saved_vars.push_back(old);
+        setenv(name.c_str(), value.c_str(), 1);  // the builtin and what it runs see it
     }
+    struct Restore {
+        Shell& sh;
+        std::vector<SavedVar>& vars;
+        ~Restore() {
+            for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
+                if (it->env) {
+                    setenv(it->name.c_str(), it->env->c_str(), 1);
+                } else {
+                    unsetenv(it->name.c_str());
+                }
+                if (it->var) {
+                    sh.vars[it->name] = *it->var;
+                }
+            }
+        }
+    } restore{sh, saved_vars};
     SavedFds saved(c.redirects);
     try {
         apply_redirects(c.redirects);

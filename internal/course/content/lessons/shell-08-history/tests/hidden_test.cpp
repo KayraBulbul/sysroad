@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -163,4 +164,17 @@ TEST_CASE("save and load") {
     Shell c;
     load_history(c, "no-such-history-file");
     CHECK(c.history.empty());
+}
+
+TEST_CASE("only the owner can read the history file") {
+    Shell a;
+    add_history(a, "export TOKEN=hunter2");
+    {
+        std::ofstream("private.txt.tmp") << "left over";
+    }
+    chmod("private.txt.tmp", 0666);
+    save_history(a, "private.txt");
+    struct stat st{};
+    REQUIRE(stat("private.txt", &st) == 0);
+    CHECK((st.st_mode & 0777) == 0600);
 }

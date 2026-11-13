@@ -50,7 +50,9 @@ Unlike sh, conch doesn't split a variable's value into several words:
 
 `vars.cpp` (the course's) keeps **shell variables**: `X=1` alone sets
 one, which commands don't see until you `export X`. `X=1 cmd` puts `X`
-in `cmd`'s environment only.
+in `cmd`'s environment only. In front of a builtin, as in bash, it
+lasts for that builtin (`HOME=/ cd`), except for `export`, `unset` and
+`exit`, where it stays (`X=1 export X`).
 
 ## Assignment
 

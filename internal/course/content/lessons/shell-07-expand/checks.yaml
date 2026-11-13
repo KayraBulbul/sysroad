@@ -57,3 +57,11 @@
   stdin: "A=1; B=$A$A\necho $B\n"
   stdout: "11\n"
   hidden: true
+- name: an assignment before export stays
+  stdin: "X=hi export X\nsh -c 'echo [$X]'\necho [$X]\n"
+  stdout: "[hi]\n[hi]\n"
+  hidden: true
+- name: an assignment before another builtin is for that builtin only
+  stdin: "HOME=/ cd\npwd\nA=tmp type cd > /dev/null\necho [$A]\n"
+  stdout: "/\n[]\n"
+  hidden: true

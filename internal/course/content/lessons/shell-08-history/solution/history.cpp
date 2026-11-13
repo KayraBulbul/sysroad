@@ -1,3 +1,8 @@
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <cerrno>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -43,14 +48,31 @@ void load_history(Shell& sh, const std::string& path) {
 
 void save_history(const Shell& sh, const std::string& path) {
     std::string tmp = path + ".tmp";
-    {
-        std::ofstream out(tmp, std::ios::trunc);
-        for (const auto& line : sh.history) {
-            out << line << '\n';
+    // History can hold passwords typed by mistake: only the owner may read
+    // it. fchmod covers a .tmp left over from before with looser bits.
+    int fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd == -1) {
+        return;
+    }
+    fchmod(fd, 0600);
+    std::string all;
+    for (const auto& line : sh.history) {
+        all += line + '\n';
+    }
+    size_t done = 0;
+    while (done < all.size()) {
+        ssize_t n = write(fd, all.data() + done, all.size() - done);
+        if (n == -1 && errno == EINTR) {
+            continue;
         }
-        if (!out) {
-            return;
+        if (n <= 0) {
+            close(fd);
+            return;  // keep the old history rather than half a new one
         }
+        done += static_cast<size_t>(n);
+    }
+    if (close(fd) == -1) {
+        return;
     }
     std::rename(tmp.c_str(), path.c_str());
 }

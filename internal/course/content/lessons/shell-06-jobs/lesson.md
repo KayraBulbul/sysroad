@@ -17,8 +17,10 @@ command, not the shell; Ctrl-Z pauses it; `fg` and `bg` bring it back.
 This is lesson 6.2.6 inside conch.
 
 When `main` sees a terminal, it sets `sh.interactive`, points `sh.tty`
-at fd 0 and calls your **`init_job_control`**: ignore `SIGINT SIGQUIT
-SIGTSTP SIGTTIN SIGTTOU`, lead a process group, take the terminal. From
+at fd 0 and calls your **`init_job_control`**: wait until its group is
+in the foreground (`conch &` must not steal the terminal), ignore
+`SIGINT SIGQUIT SIGTSTP SIGTTIN SIGTTOU`, lead a process group, take
+the terminal. From
 then on, `launch_job` (the course's) puts each job in a group of its
 own, `job.pgid`, gives a foreground job the terminal from both sides
 of the fork, and sets the signals back to their defaults in each
