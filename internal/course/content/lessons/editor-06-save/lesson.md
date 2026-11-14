@@ -1,10 +1,9 @@
 ---
 title: "Saving, and the unsaved-changes flag"
-base: editor-05-insert
 kind: capstone
+project: kite
 program: kite
-minutes: 35
-files: [save.cpp]
+minutes: 55
 run:
   args: [notes.txt]
   interactive: true
@@ -14,34 +13,60 @@ deeper:
   - title: "rename(2) (man7.org)"
     url: https://man7.org/linux/man-pages/man2/rename.2.html
 ---
-kite gets two bars under the text. The **status bar**, in inverted
-colours, says what you're editing. The **message bar** under it shows
-messages like "6 bytes written to disk" for five seconds.
+Ctrl-S saves. Three things come with it.
+
+**The unsaved-changes flag.** Every edit that changes the text sets a
+`dirty` flag, and a save clears it. The status bar shows it:
 
 ```text
 notes.txt - 12 lines (modified)                        4/12
-6 bytes written to disk
+12 bytes written to disk
 ```
 
-The `(modified)` comes from `dirty`, which every edit now sets and a
-save clears. It also guards quitting: with unsaved changes, Ctrl-Q
-warns, and only quits if you press it three more times.
+A key that changes nothing, like Backspace at the start of the file,
+leaves it alone. The flag also guards quitting: with unsaved changes,
+Ctrl-Q doesn't quit but warns, `Unsaved changes! Press Ctrl-Q 3 more
+times to quit anyway.`, and counts down with each Ctrl-Q (`2 more
+times`, `1 more time`) until the fourth quits. Any other key starts
+the count again.
 
-Saving looks easy, `std::ofstream out(name); out << text;`, but that
-opens the file by **emptying** it first. If the program crashes, or the
-disk fills up, halfway through writing, your file is now half a file.
-The safe way is to write the whole text to a **new** file next to it,
-then `std::rename` the new file over the old one. Within one
-filesystem, a rename is atomic: anyone looking sees the old file or the
-new one, never a mix.
+**Saving safely.** `std::ofstream out(name); out << text;` looks like
+enough, but it opens the file by **emptying** it first. If the program
+crashes, or the disk fills up, halfway through writing, your file is
+now half a file. The safe way is to write the whole text to a **new**
+file next to it, then `std::rename` the new file over the old one.
+Within one filesystem a rename is atomic: anyone looking sees the old
+file or the new one, never a mix. The text is every line followed by
+`\n`. Then `N bytes written to disk`, or if anything fails,
+`Can't save!` and the reason, with the temporary file removed and the
+file still marked modified.
 
-The course does the rest: Ctrl-S calls your `save_file`, asking for a
-name first if the file has none, and the bars are drawn from your
-`status_bar`.
+**Asking for a name.** A file with no name needs one first: Ctrl-S
+asks `Save as: ` in the message bar, and what you type shows after it.
+Backspace (or Delete) removes the last character, Enter with an answer
+saves under that name, and Escape gives up with `Not saved`.
+
+The obvious way to ask is a loop inside the Ctrl-S code that reads keys
+and redraws until Enter. kite does it differently: the question is part
+of the editor's **state**. Ctrl-S stores a prompt in the `Editor` (a
+label, the answer so far, and what to do with the answer) and returns.
+While a prompt is there, `process_key` sends every key to it, and
+`draw_screen` shows it in the message bar instead of the message.
+Nothing in `main` changes, and the prompt can't get out of step with
+the screen, because `main` still draws after every key. "What to do
+with the answer" is a function stored in the prompt, a lambda in a
+`std::function` (lesson 1.4.3), so next lesson's search can ask its own
+question the same way.
+
+## Contract
+
+Nothing new. The tests press Ctrl-S, then read the file back from disk
+and the bars off the screen.
 
 ## Assignment
 
-- [ ] `rows_to_string` joins the rows, each followed by `\n`
-- [ ] `save_file` writes the text to a temporary file next to `e.filename`, renames it over `e.filename`, clears `dirty`, and sets the message to `N bytes written to disk`
-- [ ] When the file can't be written or renamed, `save_file` removes the temporary file, sets a message starting `Can't save!`, leaves `dirty` alone, and returns false
-- [ ] `status_bar` is exactly `screen_cols` wide: on the left, the name (or `[No Name]`), cut to 20 characters, then ` - N lines`, then ` (modified)` if dirty; on the right, `line/lines`, with the line counted from 1. When both don't fit, drop the right side, then cut the left
+- [ ] After a change to the text, the status bar shows ` (modified)` after the line count until the file is saved; keys that change nothing don't
+- [ ] Ctrl-S writes every line followed by `\n` to a temporary file next to the file and renames it over the file; then it says `N bytes written to disk` and ` (modified)` goes
+- [ ] When it can't write or rename, it removes the temporary file, says `Can't save!` and why, and the file stays ` (modified)`
+- [ ] With no name, Ctrl-S asks `Save as: ` in the message bar; Enter saves under the answer, Escape says `Not saved`, and while it asks, every key goes to the answer
+- [ ] With unsaved changes, Ctrl-Q warns and counts down from 3, and any other key starts the count again

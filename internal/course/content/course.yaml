@@ -215,19 +215,25 @@ phases:
             kind: quiz
       - id: editor
         title: "Capstone: text editor"
-        project: raw-mode terminal, rendering, file I/O, search, syntax highlighting
+        project: "kite, written from an empty folder: raw mode, drawing the screen, file I/O, editing, search, syntax highlighting, undo"
         lessons:
           - id: editor-01-raw
-            title: Raw mode and reading keys
+            title: Raw mode
+            kind: capstone
+          - id: editor-01b-keys
+            title: Reading keys
             kind: capstone
           - id: editor-02-screen
             title: Drawing the screen with escape codes
+            kind: capstone
+          - id: editor-02b-status
+            title: The status bar and messages
             kind: capstone
           - id: editor-03-cursor
             title: Moving the cursor
             kind: capstone
           - id: editor-04-open
-            title: Opening files and scrolling
+            title: Tabs, line endings and scrolling
             kind: capstone
           - id: editor-05-insert
             title: Inserting and deleting text
@@ -238,11 +244,17 @@ phases:
           - id: editor-07-search
             title: Incremental search
             kind: capstone
+          - id: editor-07b-colour
+            title: "Drawing in colour: numbers, strings, the match"
+            kind: capstone
           - id: editor-08-highlight
             title: Syntax highlighting for C++
             kind: capstone
           - id: editor-09-undo
             title: Undo and redo
+            kind: capstone
+          - id: editor-10-steps
+            title: Undo a word at a time
             kind: capstone
 
   - id: p4

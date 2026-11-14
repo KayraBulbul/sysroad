@@ -1,3 +1,34 @@
+The data:
+
+```cpp
+struct Edit {
+    enum class Kind { Insert, Erase };
+    Kind kind;
+    Pos at;
+    std::string text;   // may hold line breaks
+    Pos cursor;         // where the cursor was before
+};
+struct History { std::vector<Edit> undo, redo; };
+```
+
+With a `History history;` in the editor, a `record(h, edit)` that
+empties `h.redo` and pushes the edit onto `h.undo` is all the
+bookkeeping.
+---
+`insert_text`: cut the row at `at` into the part before and the tail
+after; append the text up to each `'\n'` to the current row, and at
+each `'\n'` insert a new empty row after it and carry on there; then
+put the tail back on the last row. The end position is that row and
+the length before the tail. If `at` is the line past the end, add an
+empty row first.
+---
+`erase_text`: from `at`, erase what's left of the row (or `n`, if
+less); while there's still some of `n` to go and a next row, join the
+next row on (that's the line break, one character) and carry on.
+Remake `render` and colours for the rows you changed: with last
+lesson's colouring, starting from the first changed row covers the
+rest.
+---
 `undo` is a handful of lines:
 
 ```cpp
@@ -7,19 +38,7 @@ if (edit.kind == Edit::Kind::Insert) erase_text(e, edit.at, edit.text.size());
 else insert_text(e, edit.at, edit.text);
 ```
 
-then the cursor, `dirty`, `h.redo.push_back(std::move(edit))` and
-`h.sealed = true`. In `redo`, `insert_text` returns where the text
-ends, which is where the cursor goes.
----
-For `record`, write `joins(last, edit)` first. Both must be the same
-kind, on the same row, with no `'\n'` in either text. Then:
-
-- typing: `edit.at.col == last.at.col + last.text.size()`, and not a
-  word after a space: `last.text.back() == ' ' && edit.text.front() != ' '`
-- Backspace: `edit.at.col + edit.text.size() == last.at.col`
-- Delete: `edit.at.col == last.at.col`
----
-Joining Backspace moves the step's start left: `last.at = edit.at` and
-`last.text = edit.text + last.text`. Keep `last.cursor` as it is: undo
-should put the cursor where it was before the *first* Backspace.
-Typing and Delete just append: `last.text += edit.text`.
+then the cursor, `dirty`, and `h.redo.push_back(std::move(edit))`. In
+`redo`, `insert_text` returns where the text ends, which is where the
+cursor goes, and the edit goes straight back on `h.undo`, not through
+`record`, which would empty redo.

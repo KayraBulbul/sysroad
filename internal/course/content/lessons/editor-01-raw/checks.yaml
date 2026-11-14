@@ -1,0 +1,4 @@
+- name: without a terminal, kite says so and exits with status 1
+  stdin: "hello\n"
+  stdout: ""
+  exit: 1

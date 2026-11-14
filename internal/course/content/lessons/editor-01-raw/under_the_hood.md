@@ -18,12 +18,16 @@ leftover that still freezes people's terminals today. kite wants both
 keys, for Save and Quit.
 
 **`VMIN` and `VTIME`.** With `VMIN = 0, VTIME = 1`, `read` returns after
-at most a tenth of a second, with or without input. kite uses that to
-tell the Escape key from the start of an escape sequence: if nothing
-follows ESC within a tenth of a second, it was a key press. Vim's
-`ttimeoutlen` setting is the same idea.
+at most a tenth of a second, with or without input. With `VMIN = 1,
+VTIME = 0` it would wait for a byte however long that took, which is
+simpler but leaves kite no way to notice that nothing came. The next
+lesson uses the timeout to tell the Escape key from the start of an
+escape sequence. Vim's `ttimeoutlen` setting is the same idea.
 
 **Restoring the terminal.** A program that crashes in raw mode leaves
 the shell without echo. `reset` (typed blind) fixes it. That's why
-`RawMode` is RAII: its destructor restores the saved settings on any
-way out of `main`, including an exception.
+raw mode is RAII: the destructor restores the saved settings on any
+way out of `main`, including an exception. Not on every way out of the
+program, though: `std::exit` skips the destructors of local objects,
+and a crash or `kill -9` skips everything. Editors that care also put
+the terminal back from a signal handler.

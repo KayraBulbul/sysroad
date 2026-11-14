@@ -20,4 +20,4 @@ reason.
 **`std::getline` and binary files.** A NUL byte or invalid UTF-8 goes
 through untouched: `getline` only cares about `\n`. The renderer will
 draw control characters as they are, which a terminal may act on. The
-syntax highlighting lesson shows them safely instead.
+colour lesson shows them safely instead.
