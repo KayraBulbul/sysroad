@@ -201,6 +201,8 @@ func graderCMake(link, visible, all []string, doctestDir, doctestMain, testsDir,
 // FETCHCONTENT_SOURCE_DIR_DOCTEST at it. It has the same layout and
 // targets as the real one: doctest::doctest and doctest::doctest_with_main.
 func (e *Engine) doctestPackage() (string, error) {
+	doctestOnce.Lock() // the temp name below is only unique per process
+	defer doctestOnce.Unlock()
 	h := sha256.Sum256(doctestHeader)
 	dir := filepath.Join(e.CacheDir, "doctest-pkg", hex.EncodeToString(h[:8]))
 	if _, err := os.Stat(filepath.Join(dir, "CMakeLists.txt")); err == nil {
