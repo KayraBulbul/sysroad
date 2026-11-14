@@ -43,6 +43,10 @@ type ProjectInfo struct {
 	Contract []string `json:"contract"`
 	// Removes names the files this lesson's reference deletes.
 	Removes []string `json:"removes"`
+	// Starter names the files the project's first lesson puts in the
+	// folder when it's made (data to try the program on); empty for the
+	// other lessons, which never write into it.
+	Starter []string `json:"starter"`
 }
 
 // projectInfo describes l's place in its project, or nil outside one. Hold mu.
@@ -54,6 +58,11 @@ func (s *Service) projectInfo(l *course.Lesson) *ProjectInfo {
 	info := &ProjectInfo{ID: p.ID, Header: p.Header, Removes: l.Meta.SolutionRemoves}
 	for _, it := range l.Contract() {
 		info.Contract = append(info.Contract, it.Decl())
+	}
+	if p.Lessons[0] == l {
+		if starter, err := l.Starter(); err == nil {
+			info.Starter = l.SortedNames(starter)
+		}
 	}
 	cur := s.app.ProjectCurrent(p)
 	if cur != nil {

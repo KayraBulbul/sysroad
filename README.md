@@ -183,7 +183,8 @@ Only one window runs at a time: launching it again brings the open one forward.
   clang-format, in the course's style unless a `.clang-format` in the data folder
   says otherwise (Mac: `brew install clang-format`).
 - **Projects:** a project lesson's editor has a tab for every file in `work/<project>/`,
-  the header first; an empty folder shows the contract and a button to create the header.
+  the header first. Until the header exists, the editor shows the contract and a button
+  to create it.
   `+` on the tab strip makes a file (`src/buffer.cpp` makes the folder too). Double-click
   a tab, or use rename and delete on the strip, to change one; delete moves the file to
   `.local/reset-backup/`. Files you make, rename or delete in a terminal show up as you

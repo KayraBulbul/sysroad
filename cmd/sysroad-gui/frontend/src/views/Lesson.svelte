@@ -30,6 +30,11 @@
     return `This lesson is locked. The ${proj.id} project is on "${proj.onTitle}".`;
   });
   const emptyProject = $derived(!!proj && workspace.lesson === id && !workspace.loading && workspace.fileTabs() === 0 && !workspace.solutionOpen());
+  // Files but no header yet (only the lesson's demo files, say): keep
+  // saying what to make, with the contract, until it exists.
+  const noHeader = $derived(
+    canEdit && !emptyProject && workspace.lesson === id && !workspace.loading && !workspace.tabs.some((t) => t.kind === "file" && t.name === proj?.header),
+  );
 
   // Pane sizes, remembered per machine.
   let lessonW = $state(pref("lessonW", 0.42));
@@ -653,6 +658,15 @@
           {#if proj?.onId}<button class="btn" onclick={() => proj && openLesson(proj.onId)}>Go to it</button>{/if}
         </div>
       {/if}
+      {#if noHeader && proj}
+        <div class="bar">
+          <div class="what">
+            <span>The tests include <code>{proj.header}</code>, which you haven't made yet. {#if proj.contract?.length}Declare in it:{/if}</span>
+            {#if proj.contract?.length}<pre>{proj.contract.join("\n")}</pre>{/if}
+          </div>
+          <button class="btn" onclick={createHeader}>Create {proj.header}</button>
+        </div>
+      {/if}
       {#if proj && workspace.solutionOpen()}
         <div class="bar">
           <span>
@@ -683,6 +697,9 @@
             {#if proj.contract?.length}
               <p class="dim">The tests include <code>{proj.header}</code> and use:</p>
               <pre>{proj.contract.join("\n")}</pre>
+            {/if}
+            {#if canEdit && proj.starter?.length}
+              <p class="dim">Your first file brings the lesson's {proj.starter.join(" and ")} with it, to try {proj.id} on.</p>
             {/if}
             {#if canEdit}
               <p class="row">
@@ -920,8 +937,22 @@
     border-bottom: 1px solid var(--line);
     color: var(--fg-soft);
   }
-  .bar span {
+  .bar span,
+  .bar .what {
     flex: 1;
+    min-width: 0;
+  }
+  .bar code {
+    font: inherit;
+    color: var(--fg-bright);
+  }
+  .bar pre {
+    margin: 6px 0 0;
+    max-height: 9em;
+    overflow: auto;
+    font: inherit;
+    color: var(--fg-bright);
+    white-space: pre-wrap;
   }
   .bar.bad {
     color: var(--bright-red);

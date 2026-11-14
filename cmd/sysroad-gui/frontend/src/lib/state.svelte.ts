@@ -98,7 +98,9 @@ export function go(r: Route, record = true) {
     fwdStack.length = 0;
   }
   if (r.view === "lesson") {
-    if (!ui.lessons[r.id]) loadLesson(r.id);
+    // Show what's cached at once, and fetch it again: a project lesson's
+    // page depends on the others (the one you passed unlocks the next).
+    loadLesson(r.id);
     savePref("lastLesson", r.id);
   }
   ui.route = r;

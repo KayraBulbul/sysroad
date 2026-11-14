@@ -209,6 +209,13 @@ export interface ProjectInfo {
      * Removes names the files this lesson's reference deletes.
      */
     "removes": string[] | null;
+
+    /**
+     * Starter names the files the project's first lesson puts in the
+     * folder when it's made (data to try the program on); empty for the
+     * other lessons, which never write into it.
+     */
+    "starter": string[] | null;
 }
 
 /**

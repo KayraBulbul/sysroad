@@ -298,6 +298,14 @@ func TestProjectOrderAndCatchUp(t *testing.T) {
 	if d, _ := s.Lesson("tally-aside"); d.Project != nil {
 		t.Fatal("a lesson outside the project has project info")
 	}
+	// The first lesson says which files it puts in the folder with the
+	// first one you make, so the empty folder's note can say so.
+	if !slices.Equal(p.Starter, []string{"words.txt"}) {
+		t.Fatalf("starter files: %v", p.Starter)
+	}
+	if d, _ := s.Lesson(lines); len(d.Project.Starter) != 0 {
+		t.Fatalf("a later lesson puts nothing in the folder, but lists %v", d.Project.Starter)
+	}
 	if d, _ := s.Lesson(report); !slices.Equal(d.Project.Removes, []string{"src/lines.cpp"}) {
 		t.Fatalf("files the reference deletes: %v", d.Project.Removes)
 	}
