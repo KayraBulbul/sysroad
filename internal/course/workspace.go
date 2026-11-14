@@ -13,10 +13,10 @@ import (
 // the start of a lesson. It's in the data repo, so it syncs.
 const SnapshotsDirName = "snapshots"
 
-// leftOut reports whether an entry in your folder is left out of builds
+// LeftOut reports whether an entry in your folder is left out of builds
 // and snapshots: dot files and folders, and build output, as the data
 // repo's .gitignore leaves them out of sync.
-func leftOut(name string, dir bool) bool {
+func LeftOut(name string, dir bool) bool {
 	if strings.HasPrefix(name, ".") {
 		return true
 	}
@@ -27,7 +27,7 @@ func leftOut(name string, dir bool) bool {
 }
 
 // listFiles lists the regular files under root as slash paths relative to
-// it, leaving out what leftOut says. A missing root has none.
+// it, leaving out what LeftOut says. A missing root has none.
 func listFiles(root string) ([]string, error) {
 	var out []string
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -40,7 +40,7 @@ func listFiles(root string) ([]string, error) {
 		if p == root {
 			return nil
 		}
-		if leftOut(d.Name(), d.IsDir()) {
+		if LeftOut(d.Name(), d.IsDir()) {
 			if d.IsDir() {
 				return fs.SkipDir
 			}

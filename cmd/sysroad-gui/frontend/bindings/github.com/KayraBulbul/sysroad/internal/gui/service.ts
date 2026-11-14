@@ -31,10 +31,38 @@ export function AnswerQuiz(id: string, q: number, pick: number): $CancellablePro
 }
 
 /**
+ * CatchUp replaces the project folder with the course's reference as of
+ * the end of this lesson, the one the project is on, and skips the lesson
+ * (no XP). Your files move to .local/reset-backup/ first.
+ */
+export function CatchUp(id: string): $CancellablePromise<$models.CaughtUp | null> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.CatchUp", id);
+}
+
+/**
  * CheckUpdates looks for new commits now.
  */
 export function CheckUpdates(): $CancellablePromise<$models.UpdateInfo> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.CheckUpdates");
+}
+
+/**
+ * CreateFile makes an empty file in a project lesson's folder: name is a
+ * slash path relative to it, and folders on the way are made. It never
+ * overwrites a file. The first one makes the folder, pulling first as
+ * SaveFile does, and starts the lesson.
+ */
+export function CreateFile(id: string, name: string): $CancellablePromise<$models.File | null> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.CreateFile", id, name);
+}
+
+/**
+ * DeleteFile moves a file out of a project lesson's folder into a new
+ * folder in .local/reset-backup/, so nothing is lost, and returns where it
+ * went.
+ */
+export function DeleteFile(id: string, name: string): $CancellablePromise<string> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.DeleteFile", id, name);
 }
 
 /**
@@ -61,7 +89,10 @@ export function Lesson(id: string): $CancellablePromise<$models.LessonDetail | n
  * OpenFiles returns the files you edit in a lesson, then the starter's other
  * files (headers it shares with the tests) read-only. A lesson you haven't
  * started yet shows its starter code; the folder is made on the first save or
- * run, so browsing doesn't litter the data repo.
+ * run, so browsing doesn't litter the data repo. In a project it's every
+ * text file in the project's folder, the contract header first: none while
+ * the folder is empty or not made yet. They're read-only unless the project
+ * is on this lesson.
  */
 export function OpenFiles(id: string): $CancellablePromise<$models.File[] | null> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.OpenFiles", id);
@@ -76,8 +107,17 @@ export function Prefs(): $CancellablePromise<$models.Prefs> {
 }
 
 /**
- * Reset puts the starter code back, moving your files to
- * .local/reset-backup/. It returns the backup folder and the new files.
+ * RenameFile renames (or moves) a file in a project lesson's folder. It
+ * never overwrites a file. It returns the file under its new name.
+ */
+export function RenameFile(id: string, $from: string, to: string): $CancellablePromise<$models.File | null> {
+    return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.RenameFile", id, $from, to);
+}
+
+/**
+ * Reset puts the starter code back (in a project, the folder as it was at
+ * the start of the lesson), moving your files to .local/reset-backup/. It
+ * returns the backup folder and the new files.
  */
 export function Reset(id: string): $CancellablePromise<[string, $models.File[] | null]> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.Reset", id);
@@ -129,7 +169,8 @@ export function Snapshot(): $CancellablePromise<$models.Snapshot> {
 }
 
 /**
- * Solution is the lesson's reference solution, for the files you edit.
+ * Solution is the lesson's reference solution, for the files you edit; in
+ * a project, the files this lesson's reference adds or changes.
  */
 export function Solution(id: string): $CancellablePromise<$models.File[] | null> {
     return $Call.ByName("github.com/KayraBulbul/sysroad/internal/gui.Service.Solution", id);

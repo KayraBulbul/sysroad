@@ -182,6 +182,15 @@ Only one window runs at a time: launching it again brings the open one forward.
   C++ keywords and common `std` names (clangd comes later). `<space>cf` formats with
   clang-format, in the course's style unless a `.clang-format` in the data folder
   says otherwise (Mac: `brew install clang-format`).
+- **Projects:** a project lesson's editor has a tab for every file in `work/<project>/`,
+  the header first; an empty folder shows the contract and a button to create the header.
+  `+` on the tab strip makes a file (`src/buffer.cpp` makes the folder too). Double-click
+  a tab, or use rename and delete on the strip, to change one; delete moves the file to
+  `.local/reset-backup/`. Files you make, rename or delete in a terminal show up as you
+  do it. A lesson the project isn't on shows your files read-only, with Run, Submit and
+  Reset off and a link to the lesson it's on. Reference (`v`) shows the course's
+  reference for the lesson and the files it deletes; Catch up (`C`) there swaps your
+  folder for it and skips the lesson, after asking.
 - **Interactive programs** (a lesson whose sample run needs a terminal) open in your
   terminal (`$TERMINAL`, `xdg-terminal-exec`, or Terminal.app on a Mac) for now.
 
@@ -193,7 +202,7 @@ Only one window runs at a time: launching it again brings the open one forward.
 | `<space>r s h v R u n p` | editor, vim normal mode | run, submit, hint, solution, reset, under the hood, next, previous |
 | `<space>cf` | editor, vim normal mode | format the file with clang-format |
 | `Ctrl+Space`, `Ctrl+N/P`, `Enter`/`Tab`/`Ctrl+Y` | editor | open, move through, accept completions |
-| `r s h v R u [ ] d` | lesson, outside the editor | the same, plus `d` for done on hand-checked steps |
+| `r s h v R u [ ] d C` | lesson, outside the editor | the same, plus `d` for done on hand-checked steps and `C` to catch up in a project |
 | `Ctrl+H` / `Ctrl+L` / `Ctrl+J` | lesson | focus the lesson, the editor, the output |
 | `Ctrl+B` | lesson | hide or show the lesson pane |
 | `Shift+Tab` | editor | next editor tab (files, then the solution if open) |

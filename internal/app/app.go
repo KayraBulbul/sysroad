@@ -61,11 +61,12 @@ func Open(dir string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return openCourse(dir, c)
+	return OpenCourse(dir, c)
 }
 
-// openCourse opens the data dir with a given course; tests pass a fixture.
-func openCourse(dir string, c *course.Course) (*App, error) {
+// OpenCourse opens the data dir with a given course instead of the built-in
+// one; tests pass a fixture.
+func OpenCourse(dir string, c *course.Course) (*App, error) {
 	a := &App{Dir: dir, Course: c, Engine: course.NewEngine(dir), courseSecs: c.Roadmap().Sections}
 	if err := a.migrate(); err != nil {
 		return nil, fmt.Errorf("migrating to the course layout: %w", err)

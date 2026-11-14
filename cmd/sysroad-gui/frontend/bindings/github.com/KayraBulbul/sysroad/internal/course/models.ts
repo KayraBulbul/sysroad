@@ -31,7 +31,7 @@ export interface Result {
     "ok": boolean;
 
     /**
-     * compile, tests, checks, check, done
+     * compile, contract, project, tests, checks, check, done
      */
     "stage": string;
     "summary": string;

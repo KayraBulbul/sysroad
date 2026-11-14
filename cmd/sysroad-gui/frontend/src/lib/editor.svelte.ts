@@ -50,7 +50,7 @@ export type Buffer = {
   saved: string; // content last known to be on disk
   onDisk: boolean;
   dirty: boolean;
-  conflict: File | null; // disk content that differs from ours
+  conflict: File | null; // disk content that differs from ours; onDisk false: the file was deleted
   readOnly: boolean; // a solution, or a file the lesson gives you (its header)
   solution: boolean;
   timer?: ReturnType<typeof setTimeout>;
@@ -58,7 +58,7 @@ export type Buffer = {
   again?: boolean;
 };
 
-export type Tab = { key: string; name: string; kind: "file" | "solution" | "diff"; readOnly: boolean; dirty: boolean; conflict: boolean };
+export type Tab = { key: string; name: string; kind: "file" | "solution" | "diff"; readOnly: boolean; dirty: boolean; conflict: boolean; gone: boolean };
 
 export type Actions = {
   run: () => void;
@@ -177,6 +177,7 @@ export class Workspace {
   loading = $state(false);
 
   private bufs = new Map<string, Buffer>();
+  private headers = new Map<string, string>(); // a project lesson's contract header, shown first
   private openGen = 0; // bumps on every open(), so a superseded one gives up
   private vimConf = new Compartment();
   private actions: Actions | null = null;
@@ -370,6 +371,10 @@ export class Workspace {
     return EditorState.create({ doc, extensions: this.extensions(readOnly, extra) });
   }
 
+  private tabFor(buf: Buffer): Tab {
+    return { key: buf.key, name: buf.name, kind: "file", readOnly: buf.readOnly, dirty: buf.dirty, conflict: !!buf.conflict, gone: buf.conflict?.onDisk === false };
+  }
+
   private fileBuffer(lesson: string, f: File): Buffer {
     const readOnly = !!f.readOnly;
     return { key: `${lesson}/${f.name}`, lesson, name: f.name, state: this.newState(f.content, readOnly), base: f.hash, saved: f.content, onDisk: f.onDisk, dirty: false, conflict: null, readOnly, solution: false };
@@ -393,9 +398,11 @@ export class Workspace {
     }
     this.loading = true;
     let files: File[] = [];
+    let listed = true;
     try {
       files = (await Service.OpenFiles(lesson)) ?? [];
     } catch (e) {
+      listed = false;
       if (gen === this.openGen) this.onError(errText(e));
     }
     if (gen !== this.openGen) return; // moved on meanwhile
@@ -408,10 +415,25 @@ export class Workspace {
       if (!buf) {
         buf = this.fileBuffer(lesson, f);
         this.bufs.set(key, buf);
-      } else if (f.hash !== buf.base) {
-        this.diskChanged(buf, f);
+      } else {
+        if (f.hash !== buf.base) this.diskChanged(buf, f);
+        // A project lesson you just passed: its files are read-only now.
+        if (!!f.readOnly !== buf.readOnly && !buf.dirty) this.setReadOnly(buf, !!f.readOnly);
       }
-      tabs.push({ key, name: f.name, kind: "file", readOnly: buf.readOnly, dirty: buf.dirty, conflict: !!buf.conflict });
+      tabs.push(this.tabFor(buf));
+    }
+    // A project file that went while you were away: let it go, unless you
+    // have changes in it.
+    const names = new Set(files.map((f) => `${lesson}/${f.name}`));
+    for (const b of listed ? [...this.bufs.values()] : []) {
+      if (b.lesson !== lesson || b.solution || names.has(b.key)) continue;
+      if (b.dirty) {
+        b.conflict = this.goneFile(b);
+        tabs.push(this.tabFor(b));
+      } else {
+        clearTimeout(b.timer);
+        this.bufs.delete(b.key);
+      }
     }
     // Keep a solution tab that was open.
     for (const t of this.tabs) if (t.kind !== "file" && this.bufs.has(t.key)) tabs.push(t);
@@ -424,7 +446,7 @@ export class Workspace {
   private showCached(lesson: string) {
     const tabs: Tab[] = [];
     for (const b of this.bufs.values()) {
-      if (b.lesson === lesson && !b.solution) tabs.push({ key: b.key, name: b.name, kind: "file", readOnly: b.readOnly, dirty: b.dirty, conflict: !!b.conflict });
+      if (b.lesson === lesson && !b.solution) tabs.push(this.tabFor(b));
     }
     this.tabs = tabs;
     this.active = 0;
@@ -454,7 +476,120 @@ export class Workspace {
     if (t) {
       t.dirty = buf.dirty;
       t.conflict = !!buf.conflict;
+      t.gone = buf.conflict?.onDisk === false;
     }
+  }
+
+  private setReadOnly(buf: Buffer, readOnly: boolean) {
+    buf.readOnly = readOnly;
+    buf.state = this.newState(buf.state.doc.toString(), readOnly);
+    if (this.current() === buf && this.view) this.view.setState(buf.state);
+    const t = this.tabs.find((x) => x.key === buf.key);
+    if (t) t.readOnly = readOnly;
+  }
+
+  // ---- a project's files: you make, rename and delete them ----
+
+  // setHeader names a project lesson's contract header, which sorts first.
+  setHeader(lesson: string, header: string) {
+    this.headers.set(lesson, header);
+  }
+
+  // fileTabs counts the open lesson's files (not the solution's).
+  fileTabs(): number {
+    return this.tabs.filter((t) => t.kind === "file").length;
+  }
+
+  hasFile(lesson: string, name: string): boolean {
+    return this.bufs.has(`${lesson}/${name}`);
+  }
+
+  activeFile(): string {
+    const t = this.tabs[this.active];
+    return t?.kind === "file" ? t.name : "";
+  }
+
+  // placeTab puts a file's tab where the Go side lists it: the header
+  // first, then by name, before any solution tabs.
+  private placeTab(lesson: string, tab: Tab) {
+    const header = this.headers.get(lesson) ?? "";
+    const before = (a: string, b: string) => (a === header ? b !== header : b === header ? false : a < b);
+    const name = this.bufs.get(tab.key)?.name ?? tab.name;
+    let i = this.tabs.findIndex((t) => t.kind !== "file" || before(name, t.name));
+    if (i < 0) i = this.tabs.length;
+    this.tabs.splice(i, 0, tab);
+    return i;
+  }
+
+  // addFile opens a file that's new in the folder: made here (focus it) or
+  // in a terminal next to the app.
+  addFile(lesson: string, f: File, focus: boolean) {
+    if (lesson !== this.lesson) return;
+    const key = `${lesson}/${f.name}`;
+    if (this.bufs.has(key)) {
+      const i = this.tabs.findIndex((t) => t.key === key);
+      if (focus && i >= 0) this.select(i);
+      return;
+    }
+    const buf = this.fileBuffer(lesson, f);
+    this.bufs.set(key, buf);
+    const activeKey = this.tabs[this.active]?.key;
+    const i = this.placeTab(lesson, this.tabFor(buf));
+    if (focus || this.fileTabs() === 1) {
+      this.active = -1;
+      this.select(i);
+      if (focus) this.focus();
+    } else {
+      this.active = this.tabs.findIndex((t) => t.key === activeKey);
+    }
+  }
+
+  // removeFile closes a file that's gone from the folder.
+  removeFile(lesson: string, name: string) {
+    const key = `${lesson}/${name}`;
+    const buf = this.bufs.get(key);
+    if (buf) clearTimeout(buf.timer);
+    this.bufs.delete(key);
+    const i = this.tabs.findIndex((t) => t.key === key);
+    if (i < 0) return;
+    const activeKey = this.tabs[this.active]?.key;
+    this.tabs.splice(i, 1);
+    if (activeKey !== key) {
+      this.active = this.tabs.findIndex((t) => t.key === activeKey);
+      return;
+    }
+    this.active = -1;
+    if (this.tabs.length) this.select(Math.min(i, this.tabs.length - 1));
+    else this.view?.setState(this.newState("", true));
+  }
+
+  // renamed moves a file's buffer (history, cursor) to its new name.
+  renamed(lesson: string, from: string, f: File) {
+    const buf = this.bufs.get(`${lesson}/${from}`);
+    if (!buf) return;
+    const wasActive = this.tabs[this.active]?.key === buf.key;
+    const activeKey = this.tabs[this.active]?.key;
+    this.tabs = this.tabs.filter((t) => t.key !== buf.key);
+    this.bufs.delete(buf.key);
+    buf.key = `${lesson}/${f.name}`;
+    buf.name = f.name;
+    buf.base = f.hash;
+    buf.saved = f.content;
+    buf.onDisk = true;
+    this.bufs.set(buf.key, buf);
+    const i = this.placeTab(lesson, this.tabFor(buf));
+    this.active = wasActive ? i : this.tabs.findIndex((t) => t.key === activeKey);
+  }
+
+  // saveFile saves one file now (before it's renamed).
+  async saveFile(lesson: string, name: string) {
+    const buf = this.bufs.get(`${lesson}/${name}`);
+    if (buf && !buf.readOnly && (buf.dirty || buf.saving)) await this.save(buf);
+    return !buf?.conflict;
+  }
+
+  private goneFile(buf: Buffer): File {
+    return { name: buf.name, content: "", hash: "", onDisk: false, readOnly: false };
   }
 
   private markDirty(buf: Buffer) {
@@ -584,7 +719,25 @@ export class Workspace {
 
   onFileEvent(ev: FileEvent) {
     const buf = this.bufs.get(`${ev.lesson}/${ev.name}`);
-    if (buf) this.diskChanged(buf, ev);
+    if (ev.removed) {
+      if (buf) this.diskRemoved(buf);
+    } else if (buf) {
+      this.diskChanged(buf, ev);
+    } else if (ev.lesson === this.lesson && !this.loading) {
+      this.addFile(ev.lesson, ev, false); // made outside the app
+    }
+  }
+
+  // diskRemoved: a project file was deleted outside the app. A clean one
+  // closes; one with changes stays, asking whether to let it go.
+  private diskRemoved(buf: Buffer) {
+    if (buf.solution) return;
+    if (!buf.dirty && !buf.saving) {
+      this.removeFile(buf.lesson, buf.name);
+      return;
+    }
+    buf.conflict = this.goneFile(buf);
+    this.sync(buf);
   }
 
   // resolve settles a conflict: take the disk's version, or keep yours and
@@ -593,6 +746,20 @@ export class Workspace {
     const buf = this.current();
     const disk = buf?.conflict;
     if (!buf || !disk) return;
+    if (!disk.onDisk) {
+      // Deleted on disk: let it go, or write yours back.
+      buf.conflict = null;
+      if (choice === "reload") {
+        this.removeFile(buf.lesson, buf.name);
+        return;
+      }
+      buf.base = "";
+      buf.onDisk = false;
+      buf.dirty = true;
+      this.sync(buf);
+      this.save(buf);
+      return;
+    }
     buf.conflict = null;
     buf.base = disk.hash;
     if (choice === "reload") {
@@ -610,20 +777,23 @@ export class Workspace {
     }
   }
 
-  // replaceAll swaps in fresh files after a Reset (no undo across it).
+  // replaceAll swaps in fresh files after a Reset or catching up (no undo
+  // across it). In a project the files may differ from the ones open.
   replaceAll(lesson: string, files: File[]) {
-    for (const f of files) {
-      const key = `${lesson}/${f.name}`;
-      const old = this.bufs.get(key);
-      if (old) clearTimeout(old.timer);
-      this.bufs.set(key, this.fileBuffer(lesson, f));
+    for (const b of [...this.bufs.values()]) {
+      if (b.lesson === lesson && !b.solution) {
+        clearTimeout(b.timer);
+        this.bufs.delete(b.key);
+      }
     }
+    for (const f of files) this.bufs.set(`${lesson}/${f.name}`, this.fileBuffer(lesson, f));
     if (lesson === this.lesson) {
-      this.tabs = this.tabs.filter((t) => t.kind === "file");
-      this.tabs.forEach((t) => this.sync(this.bufs.get(t.key)!));
-      const a = this.active < this.tabs.length ? this.active : 0;
+      for (const t of this.tabs) if (t.kind !== "file") this.bufs.delete(t.key);
+      this.tabs = files.map((f) => this.tabFor(this.bufs.get(`${lesson}/${f.name}`)!));
+      const a = this.active < this.tabs.length ? Math.max(this.active, 0) : 0;
       this.active = -1;
-      this.select(a);
+      if (this.tabs.length) this.select(a);
+      else this.view?.setState(this.newState("", true));
     }
   }
 
@@ -642,7 +812,7 @@ export class Workspace {
         diff && mine ? [unifiedMergeView({ original: mine.state.doc.toString(), mergeControls: false, highlightChanges: true, gutter: true })] : [],
       );
       this.bufs.set(key, { key, lesson: this.lesson, name: f.name, state, base: f.hash, saved: f.content, onDisk: false, dirty: false, conflict: null, readOnly: true, solution: true });
-      tabs.push({ key, name: f.name, kind: diff ? "diff" : "solution", readOnly: true, dirty: false, conflict: false });
+      tabs.push({ key, name: f.name, kind: diff ? "diff" : "solution", readOnly: true, dirty: false, conflict: false, gone: false });
     }
     this.tabs = tabs;
     const first = tabs.findIndex((t) => t.kind !== "file");
@@ -654,7 +824,8 @@ export class Workspace {
     for (const t of this.tabs) if (t.kind !== "file") this.bufs.delete(t.key);
     this.tabs = this.tabs.filter((t) => t.kind === "file");
     this.active = -1;
-    this.select(0);
+    if (this.tabs.length) this.select(0);
+    else this.view?.setState(this.newState("", true));
   }
 
   solutionOpen() {

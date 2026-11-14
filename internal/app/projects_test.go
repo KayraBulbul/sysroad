@@ -26,7 +26,7 @@ func openTally(t *testing.T) *App {
 	if err := Seed(dir); err != nil {
 		t.Fatal(err)
 	}
-	a, err := openCourse(dir, c)
+	a, err := OpenCourse(dir, c)
 	if err != nil {
 		t.Fatal(err)
 	}

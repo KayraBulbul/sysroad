@@ -59,7 +59,7 @@
     <div class="head" class:ok={result.ok} class:bad={!result.ok}>
       <span class="sum">{result.summary}</span>
       {#if result.total > 0}
-        <span class="chip">{result.passed}/{result.total} tests</span>
+        <span class="chip">{result.passed}/{result.total} {result.stage === "contract" ? "match the contract" : "tests"}</span>
       {/if}
       <span class="meta">{result.mode} · {ago(result.at)}</span>
     </div>

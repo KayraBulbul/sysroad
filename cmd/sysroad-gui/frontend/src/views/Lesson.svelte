@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onMount, untrack } from "svelte";
-  import { Service, Mode, errText, type Result } from "../lib/api";
+  import { onMount, tick, untrack } from "svelte";
+  import { Service, Mode, ProjectState, errText, tilde, type Result } from "../lib/api";
   import { ui, loadLesson, openLesson, refresh, toast, fail, ask, pref, savePref, up, where } from "../lib/state.svelte";
   import { workspace, type Actions } from "../lib/editor.svelte";
   import LessonPane from "../components/LessonPane.svelte";
@@ -14,6 +14,22 @@
   const d = $derived(ui.lessons[id]);
   const hasCode = $derived(!!d?.hasCode);
   const graded = $derived(!!d?.graded);
+
+  // A project lesson: you make its files, and only the lesson the project
+  // is on can change them or run. The others show your files read-only.
+  const proj = $derived(d?.project ?? null);
+  const away = $derived(!!proj && proj.state !== ProjectState.ProjectCurrent);
+  const canEdit = $derived(!!proj && !away);
+  const orderLine = $derived.by(() => {
+    if (!proj || !away) return "";
+    if (!proj.onId) return `You've finished the ${proj.id} project.`;
+    if (proj.state === ProjectState.ProjectPassed) {
+      const how = d?.status === "skipped" ? "You caught up past this lesson." : "You've passed this lesson.";
+      return `${how} The ${proj.id} project is on "${proj.onTitle}".`;
+    }
+    return `This lesson is locked. The ${proj.id} project is on "${proj.onTitle}".`;
+  });
+  const emptyProject = $derived(!!proj && workspace.lesson === id && !workspace.loading && workspace.fileTabs() === 0 && !workspace.solutionOpen());
 
   // Pane sizes, remembered per machine.
   let lessonW = $state(pref("lessonW", 0.42));
@@ -52,6 +68,38 @@
       lessonEl?.scrollTo({ top: 0 });
     });
   });
+  // A project lesson's header sorts first among its tabs. When its place in
+  // the project changes (you passed it, caught up), its files change between
+  // editable and read-only: fetch them again.
+  let placeOf = { id: "", state: "" };
+  $effect(() => {
+    const lid = d?.id ?? "";
+    const st = d?.project?.state ?? "";
+    untrack(() => {
+      if (d?.project) workspace.setHeader(lid, d.project.header);
+      if (lid === placeOf.id && st !== placeOf.state && lid === id) workspace.open(lid);
+      placeOf = { id: lid, state: st };
+    });
+  });
+  // Keep the active tab in sight when the strip scrolls.
+  let tabsEl: HTMLDivElement | undefined = $state();
+  $effect(() => {
+    void workspace.active;
+    void workspace.tabs.length;
+    tick().then(() => tabsEl?.querySelector(".tab.on")?.scrollIntoView({ block: "nearest", inline: "nearest" }));
+  });
+  // A mouse wheel scrolls the tab strip sideways.
+  $effect(() => {
+    const el = tabsEl;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  });
   // Load the neighbours ahead, so <leader>n/p and [ ] land on a ready page.
   $effect(() => {
     for (const n of [d?.next, d?.prev]) if (n && !ui.lessons[n]) untrack(() => loadLesson(n));
@@ -76,6 +124,10 @@
     }
     if (!d.graded) {
       toast(d.written || d.body ? "Nothing to run here — mark it done when you've done it" : "This lesson isn't written yet");
+      return;
+    }
+    if (away) {
+      toast(orderLine);
       return;
     }
     if (running) {
@@ -140,6 +192,11 @@
     if (!d) return;
     try {
       const files = (await Service.Solution(d.id)) ?? [];
+      if (!files.length) {
+        const gone = d.project?.removes ?? [];
+        toast(gone.length ? `The reference only deletes ${gone.join(", ")}` : "The reference changes no files");
+        return;
+      }
       solDiff = diff;
       workspace.showSolution(files, diff);
     } catch (e) {
@@ -153,7 +210,16 @@
       workspace.hideSolution();
       return;
     }
-    if (d.status === "done") return void openSolution(false);
+    if (d.status === "done" || d.status === "skipped") return void openSolution(false);
+    if (d.project) {
+      ask({
+        title: "Peek at the reference?",
+        detail: "The course's reference for this lesson opens read-only next to your files: the files it adds or changes. You can still finish the lesson yourself.",
+        yes: "Show reference",
+        onYes: () => openSolution(false),
+      });
+      return;
+    }
     ask({
       title: "Peek at the solution?",
       detail: "It opens read-only next to your files. You can still finish the lesson yourself.",
@@ -164,18 +230,169 @@
 
   function reset() {
     if (!d?.hasCode) return;
+    if (away) return toast(orderLine);
     const lessonID = d.id;
+    const project = !!d.project;
     ask({
-      title: "Reset to the starter code?",
-      detail: "Your files move to .local/reset-backup/ in the data folder, so nothing is lost.",
+      title: project ? "Reset the project to the start of this lesson?" : "Reset to the starter code?",
+      detail: project
+        ? "Your files move to .local/reset-backup/ in the data folder, and the project goes back to how it was when this lesson started."
+        : "Your files move to .local/reset-backup/ in the data folder, so nothing is lost.",
       yes: "Reset",
       danger: true,
       onYes: async () => {
         try {
           const [backup, files] = await Service.Reset(lessonID);
           workspace.replaceAll(lessonID, files ?? []);
-          toast(backup ? `Reset. Your old files are in ${backup.replace(/^\/(home|Users)\/[^/]+/, "~")}` : "Reset to the starter code", "good", 6000);
+          solDiff = false;
+          const done = project ? "Reset to the start of this lesson" : "Reset to the starter code";
+          toast(backup ? `Reset. Your old files are in ${tilde(backup)}` : done, "good", 6000);
           refresh();
+        } catch (e) {
+          fail(e);
+        }
+      },
+    });
+  }
+
+  // ---- a project's files ----
+
+  // Catching up swaps your project for the course's reference as of the end
+  // of this lesson, and skips the lesson.
+  function catchUp() {
+    if (!d?.project) return;
+    if (away) return toast(orderLine);
+    const lessonID = d.id;
+    ask({
+      title: "Catch up to the reference?",
+      detail:
+        "Your files move to .local/reset-backup/ in the data folder, and the course's reference as of the end of this lesson takes their place. The lesson is skipped, with no XP.",
+      yes: "Catch up",
+      danger: true,
+      onYes: async () => {
+        try {
+          const r = await Service.CatchUp(lessonID);
+          if (!r) return;
+          workspace.replaceAll(lessonID, r.files ?? []);
+          solDiff = false;
+          if (r.lesson) ui.lessons[lessonID] = r.lesson;
+          toast(r.backup ? `Caught up. Your old files are in ${tilde(r.backup)}` : "Caught up", "good", 6000);
+          refresh();
+        } catch (e) {
+          fail(e);
+        }
+      },
+    });
+  }
+
+  // Naming a file: a new one, or the active tab's new name. The field sits
+  // in the tab strip; Enter does it, Escape lets it go.
+  let naming = $state<{ from: string } | null>(null); // from "" is a new file
+  let nameText = $state("");
+  let nameErr = $state("");
+  let nameEl: HTMLInputElement | undefined = $state();
+
+  function startNaming(from: string, text: string) {
+    if (!canEdit) return;
+    naming = { from };
+    nameText = text;
+    nameErr = "";
+    tick().then(() => {
+      nameEl?.focus();
+      // Select the name without its extension, as file managers do.
+      const dot = text.lastIndexOf(".");
+      const slash = text.lastIndexOf("/");
+      nameEl?.setSelectionRange(slash + 1, dot > slash + 1 ? dot : text.length);
+    });
+  }
+
+  function newFile() {
+    startNaming("", "");
+  }
+
+  function renameFile() {
+    const name = workspace.activeFile();
+    if (name) startNaming(name, name);
+  }
+
+  function stopNaming() {
+    naming = null;
+    nameErr = "";
+  }
+
+  async function create(name: string) {
+    if (!d) return;
+    const lessonID = d.id;
+    const started = d.status !== "todo";
+    const f = await Service.CreateFile(lessonID, name);
+    if (f) workspace.addFile(lessonID, f, true);
+    // The editor was hidden behind the empty folder's note: focus it once
+    // it shows.
+    await tick();
+    workspace.focus();
+    if (!started) await Promise.all([loadLesson(lessonID), refresh()]);
+  }
+
+  async function commitName() {
+    const n = naming;
+    const name = nameText.trim();
+    if (!n || !d) return;
+    const lessonID = d.id;
+    try {
+      if (!n.from) {
+        await create(name);
+      } else if (name !== n.from) {
+        if (!(await workspace.saveFile(lessonID, n.from))) {
+          nameErr = "This file changed on disk: choose Reload or Keep mine first";
+          return;
+        }
+        const f = await Service.RenameFile(lessonID, n.from, name);
+        if (f) workspace.renamed(lessonID, n.from, f);
+      }
+      stopNaming();
+      await tick();
+      workspace.focus();
+    } catch (e) {
+      nameErr = errText(e);
+    }
+  }
+
+  function nameKey(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitName();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      stopNaming();
+      workspace.focus();
+    }
+  }
+
+  async function createHeader() {
+    if (!proj) return;
+    try {
+      await create(proj.header);
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  function deleteFile() {
+    const name = workspace.activeFile();
+    if (!d || !canEdit || !name) return;
+    const lessonID = d.id;
+    ask({
+      title: `Delete ${name}?`,
+      detail: "It moves to .local/reset-backup/ in the data folder, so nothing is lost.",
+      yes: "Delete",
+      danger: true,
+      onYes: async () => {
+        try {
+          await workspace.saveFile(lessonID, name);
+          const dst = await Service.DeleteFile(lessonID, name);
+          workspace.removeFile(lessonID, name);
+          toast(`Deleted. ${name} is in ${tilde(dst)}`, "good", 6000);
         } catch (e) {
           fail(e);
         }
@@ -352,6 +569,7 @@
       case "u": uth(); break;
       case "v": solution(); break;
       case "R": reset(); break;
+      case "C": catchUp(); break;
       case "d": toggleDone(); break;
       case "]": next(); break;
       case "[": prev(); break;
@@ -387,29 +605,94 @@
   <div class="right">
     <div class="editor-area" style="height:{hasCode ? (1 - outH) * 100 : 0}%" class:hidden={!hasCode}>
       <div class="tabs">
-        {#each workspace.tabs as t, i (t.key)}
-          <button class="tab" class:on={i === workspace.active} class:ro={t.readOnly} onclick={() => { workspace.select(i); workspace.focus(); }}>
-            {#if t.kind === "solution"}<span class="badge">solution</span>{:else if t.kind === "diff"}<span class="badge">diff</span>{:else if t.readOnly}<span class="badge ro" title="Shared with the tests. You don't edit this file">read-only</span>{/if}
-            {t.name}
-            {#if t.conflict}<span class="mark bad" title="Changed on disk">!</span>{:else if t.dirty}<span class="mark" title="Unsaved">●</span>{/if}
-          </button>
-        {/each}
+        <div class="files" bind:this={tabsEl}>
+          {#each workspace.tabs as t, i (t.key)}
+            {#if naming && naming.from && t.kind === "file" && t.name === naming.from}
+              <input class="name" bind:this={nameEl} bind:value={nameText} onkeydown={nameKey} onblur={stopNaming} spellcheck="false" aria-label="New name for {t.name}" />
+            {:else}
+              <button
+                class="tab"
+                class:on={i === workspace.active}
+                class:ro={t.readOnly}
+                onclick={() => { workspace.select(i); workspace.focus(); }}
+                ondblclick={() => { if (t.kind === "file") renameFile(); }}
+                title={canEdit && t.kind === "file" ? "Double-click to rename" : undefined}
+              >
+                {#if t.kind === "solution"}<span class="badge">{proj ? "reference" : "solution"}</span>{:else if t.kind === "diff"}<span class="badge">diff</span>{:else if t.readOnly && !proj}<span class="badge ro" title="Shared with the tests. You don't edit this file">read-only</span>{/if}
+                {t.name}
+                {#if t.conflict}<span class="mark bad" title={t.gone ? "Deleted on disk" : "Changed on disk"}>!</span>{:else if t.dirty}<span class="mark" title="Unsaved">●</span>{/if}
+              </button>
+            {/if}
+          {/each}
+          {#if naming && !naming.from}
+            <input class="name" bind:this={nameEl} bind:value={nameText} onkeydown={nameKey} onblur={stopNaming} placeholder="src/name.cpp" spellcheck="false" aria-label="New file name" />
+          {/if}
+        </div>
+        {#if canEdit && !naming}
+          <button class="tool add" onclick={newFile} title="New file in the project folder">+</button>
+        {/if}
         <span class="spacer"></span>
+        {#if canEdit && workspace.activeFile() && !naming}
+          <button class="tool" onclick={renameFile} title="Rename {workspace.activeFile()} (or double-click its tab)">rename</button>
+          <button class="tool" onclick={deleteFile} title="Delete {workspace.activeFile()}">delete</button>
+        {/if}
+        {#if away && workspace.fileTabs()}<span class="ro-note">read-only</span>{/if}
         {#if workspace.solutionOpen()}
           <button class="tool" class:on={solDiff} onclick={() => openSolution(!solDiff)} title="Show the solution's changes against your code">diff</button>
-          <button class="tool" onclick={() => workspace.hideSolution()} title="Close the solution">close solution</button>
+          <button class="tool" onclick={() => workspace.hideSolution()} title={proj ? "Close the reference" : "Close the solution"}>{proj ? "close reference" : "close solution"}</button>
         {/if}
         {#if workspace.leaderPending}<span class="leader">␣ r run · s submit · h hint · cf format · v solution · n/p next/prev</span>{/if}
         <button class="tool" class:on={workspace.vimMode} onclick={toggleVim} title="Vim mode">vim</button>
       </div>
-      {#if workspace.tabs[workspace.active]?.conflict}
-        <div class="conflict">
-          <span>This file changed on disk (another machine, or another editor).</span>
-          <button class="btn" onclick={() => workspace.resolve("reload")}>Reload</button>
-          <button class="btn ghost" onclick={() => workspace.resolve("keep")}>Keep mine</button>
+      {#if nameErr}
+        <div class="bar bad">{nameErr}</div>
+      {/if}
+      {#if orderLine}
+        <div class="bar">
+          <span>{orderLine}</span>
+          {#if proj?.onId}<button class="btn" onclick={() => proj && openLesson(proj.onId)}>Go to it</button>{/if}
         </div>
       {/if}
-      <div class="cm" bind:this={editorEl}></div>
+      {#if proj && workspace.solutionOpen()}
+        <div class="bar">
+          <span>
+            The course's reference: the files this lesson adds or changes.
+            {#if proj.removes?.length}It deletes {proj.removes.join(", ")}.{/if}
+          </span>
+          {#if canEdit}<button class="btn" onclick={catchUp} title="Swap your project for the reference and skip this lesson">Catch up <span class="k">C</span></button>{/if}
+        </div>
+      {/if}
+      {#if workspace.tabs[workspace.active]?.conflict}
+        <div class="conflict">
+          {#if workspace.tabs[workspace.active]?.gone}
+            <span>This file was deleted on disk (another editor, or a sync).</span>
+            <button class="btn" onclick={() => workspace.resolve("reload")}>Let it go</button>
+            <button class="btn ghost" onclick={() => workspace.resolve("keep")}>Keep mine</button>
+          {:else}
+            <span>This file changed on disk (another machine, or another editor).</span>
+            <button class="btn" onclick={() => workspace.resolve("reload")}>Reload</button>
+            <button class="btn ghost" onclick={() => workspace.resolve("keep")}>Keep mine</button>
+          {/if}
+        </div>
+      {/if}
+      <div class="cm-wrap">
+        <div class="cm" class:gone={emptyProject} bind:this={editorEl}></div>
+        {#if emptyProject && proj}
+          <div class="empty-project">
+            <p>Your {proj.id} folder is empty. You make every file in it, the header and <code>main.cpp</code> included.</p>
+            {#if proj.contract?.length}
+              <p class="dim">The tests include <code>{proj.header}</code> and use:</p>
+              <pre>{proj.contract.join("\n")}</pre>
+            {/if}
+            {#if canEdit}
+              <p class="row">
+                <button class="btn primary" onclick={createHeader}>Create {proj.header}</button>
+                <span class="dim">or <kbd>+</kbd> for another file</span>
+              </p>
+            {/if}
+          </div>
+        {/if}
+      </div>
     </div>
 
     {#if hasCode}
@@ -421,8 +704,8 @@
         {#if d?.quiz}
           <span class="quiz-label">{d.quiz.solved === d.quiz.total ? "Quiz complete" : "Pick an answer for each question"} <span class="k">1–9</span></span>
         {:else if graded}
-          <button class="btn" onclick={() => run(Mode.ModeRun)} disabled={!!running}>Run <span class="k">Ctrl ⏎</span></button>
-          <button class="btn primary" onclick={() => run(Mode.ModeSubmit)} disabled={!!running}>Submit <span class="k">Ctrl ⇧ ⏎</span></button>
+          <button class="btn" onclick={() => run(Mode.ModeRun)} disabled={!!running || away}>Run <span class="k">Ctrl ⏎</span></button>
+          <button class="btn primary" onclick={() => run(Mode.ModeSubmit)} disabled={!!running || away}>Submit <span class="k">Ctrl ⇧ ⏎</span></button>
           {#if running}<button class="btn ghost" onclick={() => Service.StopRun()}>Stop <span class="k">Ctrl .</span></button>{/if}
         {:else if d && (d.written || d.body || d.url)}
           <button class="btn primary" onclick={toggleDone}>{d.status === "done" ? "Mark not done" : "Mark done"} <span class="k">d</span></button>
@@ -435,8 +718,8 @@
           <button class="btn ghost" onclick={retake} disabled={!d.quiz.solved}>Retake <span class="k">R</span></button>
         {/if}
         {#if hasCode}
-          <button class="btn ghost" onclick={solution}>{workspace.solutionOpen() ? "Hide solution" : "Solution"} <span class="k">v</span></button>
-          <button class="btn ghost" onclick={reset}>Reset <span class="k">R</span></button>
+          <button class="btn ghost" onclick={solution}>{workspace.solutionOpen() ? (proj ? "Hide reference" : "Hide solution") : proj ? "Reference" : "Solution"} <span class="k">v</span></button>
+          <button class="btn ghost" onclick={reset} disabled={away}>Reset <span class="k">R</span></button>
         {/if}
       </div>
       <div class="output">
@@ -496,9 +779,57 @@
     border-bottom: 1px solid var(--line);
     background: var(--bg-dark);
     padding: 0 6px 0 0;
+  }
+  /* The files scroll sideways on their own, so the tools stay in reach
+     however many there are. */
+  .files {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
     overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .files::-webkit-scrollbar {
+    height: 3px;
+  }
+  .files::-webkit-scrollbar-thumb {
+    border: 0;
+    border-radius: 0;
+  }
+  .name {
+    align-self: center;
+    flex: none;
+    width: 200px;
+    margin: 0 8px;
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--fg-bright);
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    outline: none;
+  }
+  .name::placeholder {
+    color: var(--fg-dim);
+  }
+  .tool.add {
+    flex: none;
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 8px 4px;
+  }
+  .ro-note {
+    align-self: center;
+    font-size: 11.5px;
+    color: var(--fg-dim);
+    margin: 0 6px;
+    white-space: nowrap;
   }
   .tab {
+    flex: none;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -574,12 +905,79 @@
   .conflict span {
     flex: 1;
   }
-  .conflict .btn {
+  .conflict .btn,
+  .bar .btn {
     height: 26px;
+  }
+  .bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    font-size: 12.5px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    color: var(--fg-soft);
+  }
+  .bar span {
+    flex: 1;
+  }
+  .bar.bad {
+    color: var(--bright-red);
+    background: color-mix(in oklab, var(--red) 10%, var(--bg));
+    border-bottom-color: color-mix(in oklab, var(--red) 35%, var(--line));
+  }
+  .cm-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
   }
   .cm {
     flex: 1;
     min-height: 0;
+  }
+  .cm.gone {
+    visibility: hidden;
+  }
+  .empty-project {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    padding: 28px 32px;
+    font-size: 13px;
+    color: var(--fg-soft);
+    background: var(--bg);
+  }
+  .empty-project p {
+    margin: 0 0 12px;
+    max-width: 60ch;
+  }
+  .empty-project .dim {
+    color: var(--fg-dim);
+  }
+  .empty-project code {
+    font: inherit;
+    color: var(--fg-bright);
+  }
+  .empty-project pre {
+    margin: 0 0 18px;
+    padding: 10px 14px;
+    font: inherit;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--fg-bright);
+    background: var(--bg-dark);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    white-space: pre-wrap;
+  }
+  .empty-project .row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
   }
   .cm :global(.cm-editor) {
     height: 100%;

@@ -164,11 +164,47 @@ func (e *Engine) moveAside(l *Lesson) (string, error) {
 	if _, err := os.Stat(dir); err != nil {
 		return "", nil
 	}
-	backup := filepath.Join(e.DataDir, ".local", "reset-backup", workName(l)+"-"+time.Now().Format("20060102-150405"))
-	if err := os.MkdirAll(filepath.Dir(backup), 0o755); err != nil {
+	backup, err := e.newBackup(l)
+	if err != nil {
 		return "", err
 	}
 	return backup, os.Rename(dir, backup)
+}
+
+// MoveFileAside moves one file of the lesson's folder (a slash path
+// relative to it) into a new folder in .local/reset-backup/, keeping its
+// path, and returns where it went.
+func (e *Engine) MoveFileAside(l *Lesson, name string) (string, error) {
+	backup, err := e.newBackup(l)
+	if err != nil {
+		return "", err
+	}
+	dst := filepath.Join(backup, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.Rename(filepath.Join(e.WorkDir(l), filepath.FromSlash(name)), dst); err != nil {
+		os.RemoveAll(backup)
+		return "", err
+	}
+	return dst, nil
+}
+
+// newBackup picks a backup folder name in .local/reset-backup/ that isn't
+// taken yet (two moves in one second get their own), making its parent.
+func (e *Engine) newBackup(l *Lesson) (string, error) {
+	root := filepath.Join(e.DataDir, ".local", "reset-backup")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return "", err
+	}
+	base := filepath.Join(root, workName(l)+"-"+time.Now().Format("20060102-150405"))
+	backup := base
+	for i := 2; ; i++ {
+		if _, err := os.Lstat(backup); errors.Is(err, os.ErrNotExist) {
+			return backup, nil
+		}
+		backup = fmt.Sprintf("%s-%d", base, i)
+	}
 }
 
 // LastResult is the most recent saved Run/Submit result for a lesson.
