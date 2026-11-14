@@ -224,8 +224,10 @@ The course lives in `internal/course/content/` and is embedded in the binary:
   sanitizers) and the brief, ending in `## Assignment`. `run: {interactive: true}` hands
   the program the terminal after the visible tests (the editor capstone); the TUI and CLI
   run it in place, the desktop app in a terminal window.
-- `starter/` and `solution/`: the files. `make test` checks that every starter fails Run
-  and every solution passes Submit.
+- `starter/` and `solution/`: the files. `solution/` holds only the files the solution
+  adds or changes; the rest come from the starter, and `solution_removes: [path]` in the
+  front matter deletes a starter file. A copy of an unchanged file fails `go test`.
+  `make test` checks that every starter fails Run and every solution passes Submit.
 - `tests/visible_*.cpp` (Run and Submit) and `tests/hidden_*.cpp` (Submit only): doctest
   test cases. If your file has a `main`, it's renamed so doctest's runs instead. Headers in
   `tests/` are shared helpers that the test files include; only `.cpp` files are compiled.

@@ -3,6 +3,7 @@ title: Dependencies with FetchContent
 minutes: 25
 build: cmake
 files: [CMakeLists.txt, tests/CMakeLists.txt, tests/test_textutil.cpp]
+solution_removes: [tests/check.hpp]
 run:
   stdin: "one two\nthree\n"
 deeper:

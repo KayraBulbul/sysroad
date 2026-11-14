@@ -7,10 +7,12 @@
 package course
 
 import (
+	"bytes"
 	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"sort"
 	"strings"
@@ -102,6 +104,9 @@ type Meta struct {
 	// Build "cmake" builds your CMake project instead of compiling the
 	// .cpp files directly; cmake.yaml says how it's graded.
 	Build string `yaml:"build"`
+	// SolutionRemoves names starter files the solution deletes; solution/
+	// holds only the files the solution adds or changes.
+	SolutionRemoves []string `yaml:"solution_removes"`
 }
 
 type Link struct {
@@ -202,9 +207,26 @@ func (l *Lesson) files(sub string) (map[string][]byte, error) {
 	return out, err
 }
 
-func (l *Lesson) Starter() (map[string][]byte, error)  { return l.files("starter") }
-func (l *Lesson) Solution() (map[string][]byte, error) { return l.files("solution") }
-func (l *Lesson) tests() (map[string][]byte, error)    { return l.files("tests") }
+func (l *Lesson) Starter() (map[string][]byte, error) { return l.files("starter") }
+func (l *Lesson) tests() (map[string][]byte, error)   { return l.files("tests") }
+
+// Solution is the starter with the files in solution/ written over it and
+// the files in SolutionRemoves deleted.
+func (l *Lesson) Solution() (map[string][]byte, error) {
+	out, err := l.Starter()
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range l.Meta.SolutionRemoves {
+		delete(out, f)
+	}
+	changed, err := l.files("solution")
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(out, changed)
+	return out, nil
+}
 
 // SortedNames returns map keys in order, primary files first.
 func (l *Lesson) SortedNames(m map[string][]byte) []string {
@@ -453,8 +475,23 @@ func (c *Course) Validate() error {
 		if l.Meta.Check != "" {
 			continue
 		}
-		starter, _ := l.Starter()
+		starter, err := l.Starter()
+		if err != nil {
+			errs = append(errs, err.Error())
+			continue
+		}
 		sol, _ := l.Solution()
+		changed, _ := l.files("solution")
+		for name, data := range changed {
+			if s, ok := starter[name]; ok && bytes.Equal(data, s) {
+				errs = append(errs, l.ID+": solution/"+name+" is the same as the starter's, so delete it")
+			}
+		}
+		for _, f := range l.Meta.SolutionRemoves {
+			if _, ok := starter[f]; !ok {
+				errs = append(errs, l.ID+": solution_removes names "+f+", which the starter doesn't have")
+			}
+		}
 		for _, f := range l.Meta.Files {
 			if _, ok := starter[f]; !ok {
 				errs = append(errs, l.ID+": starter/"+f+" missing")
