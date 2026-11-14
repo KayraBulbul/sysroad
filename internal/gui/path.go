@@ -30,6 +30,11 @@ func UseLoginPath() {
 	}
 	home, _ := os.UserHomeDir()
 	dirs = append(dirs, "/opt/homebrew/bin", "/usr/local/bin", filepath.Join(home, "go", "bin"))
+	os.Setenv("PATH", joinPath(dirs))
+}
+
+// joinPath makes a PATH value of dirs, dropping empty and repeated entries.
+func joinPath(dirs []string) string {
 	seen := map[string]bool{}
 	var path []string
 	for _, d := range dirs {
@@ -38,5 +43,5 @@ func UseLoginPath() {
 			path = append(path, d)
 		}
 	}
-	os.Setenv("PATH", strings.Join(path, string(os.PathListSeparator)))
+	return strings.Join(path, string(os.PathListSeparator))
 }

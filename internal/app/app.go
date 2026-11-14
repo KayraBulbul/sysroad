@@ -252,7 +252,7 @@ type Ref struct {
 
 // Counts reports whether a step counts towards its section's progress:
 // optional steps only count once done, skipped steps never count.
-func (a *App) Counts(sec *roadmap.Section, st *roadmap.Step) bool {
+func (a *App) Counts(st *roadmap.Step) bool {
 	s := a.Progress.StatusOf(st.ID)
 	if s == store.Skipped {
 		return false
@@ -375,7 +375,7 @@ func (a *App) SectionStats(sec *roadmap.Section) Stats {
 	st := Stats{Minutes: a.Progress.Minutes[sec.ID]}
 	for _, step := range sec.Steps {
 		st.Minutes += a.Progress.Minutes[step.ID]
-		if !a.Counts(sec, step) {
+		if !a.Counts(step) {
 			continue
 		}
 		st.Total++

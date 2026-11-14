@@ -39,7 +39,6 @@ type Service struct {
 	cancelRun context.CancelFunc
 
 	hintsMod   int64
-	latestID   string
 	latestAt   time.Time
 	themeDir   string
 	theme      Theme
@@ -70,7 +69,7 @@ func New(a *app.App, emit func(string, any), openURL func(string) error) *Servic
 		themeDir: ThemeDir(),
 		stop:     make(chan struct{}),
 	}
-	s.latestID, s.latestAt = a.Engine.Latest()
+	_, s.latestAt = a.Engine.Latest()
 	s.theme = LoadTheme(s.themeDir)
 	s.files = newFileWatcher(a.Engine, func(ev FileEvent) { s.emit(EvFile, ev) })
 	s.updates = newUpdater(UpdateSrc(), func(i UpdateInfo) { s.emit(EvUpdate, i) })
@@ -144,7 +143,7 @@ func (s *Service) tick(now time.Time) {
 	var newResult string
 	id, at := s.app.Engine.Latest()
 	if at.After(s.latestAt) {
-		s.latestID, s.latestAt, newResult = id, at, id
+		s.latestAt, newResult = at, id
 		changed = true
 	}
 	startSync := s.sync.Tick(now, at)
@@ -502,7 +501,7 @@ func (s *Service) Run(id string, mode course.Mode) (*RunOutcome, error) {
 		out.Result = res
 		out.Outcome, err = s.app.Record(l, res)
 		// Our own result: the tick shouldn't announce it as someone else's.
-		s.latestID, s.latestAt = engine.Latest()
+		_, s.latestAt = engine.Latest()
 	}
 	s.mu.Unlock()
 	s.emit(EvState, nil)

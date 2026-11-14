@@ -125,18 +125,13 @@ func runTUI(dir string, side bool) error {
 	}
 	if s, ok := final.(syncer); ok && s.Dirty() && gitsync.IsRepo(dir) {
 		fmt.Fprint(os.Stderr, "sysroad: syncing… ")
-		if err := syncWithRetry(dir, 20*time.Second); err != nil {
+		if err := gitsync.SyncWait(dir, 20*time.Second); err != nil {
 			fmt.Fprintln(os.Stderr, "failed:", err, "(changes are committed locally; run `sysroad sync` later)")
 			return nil
 		}
 		fmt.Fprintln(os.Stderr, "done")
 	}
 	return nil
-}
-
-// syncWithRetry waits out a sync still running in a background goroutine.
-func syncWithRetry(dir string, timeout time.Duration) error {
-	return gitsync.SyncWait(dir, timeout)
 }
 
 func runSync(dir string) error {
@@ -146,7 +141,7 @@ func runSync(dir string) error {
 	if !gitsync.IsRepo(dir) {
 		return errors.New(dir + " is not a git repo — run `sysroad init`")
 	}
-	if err := syncWithRetry(dir, time.Minute); err != nil {
+	if err := gitsync.SyncWait(dir, time.Minute); err != nil {
 		return err
 	}
 	if !gitsync.HasRemote(context.Background(), dir) {

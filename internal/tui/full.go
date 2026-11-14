@@ -65,8 +65,6 @@ func NewFull(a *app.App) *Full {
 	return m
 }
 
-func (m *Full) Init() tea.Cmd { return m.core.init() }
-
 func (m *Full) sec() *roadmap.Section {
 	secs := m.app.Roadmap.Sections
 	if len(secs) == 0 {
@@ -641,11 +639,7 @@ func (m *Full) footer() string {
 	case m.detailLesson() != nil && m.lv.confirm != "":
 		s = " " + sWarn.Render(m.lv.confirm)
 	case m.flash != "":
-		st := sGood
-		if m.flashErr {
-			st = sErr
-		}
-		s = " " + st.Render(m.flash)
+		s = " " + m.flashText()
 	case m.sync.Err != nil && m.flash == "":
 		s = " " + sErr.Render("sync: "+m.sync.Err.Error())
 	case m.detailLesson() != nil:
