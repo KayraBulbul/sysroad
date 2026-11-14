@@ -114,16 +114,6 @@
 </div>
 
 <style>
-  .page {
-    height: 100%;
-    overflow-y: auto;
-    scrollbar-gutter: stable both-edges;
-  }
-  .col {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 36px 24px 80px;
-  }
   .hero {
     display: grid;
     grid-template-columns: 150px 1fr;

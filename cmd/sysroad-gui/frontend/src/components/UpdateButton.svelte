@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Service, on, errText, type UpdateInfo } from "../lib/api";
+  import { Service, on, type UpdateInfo } from "../lib/api";
   import { fail } from "../lib/state.svelte";
 
   // ⟳ in the top bar: a dot when there's an update, a menu to check,
@@ -26,9 +26,8 @@
   async function check() {
     try {
       info = await Service.CheckUpdates();
-    } catch (e) {
+    } catch {
       // the error is in info.error too
-      void errText(e);
     }
   }
 
@@ -126,11 +125,6 @@
   }
   .icon.spin svg {
     animation: spin 1s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
   .dot {
     position: absolute;

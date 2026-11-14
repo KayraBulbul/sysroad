@@ -1,5 +1,4 @@
 import { tags as t, tagHighlighter, highlightCode } from "@lezer/highlight";
-import { parser as cppParser } from "@lezer/cpp";
 import { cppLanguage } from "@codemirror/lang-cpp";
 
 // One highlighter for the editor and for code in lessons, so both colour
@@ -22,10 +21,7 @@ export const highlighter = tagHighlighter([
   { tag: [t.invalid], class: "tok-invalid" },
 ]);
 
-// The cpp language's parser carries its highlighting props.
-const parser = cppLanguage.parser ?? cppParser;
-
-function escape(s: string) {
+export function escape(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
@@ -38,7 +34,8 @@ export function isCpp(lang: string) {
 // highlightCpp returns HTML for a C++ snippet.
 export function highlightCpp(code: string): string {
   let html = "";
-  const tree = parser.parse(code);
+  // The cpp language's parser carries its highlighting props.
+  const tree = cppLanguage.parser.parse(code);
   highlightCode(
     code,
     tree,
@@ -52,5 +49,3 @@ export function highlightCpp(code: string): string {
   );
   return html;
 }
-
-export { escape };

@@ -39,7 +39,6 @@
   --magenta: var(--c-magenta, #a28a9c);
   --cyan: var(--c-cyan, #8d9fa0);
   --orange: var(--c-orange, var(--yellow));
-  --brown: var(--c-brown, var(--red));
   --bright-red: var(--c-bright_red, var(--red));
   --bright-green: var(--c-bright_green, var(--green));
   --bright-yellow: var(--c-bright_yellow, var(--yellow));
@@ -138,6 +137,25 @@ kbd {
   background: transparent;
 }
 
+/* The scrolling page and centred column of the dashboard and phase views. */
+.page {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+}
+.col {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 36px 24px 80px;
+}
+
+/* Spinners in the output pane and the update button. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Buttons used across views. */
 .btn {
   display: inline-flex;
@@ -179,30 +197,23 @@ kbd {
 }
 
 /* Syntax colours, shared by the editor and code in lessons. */
-.tok-keyword,
-.tok-modifier,
-.tok-controlKeyword {
+.tok-keyword {
   color: var(--magenta);
 }
 .tok-typeName,
-.tok-className,
-.tok-namespace {
+.tok-className {
   color: var(--yellow);
 }
 .tok-function {
   color: var(--blue);
 }
-.tok-string,
-.tok-character {
+.tok-string {
   color: var(--green);
 }
-.tok-string2,
 .tok-escape {
   color: var(--bright-green);
 }
-.tok-number,
-.tok-bool,
-.tok-atom {
+.tok-number {
   color: var(--orange);
 }
 .tok-comment {

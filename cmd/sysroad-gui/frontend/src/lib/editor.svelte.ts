@@ -449,10 +449,6 @@ export class Workspace {
     this.view?.focus();
   }
 
-  hasFiles() {
-    return this.tabs.some((t) => t.kind === "file");
-  }
-
   private sync(buf: Buffer) {
     const t = this.tabs.find((x) => x.key === buf.key);
     if (t) {
@@ -640,14 +636,11 @@ export class Workspace {
     for (const f of files) {
       const key = `${this.lesson}/~solution/${f.name}`;
       const mine = this.bufs.get(`${this.lesson}/${f.name}`);
-      let state: EditorState;
-      if (diff && mine) {
-        state = this.newState(f.content, true, [
-          unifiedMergeView({ original: mine.state.doc.toString(), mergeControls: false, highlightChanges: true, gutter: true }),
-        ]);
-      } else {
-        state = this.newState(f.content, true);
-      }
+      const state = this.newState(
+        f.content,
+        true,
+        diff && mine ? [unifiedMergeView({ original: mine.state.doc.toString(), mergeControls: false, highlightChanges: true, gutter: true })] : [],
+      );
       this.bufs.set(key, { key, lesson: this.lesson, name: f.name, state, base: f.hash, saved: f.content, onDisk: false, dirty: false, conflict: null, readOnly: true, solution: true });
       tabs.push({ key, name: f.name, kind: diff ? "diff" : "solution", readOnly: true, dirty: false, conflict: false });
     }

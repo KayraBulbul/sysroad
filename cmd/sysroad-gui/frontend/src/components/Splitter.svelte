@@ -60,6 +60,7 @@
   .split::after {
     content: "";
     position: absolute;
+    inset: 0;
     background: var(--line);
     transition: background 0.12s;
   }
@@ -67,8 +68,7 @@
     width: 1px;
     cursor: col-resize;
   }
-  .split.x::before,
-  .split.y::before {
+  .split::before {
     content: "";
     position: absolute;
   }
@@ -78,15 +78,9 @@
   .split.y::before {
     inset: -4px 0;
   }
-  .split.x::after {
-    inset: 0;
-  }
   .split.y {
     height: 1px;
     cursor: row-resize;
-  }
-  .split.y::after {
-    inset: 0;
   }
   .split:hover::after,
   .split.dragging::after {
