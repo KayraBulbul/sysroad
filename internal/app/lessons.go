@@ -16,8 +16,9 @@ import (
 )
 
 // ResolveLesson picks the lesson a command means: an explicit ID, else the
-// lesson whose work folder contains cwd, else the current step if it is a
-// lesson, else the first unfinished written lesson.
+// lesson whose work folder contains cwd (in a project's folder, the lesson
+// the project is on), else the current step if it is a lesson, else the
+// first unfinished written lesson.
 func (a *App) ResolveLesson(arg, cwd string) (*course.Lesson, error) {
 	if arg != "" {
 		if l := a.Lesson(arg); l != nil {
@@ -39,6 +40,9 @@ func (a *App) ResolveLesson(arg, cwd string) (*course.Lesson, error) {
 				if l := a.Lesson(id); l != nil {
 					return l, nil
 				}
+				if p := a.Course.Project(id); p != nil {
+					return a.ProjectLesson(p), nil
+				}
 			}
 		}
 	}
@@ -48,7 +52,7 @@ func (a *App) ResolveLesson(arg, cwd string) (*course.Lesson, error) {
 		}
 	}
 	for _, l := range a.Course.Lessons() {
-		if l.Written && a.Progress.StatusOf(l.ID) != store.Done {
+		if l.Written && a.Progress.StatusOf(l.ID) != store.Done && a.CheckOrder(l) == nil {
 			return l, nil
 		}
 	}
@@ -100,6 +104,9 @@ func (a *App) BeginRun(l *course.Lesson) error {
 	if err := Runnable(l); err != nil {
 		return err
 	}
+	if err := a.CheckOrder(l); err != nil {
+		return err
+	}
 	return a.Start(l)
 }
 
@@ -116,7 +123,16 @@ func Execute(ctx context.Context, dir string, e *course.Engine, l *course.Lesson
 // ToggleStatus sets a step's status, or puts it back to todo if it already
 // has it. Finishing a step stops its timer.
 func (a *App) ToggleStatus(id string, s store.Status) error {
-	if a.Progress.StatusOf(id) == s {
+	cur := a.Progress.StatusOf(id)
+	if l := a.Lesson(id); l != nil && l.Project() != nil {
+		if s == store.Done || s == store.Skipped || cur == store.Done || cur == store.Skipped {
+			return ErrProjectStatus
+		}
+		if err := a.CheckOrder(l); err != nil {
+			return err
+		}
+	}
+	if cur == s {
 		s = store.Todo
 	}
 	if s == store.Done {
@@ -129,9 +145,10 @@ func (a *App) ToggleStatus(id string, s store.Status) error {
 	return a.SetStatus(id, s)
 }
 
-// Start marks a todo lesson in progress.
+// Start marks a todo lesson in progress. A project lesson starts only when
+// the project gets to it.
 func (a *App) Start(l *course.Lesson) error {
-	if a.Progress.StatusOf(l.ID) == store.Todo {
+	if a.Progress.StatusOf(l.ID) == store.Todo && a.CheckOrder(l) == nil {
 		return a.SetStatus(l.ID, store.Doing)
 	}
 	return nil
@@ -162,6 +179,9 @@ type Outcome struct {
 
 // RunLesson runs or submits a lesson and records a passing Submit.
 func (a *App) RunLesson(ctx context.Context, l *course.Lesson, mode course.Mode) (*course.Result, Outcome, error) {
+	if err := a.CheckOrder(l); err != nil {
+		return nil, Outcome{}, err
+	}
 	if _, err := a.Touch(l); err != nil {
 		return nil, Outcome{}, err
 	}
@@ -173,11 +193,18 @@ func (a *App) RunLesson(ctx context.Context, l *course.Lesson, mode course.Mode)
 	return r, out, err
 }
 
-// Record marks the lesson done if the result is a passing Submit.
+// Record marks the lesson done if the result is a passing Submit. Passing
+// a project lesson also saves a snapshot of the project folder, which the
+// next lesson's Reset goes back to.
 func (a *App) Record(l *course.Lesson, r *course.Result) (Outcome, error) {
 	before := a.XP()
 	completed := false
-	if r.OK && r.Mode == course.ModeSubmit && a.Progress.StatusOf(l.ID) != store.Done {
+	if r.OK && r.Mode == course.ModeSubmit && a.Progress.StatusOf(l.ID) != store.Done && a.CheckOrder(l) == nil {
+		if l.Project() != nil {
+			if err := a.Engine.SaveSnapshot(l); err != nil {
+				return Outcome{}, err
+			}
+		}
 		if err := a.SetStatus(l.ID, store.Done); err != nil {
 			return Outcome{}, err
 		}

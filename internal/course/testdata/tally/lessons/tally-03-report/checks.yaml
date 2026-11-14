@@ -1,0 +1,7 @@
+- name: prints the report
+  stdin: "a b\nc\n"
+  stdout: "words: 3\nlines: 2\n"
+- name: an empty report
+  hidden: true
+  stdin: ""
+  stdout: "words: 0\nlines: 0\n"

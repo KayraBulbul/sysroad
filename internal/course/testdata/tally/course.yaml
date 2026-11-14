@@ -1,0 +1,18 @@
+title: Fixture course
+phases:
+  - id: p-fixture
+    title: Fixture
+    chapters:
+      - id: ch-tally
+        title: Tally
+        lessons:
+          - id: tally-01-words
+            title: Counting words
+          - id: tally-aside
+            title: An aside between project lessons
+            kind: read
+            detail: Read something.
+          - id: tally-02-lines
+            title: Counting lines
+          - id: tally-03-report
+            title: A report

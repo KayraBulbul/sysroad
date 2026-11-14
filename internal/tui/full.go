@@ -856,6 +856,7 @@ func helpText() string {
 		{"r / s", "run the visible tests / submit every test"},
 		{"h / u", "next hint / under the hood (after passing)"},
 		{"e / v / R", "edit in $EDITOR / peek at the solution / reset to starter"},
+		{"C", "project lessons: catch up to the reference and skip the lesson"},
 		{"J/K", "scroll the output"}, {"[ ]", "previous / next lesson"},
 		{"", "Your own sections (course chapters are read-only)"},
 		{"a", "add step (right pane) / section (left pane)"}, {"r", "rename"},

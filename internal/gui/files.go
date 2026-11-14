@@ -155,12 +155,9 @@ func (s *Service) SaveFile(id, name, content, base string) (*SaveResult, error) 
 func (s *Service) Reset(id string) (string, []File, error) {
 	s.mu.Lock()
 	l, err := s.lesson(id)
-	if err == nil && !l.HasCode() {
-		err = errors.New("this lesson has no code to reset")
-	}
 	var backup string
 	if err == nil {
-		backup, err = s.app.Engine.Reset(l)
+		backup, err = s.app.ResetLesson(l)
 	}
 	if err == nil {
 		s.changed()
@@ -173,7 +170,8 @@ func (s *Service) Reset(id string) (string, []File, error) {
 	return backup, files, err
 }
 
-// Solution is the lesson's reference solution, for the files you edit.
+// Solution is the lesson's reference solution, for the files you edit; in
+// a project, the files this lesson's reference adds or changes.
 func (s *Service) Solution(id string) ([]File, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -184,7 +182,7 @@ func (s *Service) Solution(id string) ([]File, error) {
 	if !l.HasCode() {
 		return nil, errors.New("this lesson has no solution to show")
 	}
-	sol, err := l.Solution()
+	sol, err := l.PeekSolution()
 	if err != nil {
 		return nil, err
 	}

@@ -254,13 +254,43 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 		if !l.HasCode() {
 			return nil, true
 		}
+		if err := v.app.CheckOrder(l); err != nil {
+			c.fail(err)
+			return nil, true
+		}
 		v.confirm = "Reset to the starter code? Your files are moved to .local/reset-backup/ (y/N)"
+		if l.Project() != nil {
+			v.confirm = "Reset the project to how it was at the start of this lesson? Your files are moved to .local/reset-backup/ (y/N)"
+		}
 		v.onYes = func() tea.Cmd {
-			backup, err := v.app.Engine.Reset(l)
+			backup, err := v.app.ResetLesson(l)
 			if err != nil {
 				c.fail(err)
 			} else if backup != "" {
 				c.say("Reset. Your old files are in %s", tildePath(backup))
+			}
+			c.changed()
+			return nil
+		}
+		return nil, true
+	case "C":
+		if l.Project() == nil {
+			return nil, true
+		}
+		if err := v.app.CheckOrder(l); err != nil {
+			c.fail(err)
+			return nil, true
+		}
+		v.confirm = "Swap your project for the reference as of the end of this lesson, and skip it (no XP)? Your files are moved to .local/reset-backup/ (y/N)"
+		v.onYes = func() tea.Cmd {
+			backup, err := v.app.CatchUp(l)
+			switch {
+			case err != nil:
+				c.fail(err)
+			case backup != "":
+				c.say("Caught up. Your old files are in %s", tildePath(backup))
+			default:
+				c.say("Caught up")
 			}
 			c.changed()
 			return nil
@@ -276,7 +306,12 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 			return nil, true
 		}
 		c.changed()
-		cmd := exec.Command("sh", "-c", EditorCommand()+` "$1"`, "sh", l.Meta.Files[0])
+		file, err := v.app.EditFile(l)
+		if err != nil {
+			c.fail(err)
+			return nil, true
+		}
+		cmd := exec.Command("sh", "-c", EditorCommand()+` "$1"`, "sh", file)
 		cmd.Dir = dir
 		return tea.ExecProcess(cmd, func(err error) tea.Msg { return lessonEditDoneMsg{err} }), true
 	case "o":
@@ -378,7 +413,13 @@ func (v *lessonView) bodyLines(w int) []string {
 	if ch := l.Chapter; ch != nil {
 		add(trunc(sDim.Render(ch.Number+" "+ch.Title+" ")+chapterDots(v.app, ch, l.ID), w))
 	}
-	if l.HasCode() {
+	switch {
+	case l.Project() != nil:
+		add(trunc(sDim.Render("▸ "+tildePath(v.workPath())+"/ · your "+l.Project().ID+" project"), w))
+		if err := v.app.CheckOrder(l); err != nil {
+			add(sWarn.Render(wrap(err.Error(), w)))
+		}
+	case l.HasCode():
 		add(trunc(sDim.Render("▸ "+tildePath(v.workPath())+"/"+strings.Join(l.Meta.Files, ", ")), w))
 	}
 	add("")
@@ -428,9 +469,15 @@ func (v *lessonView) bodyLines(w int) []string {
 	}
 
 	if v.showSol {
-		sol, _ := l.Solution()
+		sol, _ := l.PeekSolution()
 		add("")
 		add(sHeading.Render("Solution"))
+		if l.Project() != nil {
+			add(sDim.Render(wrap("The course's reference for this lesson: the files it adds or changes.", w)))
+			if rm := l.Meta.SolutionRemoves; len(rm) > 0 {
+				add(sDim.Render(wrap("It deletes "+strings.Join(rm, ", ")+".", w)))
+			}
+		}
 		for _, name := range l.SortedNames(sol) {
 			add(sDim.Render(name))
 			add(strings.Join(codeBlock(strings.TrimRight(string(sol[name]), "\n"), langOf(name), w), "\n"))
@@ -590,6 +637,9 @@ func (v *lessonView) hints(c *core) string {
 	}
 	if l.HasCode() {
 		keys = append(keys, [2]string{"e", "edit"}, [2]string{"v", "solution"})
+	}
+	if l.Project() != nil && v.app.CheckOrder(l) == nil {
+		keys = append(keys, [2]string{"C", "catch up"})
 	}
 	keys = append(keys, [2]string{"[/]", "prev/next"}, [2]string{"q", ""})
 	return keyHints(keys)

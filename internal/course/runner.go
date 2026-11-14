@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -49,7 +50,7 @@ type Result struct {
 	Mode    Mode      `json:"mode"`
 	At      time.Time `json:"at"`
 	OK      bool      `json:"ok"`
-	Stage   string    `json:"stage"` // compile, tests, checks, check, done
+	Stage   string    `json:"stage"` // compile, contract, project, tests, checks, check, done
 	Summary string    `json:"summary"`
 	Output  string    `json:"output"`
 	Passed  int       `json:"passed"`
@@ -75,20 +76,42 @@ func NewEngine(dataDir string) *Engine {
 
 const WorkDirName = "work"
 
-func (e *Engine) WorkDir(l *Lesson) string { return filepath.Join(e.DataDir, WorkDirName, l.ID) }
+// WorkDir is the lesson's folder: work/<lesson-id>, or work/<project> for
+// every lesson of a project.
+func (e *Engine) WorkDir(l *Lesson) string {
+	return filepath.Join(e.DataDir, WorkDirName, workName(l))
+}
+
+func workName(l *Lesson) string {
+	if l.project != nil {
+		return l.project.ID
+	}
+	return l.ID
+}
+
 func (e *Engine) buildDir(l *Lesson) string {
-	return filepath.Join(e.DataDir, ".local", "build", l.ID)
+	return filepath.Join(e.DataDir, ".local", "build", workName(l))
 }
 func (e *Engine) runPath(id string) string {
 	return filepath.Join(e.DataDir, ".local", "runs", id+".json")
 }
 
 // Ensure creates the lesson's workspace from its starter files. Files that
-// already exist are never touched, so it is safe to call at any time.
+// already exist are never touched, so it is safe to call at any time. A
+// project's folder only gets the first lesson's starter, while that lesson
+// is the one being worked on; after that the course never writes into it.
 func (e *Engine) Ensure(l *Lesson) (string, error) {
 	dir := e.WorkDir(l)
 	if !l.Written || l.Meta.Check != "" {
 		return dir, nil
+	}
+	if p := l.project; p != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", err
+		}
+		if p.Lessons[0] != l {
+			return dir, nil
+		}
 	}
 	starter, err := l.Starter()
 	if err != nil {
@@ -110,21 +133,42 @@ func (e *Engine) Ensure(l *Lesson) (string, error) {
 }
 
 // Reset moves the workspace aside (into .local/reset-backup/) and recreates
-// it from the starter files. It returns where the old files went.
+// it: from the starter files, or for a project lesson as the folder was at
+// the start of the lesson (the previous lesson's snapshot, or empty for the
+// first). It returns where the old files went.
 func (e *Engine) Reset(l *Lesson) (string, error) {
-	dir := e.WorkDir(l)
-	backup := ""
-	if _, err := os.Stat(dir); err == nil {
-		backup = filepath.Join(e.DataDir, ".local", "reset-backup", l.ID+"-"+time.Now().Format("20060102-150405"))
-		if err := os.MkdirAll(filepath.Dir(backup), 0o755); err != nil {
-			return "", err
-		}
-		if err := os.Rename(dir, backup); err != nil {
-			return "", err
+	snapshot := ""
+	if prev := l.project.prev(l); prev != nil {
+		snapshot = e.SnapshotDir(prev)
+		if _, err := os.Stat(snapshot); err != nil {
+			return "", fmt.Errorf("there's no snapshot of %q to go back to", prev.Title)
 		}
 	}
-	_, err := e.Ensure(l)
+	backup, err := e.moveAside(l)
+	if err != nil {
+		return "", err
+	}
+	if snapshot != "" {
+		if err := copyTree(snapshot, e.WorkDir(l)); err != nil {
+			return backup, err
+		}
+	}
+	_, err = e.Ensure(l)
 	return backup, err
+}
+
+// moveAside moves the lesson's folder into .local/reset-backup/, if it
+// exists, and returns where it went.
+func (e *Engine) moveAside(l *Lesson) (string, error) {
+	dir := e.WorkDir(l)
+	if _, err := os.Stat(dir); err != nil {
+		return "", nil
+	}
+	backup := filepath.Join(e.DataDir, ".local", "reset-backup", workName(l)+"-"+time.Now().Format("20060102-150405"))
+	if err := os.MkdirAll(filepath.Dir(backup), 0o755); err != nil {
+		return "", err
+	}
+	return backup, os.Rename(dir, backup)
 }
 
 // LastResult is the most recent saved Run/Submit result for a lesson.
@@ -313,6 +357,8 @@ func (e *Engine) Run(ctx context.Context, l *Lesson, mode Mode) (*Result, error)
 		r, err = e.builtinCheck(ctx, l, mode)
 	case l.Meta.Build == "cmake":
 		r, err = e.runCMake(ctx, l, mode)
+	case l.project != nil:
+		r, err = e.runProject(ctx, l, mode)
 	default:
 		r, err = e.runCode(ctx, l, mode)
 	}
@@ -387,10 +433,7 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 
 	cctx, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
-	prog := filepath.Join(build, "prog")
-	if l.Meta.Program != "" {
-		prog = filepath.Join(build, l.Meta.Program)
-	}
+	prog := filepath.Join(build, programName(l))
 	testBin := filepath.Join(build, "tests-"+string(mode))
 	var progRes, testRes compiled
 	var wg sync.WaitGroup
@@ -402,18 +445,10 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 		}
 	}
 
-	// The program build carries the warnings you see. Without a program
-	// to build, a syntax-only pass shows them instead.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		args := append(append(append([]string{}, progFlags...), warnFlags...), "-I", ".")
-		if needProg {
-			args = append(append(args, srcs...), flush, "-o", prog)
-		} else {
-			args = append(append(args, "-fsyntax-only"), srcs...)
-		}
-		progRes = compile(cctx, work, cxx, args)
+		progRes = compile(cctx, work, cxx, programArgs(progFlags, srcs, flush, pathIf(needProg, prog)))
 	}()
 	if len(testFiles) > 0 {
 		wg.Add(1)
@@ -457,6 +492,16 @@ func (e *Engine) runCode(ctx context.Context, l *Lesson, mode Mode) (*Result, er
 	return e.grade(ctx, l, mode, &out, graded{prog: pathIf(needProg, prog), testBin: pathIf(len(testFiles) > 0, testBin), r: &Result{}}), nil
 }
 
+// programArgs builds the program, which carries the warnings you see.
+// Without a program to build (prog ""), a syntax-only pass shows them.
+func programArgs(flags, srcs []string, flush, prog string) []string {
+	args := append(append(append([]string{}, flags...), warnFlags...), "-I", ".")
+	if prog != "" {
+		return append(append(args, srcs...), flush, "-o", prog)
+	}
+	return append(append(args, "-fsyntax-only"), srcs...)
+}
+
 func pathIf(ok bool, p string) string {
 	if ok {
 		return p
@@ -469,16 +514,53 @@ type graded struct {
 	prog    string            // what Run shows and checks.yaml runs; "" if none
 	progs   map[string]string // CMake: each program target, for checks with program:
 	testBin string            // the doctest binary; "" if the lesson has no tests
+	suites  []suite           // a project's lessons, each with its own binary, instead of testBin
 	r       *Result           // results so far (a CMake project's own checks)
+}
+
+// suite is one lesson's tests and program checks. In a project, each
+// lesson's tests build into their own binary, because lessons' test helpers
+// often share names with different contents.
+type suite struct {
+	lesson  *Lesson
+	earlier bool     // an earlier lesson of the project: a failure is a regression
+	dir     string   // where its tests/ were written
+	files   []string // its test .cpp files, in dir
+	bin     string   // its doctest binary; "" if it has no tests
+	exclude []string // retired test-case name patterns
+	checks  []Check
+}
+
+// origin says whose tests a section of output shows, for an earlier
+// lesson's: then a failure means you broke something that used to work.
+func (s suite) origin() string {
+	if !s.earlier {
+		return ""
+	}
+	return "from an earlier lesson, “" + s.lesson.Title + "”"
+}
+
+func notes(parts ...string) string {
+	return strings.Join(slices.DeleteFunc(parts, func(s string) bool { return s == "" }), " · ")
 }
 
 // grade runs a built lesson: the sample run, the unit tests, then the
 // program checks, and sums it all up. out already holds what came before.
 func (e *Engine) grade(ctx context.Context, l *Lesson, mode Mode, out *strings.Builder, g graded) *Result {
 	r := g.r
-	work, testsDir := e.WorkDir(l), filepath.Join(e.buildDir(l), "tests")
+	work := e.WorkDir(l)
 	allOK := r.Stage == ""
 	stopped := !allOK && mode == ModeRun
+	suites := g.suites
+	if suites == nil {
+		checks, err := l.Checks()
+		if err != nil {
+			allOK, r.Stage = false, "checks"
+			out.WriteString(red(err.Error()) + "\n")
+		}
+		suites = []suite{{lesson: l, bin: g.testBin, dir: filepath.Join(e.buildDir(l), "tests"), checks: checks}}
+	}
+	testsDir := suites[len(suites)-1].dir // the lesson's own
 	// Sample run first, like seeing your program's output before the tests.
 	if mode == ModeRun && l.Meta.Run != nil && g.prog != "" && !stopped {
 		s := l.Meta.Run
@@ -502,50 +584,63 @@ func (e *Engine) grade(ctx context.Context, l *Lesson, mode Mode, out *strings.B
 		}
 	}
 
-	crashed := false
-	if g.testBin != "" && !stopped {
-		res, rep := e.runTests(ctx, g.testBin, mode)
+	crashed, shown := false, false
+	for _, s := range suites {
+		if s.bin == "" || stopped {
+			continue
+		}
+		res, rep := e.runTests(ctx, s.bin, mode, s.exclude)
 		passed, total := rep.counts()
 		r.Passed += passed
 		r.Total += total
-		if res.code != 0 {
-			allOK = false
-			r.Stage = "tests"
-			crashed = rep.crashed()
-			if len(rep.cases) == 0 {
-				// It died before a single test started: show what it said.
-				out.WriteString(section("Tests", ""))
-				out.WriteString(strings.TrimSpace(tidySanitizer(res.stdout+"\n"+res.stderr, work, testsDir)) + "\n")
-				if res.note != "" {
-					out.WriteString(red(strings.TrimPrefix(res.note, " ")) + "\n")
-				}
-			} else {
-				out.WriteString(rep.render(mode, res.stdout, tidySanitizer(res.stderr, work, testsDir), res.note))
-			}
+		if res.code == 0 {
+			continue
 		}
-	}
-	checks, err := l.Checks()
-	if err != nil {
-		allOK, r.Stage = false, "checks"
-		out.WriteString(red(err.Error()) + "\n")
+		allOK, stopped = false, mode == ModeRun
+		r.Stage = "tests"
+		crashed = crashed || rep.crashed()
+		if shown {
+			out.WriteString("\n")
+		}
+		shown = true
+		if len(rep.cases) == 0 {
+			// It died before a single test started: show what it said.
+			out.WriteString(section("Tests", s.origin()))
+			out.WriteString(strings.TrimSpace(tidySanitizer(res.stdout+"\n"+res.stderr, work, s.dir)) + "\n")
+			if res.note != "" {
+				out.WriteString(red(strings.TrimPrefix(res.note, " ")) + "\n")
+			}
+		} else {
+			out.WriteString(rep.render(mode, s.origin(), res.stdout, tidySanitizer(res.stderr, work, s.dir), res.note))
+		}
 	}
 	// Submit runs the program checks even after a failed unit test, so you
 	// see everything that's left in one go.
-	if (allOK || mode == ModeSubmit) && len(checks) > 0 {
+	for _, s := range suites {
+		if !(allOK || mode == ModeSubmit) || len(s.checks) == 0 {
+			continue
+		}
 		if !allOK {
 			out.WriteString("\n")
 		}
-		ok, passed, total, text := e.runChecks(ctx, l, g, checks, mode)
+		ok, passed, total, text := e.runChecks(ctx, l, g, s.checks, mode)
 		r.Passed += passed
 		r.Total += total
 		if text != "" {
-			out.WriteString(section("Program checks", fmt.Sprintf("%d passed · %d failed", passed, total-passed)))
+			out.WriteString(section("Program checks", notes(s.origin(), fmt.Sprintf("%d passed · %d failed", passed, total-passed))))
 		}
 		out.WriteString(text)
 		if !ok {
 			allOK = false
 			r.Stage = "checks"
 		}
+	}
+	if earlier := len(suites) - 1; allOK && mode == ModeSubmit && earlier > 0 {
+		lessons := "lessons"
+		if earlier == 1 {
+			lessons = "lesson"
+		}
+		out.WriteString(dim(fmt.Sprintf("Submit ran this lesson's tests and those of %d earlier %s in the project.", earlier, lessons)) + "\n")
 	}
 	r.Output = strings.TrimRight(out.String(), "\n") + "\n"
 	r.OK = allOK
@@ -603,7 +698,8 @@ func sortedKeys(m map[string][]byte) []string {
 
 // runTests runs the doctest binary with sysroad's reporter and reads back
 // its report.
-func (e *Engine) runTests(ctx context.Context, bin string, mode Mode) (execResult, *testReport) {
+// exclude names retired test cases, which are neither run nor listed.
+func (e *Engine) runTests(ctx context.Context, bin string, mode Mode, exclude []string) (execResult, *testReport) {
 	f, err := os.CreateTemp("", "sysroad-tests-*.jsonl")
 	if err != nil {
 		return execResult{stderr: err.Error(), code: -1}, &testReport{}
@@ -614,9 +710,14 @@ func (e *Engine) runTests(ctx context.Context, bin string, mode Mode) (execResul
 	if mode == ModeRun {
 		args = append(args, "--abort-after=1")
 	}
+	if len(exclude) > 0 {
+		args = append(args, "--test-case-exclude="+strings.Join(exclude, ","))
+	}
 	res := e.exec(ctx, bin, args, "", nil, testTimeout)
 	data, _ := os.ReadFile(f.Name())
-	return res, parseTestReport(data)
+	rep := parseTestReport(data)
+	rep.cases = slices.DeleteFunc(rep.cases, func(tc *testCase) bool { return matchesAny(exclude, tc.name) })
+	return res, rep
 }
 
 func (e *Engine) runChecks(ctx context.Context, l *Lesson, g graded, checks []Check, mode Mode) (ok bool, passed, total int, text string) {
@@ -691,14 +792,26 @@ func (e *Engine) runChecks(ctx context.Context, l *Lesson, g graded, checks []Ch
 	return ok, passed, total, b.String()
 }
 
+// programName is what the program is called: program:, else a project's
+// name, else prog.
+func programName(l *Lesson) string {
+	switch {
+	case l.Meta.Program != "":
+		return l.Meta.Program
+	case l.project != nil:
+		return l.project.ID
+	}
+	return "prog"
+}
+
 // progName is how a check shows the program it runs: the CMake target, or
 // else the lesson's first file without its extension.
 func progName(l *Lesson, program string) string {
 	switch {
 	case program != "":
 		return "./" + program
-	case l.Meta.Program != "":
-		return "./" + l.Meta.Program
+	case l.Meta.Program != "" || l.project != nil:
+		return "./" + programName(l)
 	case l.Meta.Build == "cmake":
 		if spec, err := l.CMake(); err == nil && spec.Program != "" {
 			return "./" + spec.Program
