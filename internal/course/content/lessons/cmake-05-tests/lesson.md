@@ -1,5 +1,6 @@
 ---
 title: Tests with CTest
+base: cmake-04-options
 minutes: 25
 build: cmake
 files: [tests/CMakeLists.txt, tests/test_textutil.cpp, CMakeLists.txt]

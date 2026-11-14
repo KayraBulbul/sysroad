@@ -1,5 +1,6 @@
 ---
 title: Drawing the screen with escape codes
+base: editor-01-raw
 kind: capstone
 program: kite
 minutes: 30

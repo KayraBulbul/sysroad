@@ -1,5 +1,6 @@
 ---
 title: Dependencies with FetchContent
+base: cmake-05-tests
 minutes: 25
 build: cmake
 files: [CMakeLists.txt, tests/CMakeLists.txt, tests/test_textutil.cpp]

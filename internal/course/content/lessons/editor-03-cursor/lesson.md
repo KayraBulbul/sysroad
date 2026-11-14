@@ -1,5 +1,6 @@
 ---
 title: Moving the cursor
+base: editor-02-screen
 kind: capstone
 program: kite
 minutes: 25

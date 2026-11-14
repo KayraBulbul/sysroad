@@ -1,5 +1,6 @@
 ---
 title: "fg, bg and Ctrl-Z"
+base: shell-05-background
 kind: capstone
 program: conch
 minutes: 50

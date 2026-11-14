@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"maps"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -82,6 +83,8 @@ type Lesson struct {
 	Written bool     `yaml:"-"` // has a content/lessons/<id>/ folder
 	Meta    Meta     `yaml:"-"`
 	Body    string   `yaml:"-"` // lesson.md without front matter
+
+	base *Lesson // Meta.Base, if it is an earlier lesson
 }
 
 // Meta is a written lesson's lesson.md front matter.
@@ -107,6 +110,9 @@ type Meta struct {
 	// SolutionRemoves names starter files the solution deletes; solution/
 	// holds only the files the solution adds or changes.
 	SolutionRemoves []string `yaml:"solution_removes"`
+	// Base is an earlier lesson whose solution this lesson's starter
+	// continues; starter/ holds only the files it adds or changes.
+	Base string `yaml:"base"`
 }
 
 type Link struct {
@@ -207,8 +213,28 @@ func (l *Lesson) files(sub string) (map[string][]byte, error) {
 	return out, err
 }
 
-func (l *Lesson) Starter() (map[string][]byte, error) { return l.files("starter") }
-func (l *Lesson) tests() (map[string][]byte, error)   { return l.files("tests") }
+func (l *Lesson) tests() (map[string][]byte, error) { return l.files("tests") }
+
+// Starter is the files in starter/, written over the base lesson's
+// solution if the lesson has a base.
+func (l *Lesson) Starter() (map[string][]byte, error) {
+	if l.Meta.Base == "" {
+		return l.files("starter")
+	}
+	if l.base == nil {
+		return nil, fmt.Errorf("%s: base %s is not an earlier lesson", l.ID, l.Meta.Base)
+	}
+	out, err := l.base.Solution()
+	if err != nil {
+		return nil, err
+	}
+	own, err := l.files("starter")
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(out, own)
+	return out, nil
+}
 
 // Solution is the starter with the files in solution/ written over it and
 // the files in SolutionRemoves deleted.
@@ -318,6 +344,7 @@ func Load() (*Course, error) {
 				if err := l.load(); err != nil {
 					return nil, err
 				}
+				l.base = c.lessons[l.Meta.Base] // only earlier lessons are in the map yet
 				c.lessons[l.ID] = l
 			}
 		}
@@ -461,7 +488,21 @@ func (c *Course) Roadmap() *roadmap.Roadmap {
 	return r
 }
 
-// Validate is used by tests: every written lesson's files must exist.
+// unchanged names the files in the lesson's sub folder that are identical to
+// the same path in under: copies the overlay makes redundant.
+func (l *Lesson) unchanged(sub string, under map[string][]byte) []string {
+	own, _ := l.files(sub)
+	var out []string
+	for _, name := range slices.Sorted(maps.Keys(own)) {
+		if data, ok := under[name]; ok && bytes.Equal(own[name], data) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// Validate is used by tests: every written lesson's files must exist, and
+// starter/ and solution/ must not repeat the files they are laid over.
 func (c *Course) Validate() error {
 	var errs []string
 	for _, l := range c.Lessons() {
@@ -481,10 +522,13 @@ func (c *Course) Validate() error {
 			continue
 		}
 		sol, _ := l.Solution()
-		changed, _ := l.files("solution")
-		for name, data := range changed {
-			if s, ok := starter[name]; ok && bytes.Equal(data, s) {
-				errs = append(errs, l.ID+": solution/"+name+" is the same as the starter's, so delete it")
+		for _, f := range l.unchanged("solution", starter) {
+			errs = append(errs, l.ID+": solution/"+f+" is the same as the starter's, so delete it")
+		}
+		if l.base != nil {
+			inherited, _ := l.base.Solution()
+			for _, f := range l.unchanged("starter", inherited) {
+				errs = append(errs, l.ID+": starter/"+f+" is the same as "+l.base.ID+"'s solution, so delete it")
 			}
 		}
 		for _, f := range l.Meta.SolutionRemoves {

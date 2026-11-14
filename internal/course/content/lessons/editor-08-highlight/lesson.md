@@ -1,5 +1,6 @@
 ---
 title: Syntax highlighting for C++
+base: editor-07-search
 kind: capstone
 program: kite
 minutes: 40

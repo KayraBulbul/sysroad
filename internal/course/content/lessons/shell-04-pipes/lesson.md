@@ -1,5 +1,6 @@
 ---
 title: Pipelines
+base: shell-03-redirect
 kind: capstone
 program: conch
 minutes: 50

@@ -1,5 +1,6 @@
 ---
 title: Undo and redo
+base: editor-08-highlight
 kind: capstone
 program: kite
 minutes: 40

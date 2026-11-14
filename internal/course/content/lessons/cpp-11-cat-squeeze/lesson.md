@@ -1,5 +1,6 @@
 ---
 title: "-s: squeezing blank lines"
+base: cpp-10-cat-number
 minutes: 10
 files: [cat.cpp]
 run:

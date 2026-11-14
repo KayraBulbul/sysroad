@@ -226,7 +226,10 @@ The course lives in `internal/course/content/` and is embedded in the binary:
   run it in place, the desktop app in a terminal window.
 - `starter/` and `solution/`: the files. `solution/` holds only the files the solution
   adds or changes; the rest come from the starter, and `solution_removes: [path]` in the
-  front matter deletes a starter file. A copy of an unchanged file fails `go test`.
+  front matter deletes a starter file. When a lesson carries on the same project as an
+  earlier one, `base: <lesson-id>` makes its starter that lesson's solution, and
+  `starter/` holds only the files it adds or changes. A copy of an unchanged file fails
+  `go test`.
   `make test` checks that every starter fails Run and every solution passes Submit.
 - `tests/visible_*.cpp` (Run and Submit) and `tests/hidden_*.cpp` (Submit only): doctest
   test cases. If your file has a `main`, it's renamed so doctest's runs instead. Headers in

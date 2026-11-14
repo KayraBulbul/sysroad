@@ -1,5 +1,6 @@
 ---
 title: Incremental search
+base: editor-06-save
 kind: capstone
 program: kite
 minutes: 30
