@@ -120,7 +120,7 @@ TEST_CASE("never reached") { CHECK(true); }
 		t.Fatalf("%v\n%s", err, out)
 	}
 
-	res, rep := e.runTests(ctx, bin, ModeSubmit)
+	res, rep := e.runTests(ctx, bin, ModeSubmit, nil)
 	if res.code == 0 {
 		t.Fatal("the run should fail")
 	}
@@ -130,7 +130,7 @@ TEST_CASE("never reached") { CHECK(true); }
 	if passed, total := rep.counts(); passed != 1 || total != 4 {
 		t.Errorf("counts = %d/%d, want 1/4", passed, total)
 	}
-	got := stripANSI(rep.render(ModeSubmit, res.stdout, "", res.note))
+	got := stripANSI(rep.render(ModeSubmit, "", res.stdout, "", res.note))
 	for _, want := range []string{
 		"TESTS  1 passed · 3 failed · 1 not run\n",
 		"✓ a passing test\n",

@@ -11,6 +11,26 @@ import * as course$0 from "../course/models.js";
 // @ts-ignore: Unused imports
 import * as store$0 from "../store/models.js";
 
+/**
+ * CaughtUp is what catching up did.
+ */
+export interface CaughtUp {
+    /**
+     * where your files went; "" if there were none
+     */
+    "backup": string;
+
+    /**
+     * the folder now: the reference
+     */
+    "files": File[] | null;
+
+    /**
+     * the lesson, now skipped
+     */
+    "lesson": LessonDetail | null;
+}
+
 export interface ChapterDTO {
     "id": string;
     "number": string;
@@ -45,10 +65,12 @@ export interface File {
 }
 
 /**
- * FileEvent reports a lesson file that changed on disk.
+ * FileEvent reports a lesson file that changed on disk. In a project it
+ * may also be a file that appeared, or one that went (Removed).
  */
 export interface FileEvent {
     "lesson": string;
+    "removed": boolean;
     "name": string;
     "content": string;
     "hash": string;
@@ -109,6 +131,11 @@ export interface LessonDetail {
     "note": string;
     "files": string[] | null;
     "workDir": string;
+
+    /**
+     * nil outside a project
+     */
+    "project": ProjectInfo | null;
     "result": course$0.Result | null;
 
     /**
@@ -152,6 +179,69 @@ export interface PhaseDTO {
  * the gitignored .local/ so each machine has its own.
  */
 export type Prefs = { [_ in string]?: any } | null;
+
+/**
+ * ProjectInfo is a project lesson's place in its project.
+ */
+export interface ProjectInfo {
+    "id": string;
+
+    /**
+     * the contract header, e.g. kite.hpp
+     */
+    "header": string;
+    "state": ProjectState;
+
+    /**
+     * OnID and OnTitle name the lesson the project is on; "" once every
+     * lesson is passed.
+     */
+    "onId": string;
+    "onTitle": string;
+
+    /**
+     * Contract is the declarations the tests use at this lesson, written
+     * as you'd declare them in Header.
+     */
+    "contract": string[] | null;
+
+    /**
+     * Removes names the files this lesson's reference deletes.
+     */
+    "removes": string[] | null;
+
+    /**
+     * Starter names the files the project's first lesson puts in the
+     * folder when it's made (data to try the program on); empty for the
+     * other lessons, which never write into it.
+     */
+    "starter": string[] | null;
+}
+
+/**
+ * ProjectState is where a project lesson stands in its project.
+ */
+export enum ProjectState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * the lesson the project is on
+     */
+    ProjectCurrent = "current",
+
+    /**
+     * passed or caught up; readable, not run again
+     */
+    ProjectPassed = "passed",
+
+    /**
+     * the project hasn't reached it
+     */
+    ProjectLocked = "locked",
+};
 
 export interface ResultEvent {
     "lesson": string;

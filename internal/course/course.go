@@ -3,7 +3,8 @@
 // engine that builds and tests a learner's code (see runner.go).
 //
 // Content ships inside the binary (content/). A learner's code lives in the
-// data repo under work/<lesson-id>/ so it syncs between machines.
+// data repo under work/<lesson-id>/, or work/<project>/ for a project's
+// lessons (project.go), so it syncs between machines.
 package course
 
 import (
@@ -42,7 +43,8 @@ type Course struct {
 	Title  string   `yaml:"title"`
 	Phases []*Phase `yaml:"phases"`
 
-	lessons map[string]*Lesson
+	lessons  map[string]*Lesson
+	projects []*Project
 }
 
 type Phase struct {
@@ -84,7 +86,9 @@ type Lesson struct {
 	Meta    Meta     `yaml:"-"`
 	Body    string   `yaml:"-"` // lesson.md without front matter
 
-	base *Lesson // Meta.Base, if it is an earlier lesson
+	src     fs.FS    // the course content the lesson's folder is read from
+	base    *Lesson  // Meta.Base, if it is an earlier lesson
+	project *Project // Meta.Project
 }
 
 // Meta is a written lesson's lesson.md front matter.
@@ -113,6 +117,13 @@ type Meta struct {
 	// Base is an earlier lesson whose solution this lesson's starter
 	// continues; starter/ holds only the files it adds or changes.
 	Base string `yaml:"base"`
+	// Project puts the lesson in a project: every lesson with the same
+	// project works in one folder, work/<project>/, holding only your code.
+	Project string `yaml:"project"`
+	// Contract is what this lesson adds to the project's contract.
+	Contract Contract `yaml:"contract"`
+	// Retires names earlier tests of the project this lesson makes invalid.
+	Retires []Retire `yaml:"retires"`
 }
 
 type Link struct {
@@ -145,17 +156,21 @@ type Check struct {
 // Graded reports whether Submit (rather than a manual tick) completes it.
 // Quizzes count: answering every question right completes them.
 func (l *Lesson) Graded() bool {
-	return l.Written && (l.Meta.Check != "" || len(l.Meta.Files) > 0 || l.IsQuiz())
+	return l.Written && (l.Meta.Check != "" || l.writesCode() || l.IsQuiz())
 }
 
 // HasCode reports whether the lesson has code you write in its work folder,
 // so editing, Reset and the solution apply (built-in checks have none).
-func (l *Lesson) HasCode() bool { return l.Graded() && l.Meta.Check == "" && len(l.Meta.Files) > 0 }
+func (l *Lesson) HasCode() bool { return l.Graded() && l.Meta.Check == "" && l.writesCode() }
 
-func (l *Lesson) dir() string { return path.Join("content/lessons", l.ID) }
+// writesCode: a lesson names the files you edit, or a project lesson has
+// you write all of them.
+func (l *Lesson) writesCode() bool { return len(l.Meta.Files) > 0 || l.Meta.Project != "" }
+
+func (l *Lesson) dir() string { return path.Join("lessons", l.ID) }
 
 func (l *Lesson) read(name string) (string, bool) {
-	data, err := content.ReadFile(path.Join(l.dir(), name))
+	data, err := fs.ReadFile(l.src, path.Join(l.dir(), name))
 	if err != nil {
 		return "", false
 	}
@@ -193,7 +208,7 @@ func (l *Lesson) Checks() ([]Check, error) {
 func (l *Lesson) files(sub string) (map[string][]byte, error) {
 	root := path.Join(l.dir(), sub)
 	out := map[string][]byte{}
-	err := fs.WalkDir(content, root, func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(l.src, root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				return fs.SkipAll
@@ -203,7 +218,7 @@ func (l *Lesson) files(sub string) (map[string][]byte, error) {
 		if d.IsDir() {
 			return nil
 		}
-		data, err := content.ReadFile(p)
+		data, err := fs.ReadFile(l.src, p)
 		if err != nil {
 			return err
 		}
@@ -236,10 +251,11 @@ func (l *Lesson) Starter() (map[string][]byte, error) {
 	return out, nil
 }
 
-// Solution is the starter with the files in solution/ written over it and
-// the files in SolutionRemoves deleted.
+// Solution is the reference: the starter (in a project, the previous
+// lesson's reference) with the files in solution/ written over it and the
+// files in SolutionRemoves deleted.
 func (l *Lesson) Solution() (map[string][]byte, error) {
-	out, err := l.Starter()
+	out, err := l.solutionBase()
 	if err != nil {
 		return nil, err
 	}
@@ -252,6 +268,25 @@ func (l *Lesson) Solution() (map[string][]byte, error) {
 	}
 	maps.Copy(out, changed)
 	return out, nil
+}
+
+// solutionBase is what solution/ is laid over: the previous project
+// lesson's reference, else the starter.
+func (l *Lesson) solutionBase() (map[string][]byte, error) {
+	if prev := l.project.prev(l); prev != nil {
+		return prev.Solution()
+	}
+	return l.Starter()
+}
+
+// PeekSolution is what peeking at the solution shows. In a project that's
+// only the files this lesson's reference adds or changes (SolutionRemoves
+// names the ones it deletes); elsewhere it's the whole solution.
+func (l *Lesson) PeekSolution() (map[string][]byte, error) {
+	if l.project == nil {
+		return l.Solution()
+	}
+	return l.files("solution")
 }
 
 // SortedNames returns map keys in order, primary files first.
@@ -302,7 +337,17 @@ func splitRule(s string) []string {
 
 // Load parses the built-in course.
 func Load() (*Course, error) {
-	data, err := content.ReadFile("content/course.yaml")
+	sub, err := fs.Sub(content, "content")
+	if err != nil {
+		return nil, err
+	}
+	return LoadFS(sub)
+}
+
+// LoadFS parses a course laid out like content/: course.yaml and
+// lessons/<id>/. Tests use it for fixture courses.
+func LoadFS(fsys fs.FS) (*Course, error) {
+	data, err := fs.ReadFile(fsys, "course.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +385,7 @@ func Load() (*Course, error) {
 				if err := claim(l.ID, "lesson "+l.Title); err != nil {
 					return nil, err
 				}
-				l.Chapter = ch
+				l.Chapter, l.src = ch, fsys
 				if err := l.load(); err != nil {
 					return nil, err
 				}
@@ -349,6 +394,7 @@ func Load() (*Course, error) {
 			}
 		}
 	}
+	c.linkProjects()
 	return &c, nil
 }
 
@@ -509,6 +555,9 @@ func (c *Course) Validate() error {
 		if !l.Written {
 			continue
 		}
+		if l.project != nil {
+			errs = append(errs, c.validateProjectLesson(l)...)
+		}
 		if l.Kind == KindQuiz {
 			errs = append(errs, l.validateQuiz()...)
 			continue
@@ -516,14 +565,19 @@ func (c *Course) Validate() error {
 		if l.Meta.Check != "" {
 			continue
 		}
-		starter, err := l.Starter()
+		starter, err := l.solutionBase()
 		if err != nil {
 			errs = append(errs, err.Error())
 			continue
 		}
+		under, same := "the starter", "the starter's"
+		if prev := l.project.prev(l); prev != nil {
+			under = prev.ID + "'s reference"
+			same = under
+		}
 		sol, _ := l.Solution()
 		for _, f := range l.unchanged("solution", starter) {
-			errs = append(errs, l.ID+": solution/"+f+" is the same as the starter's, so delete it")
+			errs = append(errs, l.ID+": solution/"+f+" is the same as "+same+", so delete it")
 		}
 		if l.base != nil {
 			inherited, _ := l.base.Solution()
@@ -533,7 +587,7 @@ func (c *Course) Validate() error {
 		}
 		for _, f := range l.Meta.SolutionRemoves {
 			if _, ok := starter[f]; !ok {
-				errs = append(errs, l.ID+": solution_removes names "+f+", which the starter doesn't have")
+				errs = append(errs, l.ID+": solution_removes names "+f+", which "+under+" doesn't have")
 			}
 		}
 		for _, f := range l.Meta.Files {

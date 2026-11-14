@@ -65,6 +65,7 @@ sysroad edit             # or open its file in $EDITOR directly
 | `u` | `sysroad lesson` | Under the hood, once you've passed |
 | `v` | `sysroad solution` | peek at the solution (the sidebar asks first) |
 | `R` | `sysroad reset` | put the starter code back; your files move to `.local/reset-backup/` |
+| `C` | `sysroad catchup` | project lessons: catch up to the reference (see below) |
 | `e` | `sysroad edit` | open the lesson's file in `$EDITOR` |
 | `1`–`9` | `sysroad quiz` | answer a quiz (the next unanswered question) |
 
@@ -73,6 +74,31 @@ take a lesson ID. `sysroad run` exits non-zero on failure, so it works as an edi
 keymap; the sidebar picks up the result either way. In the sidebar `j/k` scrolls the
 lesson, `J/K` scrolls the output, `[`/`]` browse lessons, `c` goes back to the current
 one and `S` syncs.
+
+### Projects
+
+Some chapters build one program over several lessons, like the kite text editor. Their
+lessons share one folder, `work/<project>/`, which starts empty: you write every file,
+the header and `main.cpp` included, and the course never writes into it. Each lesson
+names a few functions and types its tests use, declared in the project's header (say
+`kite.hpp`); the rest of the design is yours. Run checks your header against that list
+first and says what's missing or declared differently. `sysroad path` prints the
+project folder and `sysroad edit` opens the file you changed last.
+
+- The lessons unlock one at a time. Run and Submit work on the lesson the project is on;
+  passed lessons stay readable.
+- Run covers the lesson's visible tests. Submit runs every test of this lesson and of the
+  project's earlier ones, so it catches something you broke that used to work, and says
+  which lesson the failing test is from.
+- Passing a lesson saves a copy of the folder in `snapshots/<project>/<lesson>/`. Reset
+  puts the folder back to how it was when the lesson started.
+- The solution peek shows the course's reference for the lesson: the files it adds or
+  changes. It never touches your folder.
+- Catching up (`C`, `sysroad catchup`) is the way past a lesson you can't finish: after
+  asking, it moves your files to `.local/reset-backup/`, puts the reference as of the
+  end of the lesson in the folder, and skips the lesson (no XP).
+- Project lessons can't be marked done or skipped by hand, and a locked one can't be
+  started or timed.
 
 "Current" means the step you most recently started. Running a lesson starts it. If
 nothing is in progress, it's the first unfinished step on the main path. Optional steps,
@@ -156,6 +182,16 @@ Only one window runs at a time: launching it again brings the open one forward.
   C++ keywords and common `std` names (clangd comes later). `<space>cf` formats with
   clang-format, in the course's style unless a `.clang-format` in the data folder
   says otherwise (Mac: `brew install clang-format`).
+- **Projects:** a project lesson's editor has a tab for every file in `work/<project>/`,
+  the header first. Until the header exists, the editor shows the contract and a button
+  to create it.
+  `+` on the tab strip makes a file (`src/buffer.cpp` makes the folder too). Double-click
+  a tab, or use rename and delete on the strip, to change one; delete moves the file to
+  `.local/reset-backup/`. Files you make, rename or delete in a terminal show up as you
+  do it. A lesson the project isn't on shows your files read-only, with Run, Submit and
+  Reset off and a link to the lesson it's on. Reference (`v`) shows the course's
+  reference for the lesson and the files it deletes; Catch up (`C`) there swaps your
+  folder for it and skips the lesson, after asking.
 - **Interactive programs** (a lesson whose sample run needs a terminal) open in your
   terminal (`$TERMINAL`, `xdg-terminal-exec`, or Terminal.app on a Mac) for now.
 
@@ -167,7 +203,7 @@ Only one window runs at a time: launching it again brings the open one forward.
 | `<space>r s h v R u n p` | editor, vim normal mode | run, submit, hint, solution, reset, under the hood, next, previous |
 | `<space>cf` | editor, vim normal mode | format the file with clang-format |
 | `Ctrl+Space`, `Ctrl+N/P`, `Enter`/`Tab`/`Ctrl+Y` | editor | open, move through, accept completions |
-| `r s h v R u [ ] d` | lesson, outside the editor | the same, plus `d` for done on hand-checked steps |
+| `r s h v R u [ ] d C` | lesson, outside the editor | the same, plus `d` for done on hand-checked steps and `C` to catch up in a project |
 | `Ctrl+H` / `Ctrl+L` / `Ctrl+J` | lesson | focus the lesson, the editor, the output |
 | `Ctrl+B` | lesson | hide or show the lesson pane |
 | `Shift+Tab` | editor | next editor tab (files, then the solution if open) |
@@ -232,6 +268,19 @@ The course lives in `internal/course/content/` and is embedded in the binary:
   `starter/` holds only the files it adds or changes. A copy of an unchanged file fails
   `go test`.
   `make test` checks that every starter fails Run and every solution passes Submit.
+- Project lessons (`project: <id>`, instead of `base:` and `files:`) share
+  `work/<id>/`. `contract:` lists what the lesson's tests use (`header:`, the same for the
+  whole project; `types:`; `functions:` as `name` and `sig`, a C++ function type such as
+  `"std::string(const Editor&)"`; `drops:` for earlier items that no longer apply), and
+  `retires:` lists an earlier lesson's tests it makes invalid (`lesson:` with `tests:`
+  files, `cases:` doctest name patterns, `checks:` names; only `lesson:` retires them
+  all). `solution/` is laid over the previous lesson's reference, so it holds only what
+  the lesson adds or changes. Only the first lesson may have a `starter/` (data files).
+  Test helpers (the non-`.cpp` files in `tests/`) carry forward the same way: a lesson's
+  tests see the helpers of every lesson up to it, so a helper goes only where it first
+  appears or changes, and a copy fails `go test`.
+  `make test` walks each project in order in one folder: before a lesson's reference is
+  there Run must fail, and with it Submit must pass, earlier lessons' tests included.
 - `tests/visible_*.cpp` (Run and Submit) and `tests/hidden_*.cpp` (Submit only): doctest
   test cases. If your file has a `main`, it's renamed so doctest's runs instead. Headers in
   `tests/` are shared helpers that the test files include; only `.cpp` files are compiled.

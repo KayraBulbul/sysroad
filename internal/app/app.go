@@ -61,6 +61,12 @@ func Open(dir string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	return OpenCourse(dir, c)
+}
+
+// OpenCourse opens the data dir with a given course instead of the built-in
+// one; tests pass a fixture.
+func OpenCourse(dir string, c *course.Course) (*App, error) {
 	a := &App{Dir: dir, Course: c, Engine: course.NewEngine(dir), courseSecs: c.Roadmap().Sections}
 	if err := a.migrate(); err != nil {
 		return nil, fmt.Errorf("migrating to the course layout: %w", err)
@@ -204,8 +210,13 @@ func (a *App) XP() int {
 }
 
 // StartTimer starts timing id, stopping (and logging) any running timer first.
-// A todo step becomes "doing".
+// A todo step becomes "doing". A project lesson the project hasn't reached
+// is refused, so the current step is never a locked lesson; a passed one can
+// still be timed, as any done step can.
 func (a *App) StartTimer(id string) error {
+	if err := a.checkLocked(id); err != nil {
+		return err
+	}
 	if _, err := a.StopTimer(); err != nil {
 		return err
 	}

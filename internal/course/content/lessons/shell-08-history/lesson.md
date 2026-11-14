@@ -20,7 +20,7 @@ you type, as kite did in phase 3, and edits the line itself. That's
 what GNU Readline does for bash, and linenoise for redis-cli.
 
 The course's `terminal.cpp` has the raw-mode part: `read_line` puts the
-terminal in raw mode, reads keys with kite's decoder (`keys.hpp`),
+terminal in raw mode, reads keys with a decoder like kite's (`keys.hpp`),
 hands each one to a `LineEditor`, writes what its `render` returns, and
 puts the terminal back before the command runs. The editor itself is
 yours, in `lineedit.cpp`. It's plain state, with no terminal in it, so

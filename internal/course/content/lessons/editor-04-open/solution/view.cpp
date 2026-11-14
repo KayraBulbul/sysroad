@@ -1,20 +1,4 @@
-#include <string>
-
-#include "editor.hpp"
-
-std::vector<Row> read_rows(std::istream& in) {
-    std::vector<Row> rows;
-    std::string line;
-    while (std::getline(in, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        Row row{line, ""};
-        update_render(row);
-        rows.push_back(std::move(row));
-    }
-    return rows;
-}
+#include "kite.hpp"
 
 void update_render(Row& row) {
     row.render.clear();

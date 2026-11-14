@@ -5,8 +5,9 @@ the Linux console) still speaks VT100, plus decades of additions.
 
 **The alternate screen.** `\x1b[?1049h` switches to a second screen
 buffer, and `\x1b[?1049l` switches back. That's how vim, less and
-kite leave your shell's scrollback untouched when they exit. `AltScreen`
-does it as RAII, like `RawMode`.
+kite leave your shell's scrollback untouched when they exit. Programs
+that crash on the alternate screen leave you there; `tput rmcup` gets
+you back.
 
 **Why redraw everything?** It's simple and, at terminal sizes, fast:
 a 50-row screen is a few kilobytes. Real editors are smarter. ncurses
@@ -20,5 +21,13 @@ around a frame, which tells the terminal to show it all at once.
 
 **Window size.** `ioctl(fd, TIOCGWINSZ, &ws)` asks the terminal driver
 for the size. kite asks before every frame, so resizing the window just
-works. Programs that only draw on change listen for `SIGWINCH`, the
-signal sent when the size changes.
+works, but only once you press a key. Programs that redraw straight
+away listen for `SIGWINCH`, the signal sent when the size changes.
+Where there's no `ioctl` to ask, kilo moves the cursor to the far
+bottom right (`\x1b[999C\x1b[999B`) and asks the terminal where it is
+(`\x1b[6n`), which answers `\x1b[24;80R`.
+
+**How the tests see your screen.** They feed what `draw_screen`
+returns to a small terminal emulator of their own, a grid of
+characters with a cursor, and compare the grid. `\x1b[H` and
+`\x1b[1;1H` land in the same place, so either passes.

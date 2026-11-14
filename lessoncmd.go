@@ -223,25 +223,34 @@ func runSolution(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	sol, err := l.Solution()
+	sol, err := l.PeekSolution()
 	if err != nil {
 		return err
 	}
-	if len(sol) == 0 {
+	if len(sol) == 0 && len(l.Meta.SolutionRemoves) == 0 {
 		fmt.Println("This lesson has no solution files.")
 		return nil
 	}
-	emit(lessonHeading(l, "solution"))
+	if l.Project() != nil {
+		emit(lessonHeading(l, "reference: the files this lesson adds or changes"))
+	} else {
+		emit(lessonHeading(l, "solution"))
+	}
 	for _, name := range l.SortedNames(sol) {
 		emit("\n" + paint("90", "── "+name+" ──") + "\n")
 		fmt.Print(string(sol[name]))
 	}
+	if l.Project() != nil && len(l.Meta.SolutionRemoves) > 0 {
+		emit("\n" + paint("90", "── deletes "+strings.Join(l.Meta.SolutionRemoves, ", ")+" ──") + "\n")
+	}
 	return nil
 }
 
-func runReset(dir string, args []string) error {
-	yes := false
+// yesFlag reports whether args hold -y or --yes, which answers the
+// question up front, and returns the other args.
+func yesFlag(args []string) (bool, []string) {
 	var rest []string
+	yes := false
 	for _, a := range args {
 		if a == "-y" || a == "--yes" {
 			yes = true
@@ -249,19 +258,32 @@ func runReset(dir string, args []string) error {
 			rest = append(rest, a)
 		}
 	}
+	return yes, rest
+}
+
+// ask asks a yes/no question on the terminal.
+func ask(question string) bool {
+	fmt.Print(question + " [y/N] ")
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	t := strings.TrimSpace(strings.ToLower(line))
+	return t == "y" || t == "yes"
+}
+
+func runReset(dir string, args []string) error {
+	yes, rest := yesFlag(args)
 	a, l, err := openLesson(dir, rest)
 	if err != nil {
 		return err
 	}
-	if !yes {
-		fmt.Printf("Reset %q to the starter code? Your files move to .local/reset-backup/. [y/N] ", l.Title)
-		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-		if t := strings.TrimSpace(strings.ToLower(line)); t != "y" && t != "yes" {
-			fmt.Println("Not reset.")
-			return nil
-		}
+	q := fmt.Sprintf("Reset %q to the starter code? Your files move to .local/reset-backup/.", l.Title)
+	if p := l.Project(); p != nil {
+		q = fmt.Sprintf("Reset the %s project to how it was at the start of %q? Your files move to .local/reset-backup/.", p.ID, l.Title)
 	}
-	backup, err := a.Engine.Reset(l)
+	if !yes && !ask(q) {
+		fmt.Println("Not reset.")
+		return nil
+	}
+	backup, err := a.ResetLesson(l)
 	if err != nil {
 		return err
 	}
@@ -269,6 +291,39 @@ func runReset(dir string, args []string) error {
 		fmt.Println("Reset. Your old files are in", backup)
 	} else {
 		fmt.Println("Created", a.Engine.WorkDir(l))
+	}
+	return nil
+}
+
+func runCatchUp(dir string, args []string) error {
+	yes, rest := yesFlag(args)
+	a, l, err := openLesson(dir, rest)
+	if err != nil {
+		return err
+	}
+	p := l.Project()
+	if p == nil {
+		return fmt.Errorf("%s isn't part of a project; catching up is for project lessons", l.ID)
+	}
+	if err := a.CheckOrder(l); err != nil {
+		return err
+	}
+	q := fmt.Sprintf("Replace your %s folder with the course's reference as of the end of %q, and skip that lesson (no XP)? Your files move to .local/reset-backup/.", p.ID, l.Title)
+	if !yes && !ask(q) {
+		fmt.Println("Not changed.")
+		return nil
+	}
+	backup, err := a.CatchUp(l)
+	if err != nil {
+		return err
+	}
+	if backup != "" {
+		fmt.Println("Caught up. Your old files are in", backup)
+	} else {
+		fmt.Println("Caught up.")
+	}
+	if next := a.ProjectCurrent(p); next != nil {
+		fmt.Printf("The %s project is on %q now.\n", p.ID, next.Title)
 	}
 	return nil
 }
@@ -300,14 +355,18 @@ func runEdit(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(l.Meta.Files) == 0 {
+	if !l.HasCode() {
 		return fmt.Errorf("%q has no files to edit", l.Title)
 	}
 	p, err := a.Touch(l)
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("sh", "-c", tui.EditorCommand()+` "$1"`, "sh", l.Meta.Files[0])
+	file, err := a.EditFile(l)
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("sh", "-c", tui.EditorCommand()+` "$1"`, "sh", file)
 	cmd.Dir = p
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()

@@ -1,6 +1,7 @@
 #include <algorithm>
+#include <memory>
 
-#include "editor.hpp"
+#include "kite.hpp"
 
 namespace {
 
@@ -29,8 +30,7 @@ std::optional<Pos> find(const std::vector<Row>& rows, std::string_view query, Po
     int n = static_cast<int>(rows.size());
     if (dir >= 0) {
         for (int r = std::max(from.row, 0); r < n; ++r) {
-            std::size_t c =
-                first_at_or_after(rows[r], query, r == from.row ? std::max(from.col, 0) : 0);
+            std::size_t c = first_at_or_after(rows[r], query, r == from.row ? std::max(from.col, 0) : 0);
             if (c != std::string::npos) {
                 return Pos{r, static_cast<int>(c)};
             }
@@ -44,8 +44,7 @@ std::optional<Pos> find(const std::vector<Row>& rows, std::string_view query, Po
         return std::nullopt;
     }
     for (int r = std::min(from.row, n - 1); r >= 0; --r) {
-        std::size_t c = r == from.row ? last_at_or_before(rows[r], query, from.col)
-                                      : rows[r].chars.rfind(query);
+        std::size_t c = r == from.row ? last_at_or_before(rows[r], query, from.col) : rows[r].chars.rfind(query);
         if (c != std::string::npos) {
             return Pos{r, static_cast<int>(c)};
         }
@@ -57,4 +56,53 @@ std::optional<Pos> find(const std::vector<Row>& rows, std::string_view query, Po
         }
     }
     return std::nullopt;
+}
+
+namespace {
+
+// What a search remembers between keys.
+struct Search {
+    int cx, cy, rowoff, coloff;  // where it started, to go back to
+    std::optional<Pos> match;
+
+    void go_back(Editor& e) const {
+        e.cx = cx;
+        e.cy = cy;
+        e.rowoff = rowoff;
+        e.coloff = coloff;
+    }
+};
+
+}  // namespace
+
+void start_search(Editor& e) {
+    // Both callbacks share the search's state, which outlives this call.
+    auto s = std::make_shared<Search>(Search{e.cx, e.cy, e.rowoff, e.coloff, std::nullopt});
+    Prompt p;
+    p.label = "Search (arrows: next/previous, Esc: cancel): ";
+    p.on_key = [s](Editor& e, const std::string& query, int key) {
+        Pos from{s->cy, s->cx};
+        int dir = 1;
+        if (s->match && (key == kArrowRight || key == kArrowDown)) {
+            from = {s->match->row, s->match->col + 1};
+        } else if (s->match && (key == kArrowLeft || key == kArrowUp)) {
+            from = {s->match->row, s->match->col - 1};
+            dir = -1;
+        }
+        s->match = find(e.rows, query, from, dir);
+        if (s->match) {
+            e.cy = s->match->row;
+            e.cx = s->match->col;
+        } else {
+            s->go_back(e);
+        }
+    };
+    p.done = [s](Editor& e, std::optional<std::string> answer) {
+        if (!answer) {
+            s->go_back(e);
+        } else if (!s->match) {
+            set_status(e, "Not found");
+        }
+    };
+    e.prompt = std::move(p);
 }

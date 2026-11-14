@@ -1,70 +1,132 @@
 #include "doctest.h"
 
-#include "text.hpp"
+#include "search.hpp"
+
+namespace ktest {
 
 TEST_CASE("forwards wraps around to the top") {
-    auto rows = lines({"cat one", "two", "three cat"});
-    CHECK(at(find(rows, "cat", {2, 7}, 1)) == "0:0");
-    CHECK(at(find(rows, "cat", {3, 0}, 1)) == "0:0");  // from the line past the end
+    Kite k(10, 60);
+    k.open("w.txt", "cat one\ntwo\nthree cat\n");
+    k.press(keys::down, 2).press(keys::end);
+    k.press(keys::ctrl_f).type("cat");
+    CHECK(k.cursor() == "row 0, col 0");
+    k.press(keys::esc).press(keys::down);  // the line past the end
+    k.press(keys::ctrl_f).type("cat");
+    CHECK(k.cursor() == "row 0, col 0");
 }
 
-TEST_CASE("several matches on one line, forwards") {
-    auto rows = lines({"abababab"});
-    CHECK(at(find(rows, "ab", {0, 1}, 1)) == "0:2");
-    CHECK(at(find(rows, "ab", {0, 3}, 1)) == "0:4");
-    CHECK(at(find(rows, "aba", {0, 5}, 1)) == "0:0");  // overlapping: none starts at 5 or later
-}
-
-TEST_CASE("backwards finds the last match at or before `from`") {
-    auto rows = lines({"cat cat", "x", "cat cat"});
-    CHECK(at(find(rows, "cat", {2, 5}, -1)) == "2:4");
-    CHECK(at(find(rows, "cat", {2, 3}, -1)) == "2:0");
-    CHECK(at(find(rows, "cat", {1, 0}, -1)) == "0:4");
-    CHECK(at(find(rows, "cat", {0, 3}, -1)) == "0:0");
-}
-
-TEST_CASE("backwards wraps around to the bottom, and a column of -1 skips the row") {
-    auto rows = lines({"cat", "dog", "cat dog cat"});
-    CHECK(at(find(rows, "cat", {0, -1}, -1)) == "2:8");
-    CHECK(at(find(rows, "dog", {2, 3}, -1)) == "1:0");
-}
-
-TEST_CASE("next and previous walk every match in order, the way Ctrl-F's arrows do") {
-    auto rows = lines({"a.a", "", "..a"});
-    Pos p{0, 0};
+TEST_CASE("Right and Down step to the next match, Left and Up to the one before, wrapping around") {
+    Kite k(10, 60);
+    k.open("a.txt", "a.a\n\n..a\n");
+    k.press(keys::ctrl_f).type("a");
     std::string seen;
-    for (int i = 0; i < 4; ++i) {
-        auto m = find(rows, "a", {p.row, p.col + 1}, 1);
-        REQUIRE(m);
-        p = *m;
-        seen += at(p) + " ";
+    for (std::string_view key : {keys::right, keys::down, keys::right, keys::right}) {
+        k.press(key);
+        seen += k.cursor() + "; ";
     }
-    CHECK(seen == "0:2 2:2 0:0 0:2 ");
+    CHECK(seen == "row 0, col 2; row 2, col 2; row 0, col 0; row 0, col 2; ");
     std::string back;
-    for (int i = 0; i < 3; ++i) {
-        auto m = find(rows, "a", {p.row, p.col - 1}, -1);
-        REQUIRE(m);
-        p = *m;
-        back += at(p) + " ";
+    for (std::string_view key : {keys::left, keys::up, keys::left}) {
+        k.press(key);
+        back += k.cursor() + "; ";
     }
-    CHECK(back == "0:0 2:2 0:2 ");
+    CHECK(back == "row 0, col 0; row 2, col 2; row 0, col 2; ");
+    CHECK(asking(k, "a"));
 }
 
-TEST_CASE("an empty query, or no text, finds nothing") {
-    auto rows = lines({"text"});
-    CHECK(at(find(rows, "", {0, 0}, 1)) == "none");
-    CHECK(at(find({}, "x", {0, 0}, 1)) == "none");
-    CHECK(at(find({}, "x", {0, 0}, -1)) == "none");
+TEST_CASE("several matches on a line, overlapping ones too") {
+    Kite k(10, 60);
+    k.open("ab.txt", "abababab\n");
+    k.press(keys::right).press(keys::ctrl_f).type("ab");
+    CHECK(k.cursor() == "row 0, col 2");
+    k.press(keys::esc).press(keys::home).press(keys::ctrl_f).type("aba");
+    CHECK(k.cursor() == "row 0, col 0");
+    k.press(keys::right);
+    CHECK(k.cursor() == "row 0, col 2");
+    k.press(keys::right);
+    CHECK(k.cursor() == "row 0, col 4");
+    k.press(keys::right);
+    CHECK(k.cursor() == "row 0, col 0");
 }
 
-TEST_CASE("matches don't cross lines, and the case matters") {
-    auto rows = lines({"ca", "t", "Cat"});
-    CHECK(at(find(rows, "cat", {0, 0}, 1)) == "none");
-    CHECK(at(find(rows, "Cat", {0, 0}, -1)) == "2:0");
+TEST_CASE("backwards from the first column wraps around to the last match") {
+    Kite k(10, 60);
+    k.open("cd.txt", "cat\ndog\ncat dog cat\n");
+    k.press(keys::ctrl_f).type("cat").press(keys::left);
+    CHECK(k.cursor() == "row 2, col 8");
+    k.press(keys::left);
+    CHECK(k.cursor() == "row 2, col 0");
 }
 
-TEST_CASE("a column past the end of the line moves on to the next line") {
-    auto rows = lines({"ab", "ab"});
-    CHECK(at(find(rows, "ab", {0, 50}, 1)) == "1:0");
-    CHECK(at(find(rows, "ab", {1, 50}, -1)) == "1:0");
+TEST_CASE("no match: the cursor goes back, and Enter says Not found") {
+    Kite k(10, 60);
+    k.open("t.txt", "the cat\n");
+    k.press(keys::right);
+    k.press(keys::ctrl_f).type("c");
+    CHECK(k.cursor() == "row 0, col 4");
+    k.type("x");
+    CHECK(k.cursor() == "row 0, col 1");
+    k.press(keys::enter);
+    CHECK(k.line(9) == "Not found");
+    CHECK(k.cursor() == "row 0, col 1");
 }
+
+TEST_CASE("matches are exact, case and all, and stay within a line") {
+    Kite k(10, 60);
+    k.open("c.txt", "ca\nt\nCat\n");
+    k.press(keys::ctrl_f).type("cat");
+    CHECK(k.cursor() == "row 0, col 0");
+    k.press(keys::enter);
+    CHECK(k.line(9) == "Not found");
+    k.press(keys::ctrl_f).type("Cat");
+    CHECK(k.cursor() == "row 2, col 0");
+}
+
+TEST_CASE("Backspace shortens the query, and an empty one matches nothing") {
+    Kite k(10, 60);
+    k.open("t.txt", "the cat\nthe dog\n");
+    k.press(keys::ctrl_f).type("dog");
+    CHECK(k.cursor() == "row 1, col 4");
+    k.press(keys::backspace, 3);
+    CHECK(asking(k, ""));
+    CHECK(k.cursor() == "row 0, col 0");
+    k.type("t");
+    CHECK(k.cursor() == "row 0, col 0");
+}
+
+TEST_CASE("the screen follows the match, and Escape puts the view back") {
+    Kite k(6, 30);  // 4 rows of text
+    std::string text;
+    for (int i = 0; i < 20; ++i) {
+        text += "line " + std::to_string(i) + "\n";
+    }
+    k.open("lines.txt", text);
+    k.press(keys::ctrl_f).type("line 15");
+    CHECK(k.rows(0, 4) == "line 12\nline 13\nline 14\nline 15\n");
+    CHECK(k.cursor() == "row 3, col 0");
+    k.press(keys::esc);
+    CHECK(k.line(0) == "line 0");
+    CHECK(k.cursor() == "row 0, col 0");
+}
+
+TEST_CASE("searching changes nothing in the text") {
+    Kite k = cats();
+    k.press(keys::ctrl_f).type("cat").press(keys::backspace).press(keys::del).press(keys::enter);
+    CHECK(k.rows(0, 4) == "the cat\na cat sat\ncat\n~\n");
+    CHECK(k.line(8) == "cats.txt - 3 lines                                       1/3");
+}
+
+TEST_CASE("the cursor lands on a match after a tab, on screen") {
+    Kite k(10, 60);
+    k.open("tab.txt", "\tcat\n");
+    k.press(keys::ctrl_f).type("cat");
+    CHECK(k.cursor() == "row 0, col 8");
+}
+
+TEST_CASE("after Enter, typing edits at the match") {
+    Kite k = cats();
+    k.press(keys::ctrl_f).type("sat").press(keys::enter).type("x");
+    CHECK(k.line(1) == "a cat xsat");
+}
+
+}  // namespace ktest

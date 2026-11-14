@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { LessonDetail } from "../lib/api";
-  import { Service } from "../lib/api";
+  import { Service, tilde } from "../lib/api";
   import { renderMarkdown } from "../lib/markdown";
   import { ui, where, openLesson, fail } from "../lib/state.svelte";
 
@@ -36,7 +36,7 @@
   }
 
   // The work dir, shortened to ~/… for display.
-  const workShown = $derived(d.workDir ? d.workDir.replace(/^\/(home|Users)\/[^/]+/, "~") : "");
+  const workShown = $derived(d.workDir ? tilde(d.workDir) : "");
 </script>
 
 <!-- Link clicks inside the rendered markdown open in the browser. -->
@@ -64,7 +64,9 @@
       {#if d.platform}<span class="warn">{d.platform}</span>{/if}
       {#if done}<span class="done">✓ done</span>{:else if d.status === "doing"}<span class="doing">in progress</span>{/if}
     </div>
-    {#if workShown && d.files?.length}
+    {#if workShown && d.project}
+      <div class="path" title={d.workDir}>{workShown}/ · your {d.project.id} project</div>
+    {:else if workShown && d.files?.length}
       <div class="path" title={d.workDir}>{workShown}/{d.files.join(", ")}</div>
     {/if}
 

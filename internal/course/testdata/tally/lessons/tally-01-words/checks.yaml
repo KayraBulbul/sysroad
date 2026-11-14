@@ -1,0 +1,3 @@
+- name: prints the count
+  stdin: "a b\n"
+  stdout: "2\n"

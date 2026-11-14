@@ -1,69 +1,154 @@
 #include "doctest.h"
 
-#include <cstdio>
-#include <string>
+#include <filesystem>
+#include <set>
+#include <unistd.h>
 
-#include "text.hpp"
+#include "session.hpp"
 
-TEST_CASE("an empty file is empty text") {
-    CHECK(rows_to_string({}).empty());
-    Editor e = with_lines({""});
-    CHECK(rows_to_string(e.rows) == "\n");
-}
+namespace ktest {
 
-TEST_CASE("saving over a file replaces it, and leaves no temporary file") {
-    const std::string path = "kite_hidden_test.txt";
-    {
-        std::ofstream out(path);
-        out << "an old version that is longer\n";
+namespace fs = std::filesystem;
+
+static std::set<std::string> files_here() {
+    std::set<std::string> names;
+    for (const auto& entry : fs::directory_iterator(".")) {
+        names.insert(entry.path().filename().string());
     }
-    Editor e = with_lines({"new", "text"});
-    e.filename = path;
-    e.dirty = true;
-    REQUIRE(save_file(e));
-    CHECK(read_file(path) == "new\ntext\n");
-    CHECK(e.status_msg == "9 bytes written to disk");
-    std::remove(path.c_str());
-    // Whatever the temporary file was called, the folder holds nothing else.
-    std::ifstream tmp(path + ".kite-save");
-    CHECK_FALSE(tmp.good());
+    return names;
 }
 
-TEST_CASE("a save that can't happen says so, and the text stays dirty") {
-    Editor e = with_lines({"x"});
-    e.filename = "no-such-folder/inside.txt";
-    e.dirty = true;
-    CHECK_FALSE(save_file(e));
-    CHECK(e.dirty);
-    CHECK(e.status_msg.rfind("Can't save!", 0) == 0);
+TEST_CASE("Ctrl-Q counts down three more times, and the fourth quits") {
+    Kite k(6, 70);
+    k.open("q.txt", "q\n");
+    k.type("x").press(keys::ctrl_q).press(keys::ctrl_q);
+    CHECK(k.line(5) == "Unsaved changes! Press Ctrl-Q 2 more times to quit anyway.");
+    k.press(keys::ctrl_q);
+    CHECK(k.line(5) == "Unsaved changes! Press Ctrl-Q 1 more time to quit anyway.");
+    CHECK_FALSE(k.quit);
+    k.press(keys::ctrl_q);
+    CHECK(k.quit);
 }
 
-TEST_CASE("the status bar: no name, modified, and the cursor's line") {
-    Editor e = with_lines({"a", "b", "c"}, 40);
-    e.dirty = true;
-    e.cy = 2;
-    CHECK(status_bar(e) == "[No Name] - 3 lines (modified)       3/3");
+TEST_CASE("any other key starts the Ctrl-Q count again") {
+    Kite k(6, 70);
+    k.open("q.txt", "q\n");
+    k.type("x").press(keys::ctrl_q).press(keys::ctrl_q).press(keys::left).press(keys::ctrl_q);
+    CHECK(k.line(5) == "Unsaved changes! Press Ctrl-Q 3 more times to quit anyway.");
+    CHECK_FALSE(k.quit);
 }
 
-TEST_CASE("long names are cut to 20 characters") {
-    Editor e = with_lines({"a"}, 50);
-    e.filename = "a_very_long_file_name_indeed.txt";
-    CHECK(status_bar(e) == "a_very_long_file_nam - 1 lines                 1/1");
+TEST_CASE("after a save, Ctrl-Q quits straight away") {
+    Kite k(6, 40);
+    k.open("q.txt", "q\n");
+    k.type("x").press(keys::ctrl_s).press(keys::ctrl_q);
+    CHECK(k.quit);
 }
 
-TEST_CASE("on the line past the end, and with no lines at all") {
-    Editor e = with_lines({}, 25);
-    CHECK(status_bar(e) == "[No Name] - 0 lines   1/0");
+TEST_CASE("keys that change nothing don't mark the file modified") {
+    Kite k(6, 40);
+    k.open("same.txt", "ab\n");
+    k.press(keys::backspace).press(keys::end).press(keys::del).press(keys::down).press(keys::backspace);
+    CHECK(k.line(4) == "same.txt - 1 lines                   2/1");
 }
 
-TEST_CASE("a narrow window drops the right side, then cuts the left") {
-    Editor e = with_lines({"a"}, 22);
-    e.filename = "x.txt";
-    CHECK(status_bar(e) == "x.txt - 1 lines    1/1");
-    e.screen_cols = 18;
-    CHECK(status_bar(e) == "x.txt - 1 lines1/1");  // just fits
-    e.screen_cols = 17;
-    CHECK(status_bar(e) == "x.txt - 1 lines  ");
-    e.screen_cols = 10;
-    CHECK(status_bar(e) == "x.txt - 1 ");
+TEST_CASE("Enter, Backspace and Delete mark it modified too") {
+    for (std::string_view key : {keys::enter, keys::del}) {
+        Kite k(6, 40);
+        k.open("m.txt", "ab\n");
+        k.press(key);
+        CHECK(contains(k.line(4), "(modified)"));
+    }
+    Kite k(6, 40);
+    k.open("m.txt", "ab\n");
+    k.press(keys::end).press(keys::backspace);
+    CHECK(contains(k.line(4), "(modified)"));
 }
+
+TEST_CASE("saving over a file replaces it, and leaves nothing else behind") {
+    write_file("over.txt", "");
+    auto before = files_here();
+    Kite k(6, 40);
+    k.open("over.txt", "an old version that is longer\n");
+    k.press(keys::end).press(keys::backspace, 29).type("new\ntext").press(keys::ctrl_s);
+    CHECK(read_file("over.txt") == "new\ntext\n");
+    CHECK(k.line(5) == "9 bytes written to disk");
+    CHECK_MESSAGE(files_here() == before, "a temporary file is still in the folder");
+}
+
+TEST_CASE("the save goes through a new file renamed over the old one") {
+    write_file("renamed.txt", "old\n");
+    fs::remove("renamed-link.txt");
+    fs::create_hard_link("renamed.txt", "renamed-link.txt");
+    Kite k(6, 40);
+    k.open("renamed.txt", "old\n");
+    k.press(keys::end).type("er").press(keys::ctrl_s);
+    CHECK(read_file("renamed.txt") == "older\n");
+    CHECK_MESSAGE(read_file("renamed-link.txt") == "old\n",
+                  "a hard link to the old file still sees the old text only if the new text went into a new "
+                  "file. Writing over the file in place changed it.");
+}
+
+TEST_CASE("an empty file saves as an empty file") {
+    Kite k(6, 40);
+    open_file(k.e, "empty-new.txt");
+    k.press(keys::ctrl_s);
+    CHECK(fs::exists("empty-new.txt"));
+    CHECK(read_file("empty-new.txt") == "");
+    CHECK(k.line(5) == "0 bytes written to disk");
+}
+
+TEST_CASE("a save that can't happen says so, and the file stays modified") {
+    Kite k(6, 50);
+    open_file(k.e, "no-such-folder/inside.txt");
+    k.type("x").press(keys::ctrl_s);
+    CHECK(k.line(5).rfind("Can't save!", 0) == 0);
+    CHECK(contains(k.line(4), "(modified)"));
+    CHECK(files_here().count("no-such-folder") == 0);
+}
+
+TEST_CASE("a save whose rename fails removes its temporary file, and the file stays modified") {
+    fs::create_directory("a-folder.txt");  // a file can't be renamed over a folder
+    auto before = files_here();
+    Kite k(6, 50);
+    open_file(k.e, "a-folder.txt");
+    k.type("x").press(keys::ctrl_s);
+    CHECK(k.line(5).rfind("Can't save!", 0) == 0);
+    CHECK(contains(k.line(4), "(modified)"));
+    CHECK_MESSAGE(files_here() == before, "the temporary file is still in the folder");
+}
+
+TEST_CASE("with no name, Ctrl-S asks for one in the message bar") {
+    Kite k(6, 40);
+    k.draw().type("hi").press(keys::ctrl_s);
+    CHECK(k.line(5) == "Save as:");
+    k.type("out.txt");
+    CHECK(k.line(5) == "Save as: out.txt");
+    k.press(keys::backspace, 3).type("md");
+    CHECK(k.line(5) == "Save as: out.md");
+    k.press(keys::enter);
+    CHECK(read_file("out.md") == "hi\n");
+    CHECK(k.line(4) == "out.md - 1 lines                     1/1");
+    CHECK(k.line(5) == "3 bytes written to disk");
+}
+
+TEST_CASE("while it asks, keys go to the answer, not the text") {
+    Kite k(6, 40);
+    k.draw().type("hi").press(keys::ctrl_s);
+    k.press(keys::left).press(keys::enter).press(keys::ctrl_q);
+    CHECK_FALSE_MESSAGE(k.quit, "Ctrl-Q in the prompt shouldn't quit");
+    CHECK(k.line(0) == "hi");
+    CHECK_MESSAGE(k.line(5) == "Save as:", "Enter with no answer keeps asking");
+}
+
+TEST_CASE("Escape doesn't save") {
+    Kite k(6, 40);
+    k.draw().type("hi").press(keys::ctrl_s).type("never.txt").press(keys::esc);
+    CHECK_FALSE(fs::exists("never.txt"));
+    CHECK(k.line(5) == "Not saved");
+    CHECK(k.line(4) == "[No Name] - 1 lines (modified)       1/1");
+    k.type("!");
+    CHECK(k.line(0) == "hi!");
+}
+
+}  // namespace ktest

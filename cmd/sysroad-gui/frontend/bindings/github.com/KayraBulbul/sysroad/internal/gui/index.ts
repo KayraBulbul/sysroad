@@ -6,7 +6,12 @@ export {
     Service
 };
 
+export {
+    ProjectState
+} from "./models.js";
+
 export type {
+    CaughtUp,
     ChapterDTO,
     File,
     FileEvent,
@@ -14,6 +19,7 @@ export type {
     LessonRow,
     PhaseDTO,
     Prefs,
+    ProjectInfo,
     ResultEvent,
     RunOutcome,
     Running,

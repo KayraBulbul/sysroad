@@ -71,10 +71,21 @@ func New(a *app.App, emit func(string, any), openURL func(string) error) *Servic
 	}
 	_, s.latestAt = a.Engine.Latest()
 	s.theme = LoadTheme(s.themeDir)
-	s.files = newFileWatcher(a.Engine, func(ev FileEvent) { s.emit(EvFile, ev) })
+	s.files = newFileWatcher(a.Engine, func(ev FileEvent) { s.emit(EvFile, s.fileEvent(ev)) })
 	s.updates = newUpdater(UpdateSrc(), func(i UpdateInfo) { s.emit(EvUpdate, i) })
 	s.quit = func() {}
 	return s
+}
+
+// fileEvent marks a project file the watcher found read-only unless the
+// project is on its lesson, as OpenFiles does.
+func (s *Service) fileEvent(ev FileEvent) FileEvent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if l := s.app.Lesson(ev.Lesson); l != nil && l.Project() != nil {
+		ev.ReadOnly = s.app.CheckOrder(l) != nil
+	}
+	return ev
 }
 
 // OnQuit sets how RestartToUpdate quits the app. (A function, not a method,
@@ -311,6 +322,7 @@ type LessonDetail struct {
 	Note       string         `json:"note"`
 	Files      []string       `json:"files"`
 	WorkDir    string         `json:"workDir"`
+	Project    *ProjectInfo   `json:"project"` // nil outside a project
 	Result     *course.Result `json:"result"`
 	Quiz       *app.Quiz      `json:"quiz"` // quiz lessons only
 	Prev       string         `json:"prev"`
@@ -364,6 +376,7 @@ func (s *Service) Lesson(id string) (*LessonDetail, error) {
 	if d.HasCode {
 		d.WorkDir = a.Engine.WorkDir(l)
 	}
+	d.Project = s.projectInfo(l)
 	if l.IsQuiz() {
 		q, err := a.QuizState(l)
 		if err != nil {

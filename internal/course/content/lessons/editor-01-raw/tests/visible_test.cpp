@@ -1,28 +1,30 @@
 #include "doctest.h"
 
-#include "keys.hpp"
-#include "terminal.hpp"
+#include "kite.hpp"
+#include "kite_pty.hpp"
 
-TEST_CASE("ordinary bytes are keys by themselves") {
-    CHECK(decode_key("a").key == 'a');
-    CHECK(decode_key("a").used == 1);
-    CHECK(decode_key("\r").key == kEnter);
-    CHECK(decode_key("\x11").key == ctrl_key('q'));
-    CHECK(decode_key("xyz").used == 1);  // one key at a time
-}
+namespace ktest {
 
-TEST_CASE("arrow keys are ESC [ A to D") {
-    CHECK(decode_key("\x1b[A").key == kArrowUp);
-    CHECK(decode_key("\x1b[B").key == kArrowDown);
-    CHECK(decode_key("\x1b[C").key == kArrowRight);
-    CHECK(decode_key("\x1b[D").key == kArrowLeft);
-    CHECK(decode_key("\x1b[D").used == 3);
-}
-
-TEST_CASE("raw mode switches off echo and line buffering") {
+TEST_CASE("raw_attrs switches off echo and line buffering") {
     termios t{};
     t.c_lflag = ECHO | ICANON;
     termios raw = raw_attrs(t);
-    CHECK((raw.c_lflag & ECHO) == 0);
-    CHECK((raw.c_lflag & ICANON) == 0);
+    bool echo_on = (raw.c_lflag & ECHO) != 0;
+    bool line_by_line = (raw.c_lflag & ICANON) != 0;
+    CHECK_FALSE_MESSAGE(echo_on, "ECHO is still on in c_lflag");
+    CHECK_FALSE_MESSAGE(line_by_line, "ICANON is still on in c_lflag");
 }
+
+TEST_CASE("kite puts the terminal in raw mode, and Ctrl-Q puts it back") {
+    KitePty kite(10, 40);
+    REQUIRE_MESSAGE(kite.wait_for_raw_mode(), "the terminal still echoes: kite didn't switch on raw mode");
+    CHECK_MESSAGE((kite.modes().c_lflag & ICANON) == 0, "raw mode, but still line by line (ICANON)");
+    kite.type("\x11");  // Ctrl-Q
+    int status = kite.wait_exit();
+    CHECK_MESSAGE(status == 0, (std::string("Ctrl-Q should end kite with exit status 0. ") + kite.shown()));
+    termios after = kite.modes();
+    CHECK_MESSAGE((after.c_lflag & ECHO) != 0, "after kite ends, the terminal should echo again");
+    CHECK_MESSAGE((after.c_lflag & ICANON) != 0, "after kite ends, the terminal should be line by line again");
+}
+
+}  // namespace ktest

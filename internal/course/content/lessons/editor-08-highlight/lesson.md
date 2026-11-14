@@ -1,12 +1,11 @@
 ---
 title: Syntax highlighting for C++
-base: editor-07-search
 kind: capstone
+project: kite
 program: kite
-minutes: 40
-files: [highlight.cpp]
+minutes: 50
 run:
-  args: [demo/sample.cpp]
+  args: [demo/sample.cxx]
   interactive: true
 deeper:
   - title: "Build Your Own Text Editor: syntax highlighting"
@@ -14,45 +13,68 @@ deeper:
   - title: "Tree-sitter"
     url: https://tree-sitter.github.io/tree-sitter/
 ---
-kite colours C and C++ files. Each row gets a third array, `hl`, with
-one `Hl` per character of `render`: `Keyword`, `Type`, `String`,
-`Number`, `Comment` and so on. The course's `draw_screen` turns them
-into colour escape codes, like `\x1b[33m` for yellow. You decide what
-each character is:
+The rest of C++: comments, keywords, types and the preprocessor. Each
+gets its own kind of character and its own colour:
 
 ```text
-int n = 42;   // the answer
-tttnnnnnddnnncccccccccccccc
+int n = 42;   // the answer           t  type, green (32)       k  keyword, yellow (33)
+tttnnnnnddnnncccccccccccccc            c  comment, cyan (36)     p  preprocessor, blue (34)
 ```
 
-`highlight_row` walks `render` left to right, keeping a little state:
-whether it's inside a string (and which quote opened it), whether the
-last character was a **separator** (the end of a word), and whether
-it's inside a `/* */` comment. That last one can span lines, so it
-comes in as a parameter and goes out as the return value. When a row's
-answer changes, the course re-highlights the rows after it.
-
-At each position, the first rule that fits wins:
+Your walk along the row grows. At each position, the first rule that
+fits wins:
 
 ```text
 //                  a comment to the end of the line
-inside /* */        MlComment, until */ (both characters included)
+inside /* */        a comment, until */ (both characters included)
 /*                  starts one
-inside a string     String; a backslash takes the next character too; the opening quote closes it
+inside a string     String, as before
 " or '              starts a string
-a digit             Number, if it starts a word (or continues a number)
-. or a letter       Number too, right after a number: 3.14f, 0xff, 10u
+a digit, . or letter  Number, as before
 a keyword or type   as a whole word: at the start of a word, with a separator or the line's end after it
-# first on a line   Preproc, and so is the rest of the line, except strings and comments
+# first on a line   Preproc, and so is the rest of the line, except strings, numbers and comments
 anything else       Normal
 ```
 
-Only comment markers outside strings count, and only string quotes
-outside comments.
+Only comment markers outside strings count, and only quotes outside
+comments. After a comment's `*/`, as after a string, the next character
+starts a word. The keywords are
+
+```text
+if else for while do switch case default break continue return goto
+try catch throw new delete class struct union enum namespace using
+template typename public private protected virtual override static
+const constexpr inline nullptr true false
+```
+
+and the types `int long short char bool float double void auto
+unsigned signed size_t`. A `#` is only the preprocessor's when nothing
+but spaces and tabs come before it on its line, and keywords aren't
+looked for on a preprocessor line.
+
+**Comments that span lines.** A `/*` comment can run on for any number
+of lines, so a row's colours depend on the rows above it. The walk
+takes one more piece of state in, whether the row **starts** inside a
+comment, and gives one out: whether it **ends** inside one. Colouring a
+file is a walk down the rows, each starting where the last ended.
+
+Editing makes this interesting. Type `/*` on line 10 and every line
+below it turns into a comment, until the next `*/`, maybe thousands of
+lines down. Colouring the whole rest of the file on every key would
+work, but most edits don't open or close a comment. So when a row
+changes, colour it, then go on to the next row only while the next
+row's starting state is different from the one it was last coloured
+with. Each row remembers how it ended, and how it started. When a row
+starts the same as last time, it and every row after it are still
+right, so stop there.
+
+## Contract
+
+Nothing new. The tests read the colours off the screen.
 
 ## Assignment
 
-- [ ] `is_separator` is true for whitespace, `'\0'`, and `,.()+-/*=~%<>[]{};:!&|^?`
-- [ ] `highlight_row` sets `hl` to `render`'s size and colours every character by the rules above, using `kKeywords` and `kTypes`
-- [ ] It returns whether the row ends inside a `/* */` comment, starting inside one when `in_comment` is true
-- [ ] After a string's closing quote or a comment's `*/`, the next character counts as starting a word
+- [ ] Comments are cyan, keywords yellow, types green and preprocessor lines blue, by the rules above, alongside last lesson's numbers and strings
+- [ ] Keywords and types count only as whole words
+- [ ] A `/* */` comment carries on across lines, from opening the file onwards
+- [ ] Typing or deleting a `/*` or `*/` recolours every line it affects, including lines off the screen

@@ -128,10 +128,11 @@ const maxPassedListed = 10
 // are one line each.
 const maxDetailed = 3
 
-// render lays out a failed run. printed is what the tests wrote to stdout,
-// report the tidied stderr (often a sanitizer report), and note why the
-// runner stopped, if it was killed.
-func (r *testReport) render(mode Mode, printed, report, note string) string {
+// render lays out a failed run. origin says whose tests these are, if not
+// the lesson's own; printed is what the tests wrote to stdout, report the
+// tidied stderr (often a sanitizer report), and note why the runner
+// stopped, if it was killed.
+func (r *testReport) render(mode Mode, origin, printed, report, note string) string {
 	var b strings.Builder
 	var passed, failed, notRun []*testCase
 	for _, tc := range r.cases {
@@ -148,7 +149,7 @@ func (r *testReport) render(mode Mode, printed, report, note string) string {
 	if len(notRun) > 0 {
 		counts = append(counts, fmt.Sprintf("%d not run", len(notRun)))
 	}
-	b.WriteString(section("Tests", strings.Join(counts, " · ")))
+	b.WriteString(section("Tests", notes(origin, strings.Join(counts, " · "))))
 
 	if len(passed) > maxPassedListed {
 		b.WriteString(green("✓") + dim(fmt.Sprintf(" %d test cases passed", len(passed))) + "\n")

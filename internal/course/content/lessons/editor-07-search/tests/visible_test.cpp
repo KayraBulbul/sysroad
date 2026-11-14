@@ -1,19 +1,33 @@
 #include "doctest.h"
 
-#include "text.hpp"
+#include "search.hpp"
 
-TEST_CASE("forwards from the start finds the first match") {
-    auto rows = lines({"the cat", "a cat sat", "cat"});
-    CHECK(at(find(rows, "cat", {0, 0}, 1)) == "0:4");
+namespace ktest {
+
+TEST_CASE("Ctrl-F asks in the message bar, and the cursor jumps to the first match as you type") {
+    Kite k = cats();
+    k.press(keys::ctrl_f).type("c");
+    CHECK_MESSAGE(asking(k, "c"), (std::string("the message bar should start with Search and end with the query: ") + k.line(9)));
+    CHECK(k.cursor() == "row 0, col 4");
+    k.type("at");
+    CHECK(asking(k, "cat"));
+    CHECK(k.cursor() == "row 0, col 4");
 }
 
-TEST_CASE("a match at `from` counts, and the search goes on past it") {
-    auto rows = lines({"the cat", "a cat sat", "cat"});
-    CHECK(at(find(rows, "cat", {0, 4}, 1)) == "0:4");
-    CHECK(at(find(rows, "cat", {0, 5}, 1)) == "1:2");
+TEST_CASE("the search starts at the cursor, and a match right there counts") {
+    Kite k = cats();
+    k.press(keys::down).press(keys::right, 2);
+    k.press(keys::ctrl_f).type("cat");
+    CHECK(k.cursor() == "row 1, col 2");
 }
 
-TEST_CASE("no match at all") {
-    auto rows = lines({"the cat"});
-    CHECK(at(find(rows, "dog", {0, 0}, 1)) == "none");
+TEST_CASE("Enter stays at the match; Escape goes back to where the search started") {
+    Kite k = cats();
+    k.press(keys::ctrl_f).type("sat").press(keys::enter);
+    CHECK(k.cursor() == "row 1, col 6");
+    CHECK_FALSE(asking(k, ""));
+    k.press(keys::ctrl_f).type("cat").press(keys::esc);
+    CHECK(k.cursor() == "row 1, col 6");
 }
+
+}  // namespace ktest

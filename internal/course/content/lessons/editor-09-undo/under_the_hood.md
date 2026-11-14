@@ -25,7 +25,8 @@ against the ones that happened since. Zed and others use CRDTs, data
 structures whose edits commute, so the order they arrive in doesn't
 matter.
 
-**You built an editor.** About a thousand lines: raw mode, a renderer,
-scrolling, editing, atomic saves, search, highlighting and undo. Run
-`./kite kite.cpp`... well, kite is spread over many files now, so pick
-one, and edit kite with kite.
+**Why every edit goes through two functions.** Undo is only as good as
+the history is complete. With four edit functions that each change the
+rows their own way, one forgotten `record` means an edit undo can't
+see, and the next undo then puts text back in the wrong place. With
+two primitives that every edit uses, the history can't miss one.

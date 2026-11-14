@@ -1,27 +1,43 @@
 #include "doctest.h"
 
-#include "text.hpp"
+#include "session.hpp"
 
-TEST_CASE("a typed word undoes in one step, and redoes") {
-    Editor e = with_lines({""});
-    type(e, "hello");
-    CHECK(undo(e));
-    CHECK(text(e) == " @0:0");
-    CHECK(redo(e));
-    CHECK(text(e) == "hello @0:5");
+namespace ktest {
+
+TEST_CASE("Ctrl-Z takes back the last edit, and Ctrl-Y does it again") {
+    Kite k(6, 40);
+    k.open("hello.txt", "hello\n");
+    k.press(keys::end).type("!");
+    k.press(keys::ctrl_z);
+    CHECK(k.line(0) == "hello");
+    CHECK(k.cursor() == "row 0, col 5");
+    k.press(keys::ctrl_y);
+    CHECK(k.line(0) == "hello!");
+    CHECK(k.cursor() == "row 0, col 6");
 }
 
-TEST_CASE("nothing to undo or redo") {
-    Editor e = with_lines({"x"});
-    CHECK_FALSE(undo(e));
-    CHECK_FALSE(redo(e));
-    CHECK(text(e) == "x @0:0");
+TEST_CASE("with nothing to undo or redo, kite says so") {
+    Kite k(6, 40);
+    k.open("x.txt", "x\n");
+    k.press(keys::ctrl_z);
+    CHECK(k.line(5) == "Nothing to undo");
+    k.press(keys::ctrl_y);
+    CHECK(k.line(5) == "Nothing to redo");
+    CHECK(k.line(0) == "x");
 }
 
-TEST_CASE("record joins typing that carries on") {
-    History h;
-    record(h, Edit{Edit::Kind::Insert, {0, 0}, "a", {0, 0}});
-    record(h, Edit{Edit::Kind::Insert, {0, 1}, "b", {0, 1}});
-    REQUIRE(h.undo.size() == 1);
-    CHECK(h.undo[0].text == "ab");
+TEST_CASE("undo all the way back, then redo all the way") {
+    Kite k(6, 40);
+    k.open("start.txt", "start\n");
+    k.press(keys::end).type(" ab\ncd");
+    std::string done = k.screen();
+    k.press(keys::ctrl_z, 12);
+    CHECK(k.rows(0, 2) == "start\n~\n");
+    CHECK(k.cursor() == "row 0, col 5");
+    CHECK(k.line(5) == "Nothing to undo");
+    k.press(keys::ctrl_y, 12);
+    CHECK(k.rows(0, 3) == "start ab\ncd\n~\n");
+    CHECK(k.cursor() == "row 1, col 2");
 }
+
+}  // namespace ktest

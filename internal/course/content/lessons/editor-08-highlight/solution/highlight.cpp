@@ -1,7 +1,8 @@
+#include <algorithm>
 #include <cctype>
 #include <cstring>
 
-#include "editor.hpp"
+#include "kite.hpp"
 
 bool is_separator(char c) {
     return std::isspace(static_cast<unsigned char>(c)) || c == '\0' ||
@@ -14,7 +15,7 @@ bool starts_with_at(const std::string& s, std::size_t i, std::string_view word) 
     return s.compare(i, word.size(), word) == 0;
 }
 
-// A keyword or type name starting at i, as a whole word, or 0.
+// The length of a keyword or type name starting at i, as a whole word, or 0.
 std::size_t word_at(const std::string& s, std::size_t i, std::string_view word) {
     std::size_t end = i + word.size();
     if (starts_with_at(s, i, word) && (end == s.size() || is_separator(s[end]))) {
@@ -106,8 +107,7 @@ bool highlight_row(Row& row, bool in_comment) {
                 }
             }
             if (len > 0) {
-                std::fill(row.hl.begin() + static_cast<long>(i),
-                          row.hl.begin() + static_cast<long>(i + len), kind);
+                std::fill(row.hl.begin() + static_cast<long>(i), row.hl.begin() + static_cast<long>(i + len), kind);
                 i += len;
                 prev_sep = false;
                 continue;
@@ -118,4 +118,49 @@ bool highlight_row(Row& row, bool in_comment) {
         ++i;
     }
     return in_comment;
+}
+
+void update_syntax(Editor& e, int y) {
+    bool in = y > 0 && e.rows[y - 1].open_comment;
+    for (auto r = static_cast<std::size_t>(y); r < e.rows.size(); ++r) {
+        Row& row = e.rows[r];
+        // A later row that was coloured from the same starting state is
+        // still right, and so is everything after it.
+        if (r > static_cast<std::size_t>(y) && row.hl_done && row.hl_in == in) {
+            break;
+        }
+        row.hl_in = in;
+        row.hl_done = true;
+        if (e.highlight) {
+            row.open_comment = highlight_row(row, in);
+        } else {
+            row.hl.assign(row.render.size(), Hl::Normal);
+            row.open_comment = false;
+        }
+        in = row.open_comment;
+    }
+}
+
+void refresh_row(Editor& e, int y) {
+    update_render(e.rows[y]);
+    e.rows[y].hl_done = false;
+    update_syntax(e, y);
+}
+
+void select_syntax(Editor& e) {
+    e.highlight = false;
+    auto dot = e.filename.rfind('.');
+    if (dot != std::string::npos) {
+        std::string_view ext = std::string_view(e.filename).substr(dot);
+        for (std::string_view c : {".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx"}) {
+            e.highlight = e.highlight || ext == c;
+        }
+    }
+    for (Row& row : e.rows) {
+        update_render(row);
+        row.hl_done = false;
+    }
+    if (!e.rows.empty()) {
+        update_syntax(e, 0);
+    }
 }

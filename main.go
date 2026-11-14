@@ -31,8 +31,11 @@ Lessons (act on the lesson whose folder you're in, else the current one):
   sysroad submit [id]     run every test; a pass completes the lesson
   sysroad quiz [id]       answer a quiz's questions
   sysroad hint [id]       show the next hint
-  sysroad solution [id]   print the solution
-  sysroad reset [id]      put the starter code back (your files are kept)
+  sysroad solution [id]   print the solution (in a project, what this lesson's reference adds or changes)
+  sysroad reset [id]      put the starter code back, or a project as it was at the lesson's
+                          start (your files are kept)
+  sysroad catchup [id]    project lessons: swap your project for the reference as of the end
+                          of this lesson and skip it (your files are kept)
   sysroad lesson [id]     print the lesson text
   sysroad path [id]       print the lesson's folder (cd "$(sysroad path)")
   sysroad edit [id]       open the lesson's file in $EDITOR
@@ -80,6 +83,8 @@ func main() {
 		err = runSolution(dir, args)
 	case "reset":
 		err = runReset(dir, args)
+	case "catchup":
+		err = runCatchUp(dir, args)
 	case "lesson":
 		err = runShowLesson(dir, args)
 	case "path":

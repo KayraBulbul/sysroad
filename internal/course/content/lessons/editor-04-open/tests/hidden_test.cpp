@@ -1,103 +1,101 @@
 #include "doctest.h"
 
-#include <sstream>
 #include <string>
 
-#include "editor.hpp"
+#include "session.hpp"
 
-static Editor sized(int rows, int cols) {
-    Editor e;
-    e.screen_rows = rows;
-    e.screen_cols = cols;
-    return e;
+namespace ktest {
+
+TEST_CASE("\\r\\n endings, a missing last newline, and empty lines") {
+    Kite k(8, 20);
+    k.open("mixed.txt", "a\r\n\r\nb\n\nlast");
+    CHECK(k.rows(0, 6) == "a\n\nb\n\nlast\n~\n");
+    CHECK(k.line(6) == "mixed.txt - 5 lines");
 }
 
-TEST_CASE("Windows line endings, a missing last newline, and empty lines") {
-    std::istringstream in("a\r\n\r\nb\n\nlast");
-    auto rows = read_rows(in);
-    REQUIRE(rows.size() == 5);
-    CHECK(rows[0].chars == "a");
-    CHECK(rows[1].chars == "");
-    CHECK(rows[2].chars == "b");
-    CHECK(rows[3].chars == "");
-    CHECK(rows[4].chars == "last");
+TEST_CASE("tabs after text go to the next stop, and a tab at a stop takes all 8") {
+    Kite k(8, 40);
+    k.open("tabs.txt", "ab\tc\t\td\n12345678\tx\n");
+    CHECK(k.line(0) == "ab      c               d");
+    CHECK(k.line(1) == "12345678        x");
+    std::string seen;
+    for (int i = 0; i < 7; ++i) {
+        k.press(keys::right);
+        seen += std::to_string(k.term.cursor_col()) + " ";
+    }
+    CHECK_MESSAGE(seen == "1 2 8 9 16 24 25 ", "the screen columns after each Right");
 }
 
-TEST_CASE("an empty file has no rows") {
-    std::istringstream in("");
-    CHECK(read_rows(in).empty());
+TEST_CASE("moving up past the top row scrolls back") {
+    Kite k(5, 20);
+    k.open("ten.txt", "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n");
+    k.press(keys::down, 8).press(keys::up, 7);
+    CHECK(k.rows(0, 3) == "1\n2\n3\n");
+    CHECK(k.cursor() == "row 0, col 0");
 }
 
-TEST_CASE("read_rows fills in render") {
-    std::istringstream in("\tindented\n");
-    auto rows = read_rows(in);
-    REQUIRE(rows.size() == 1);
-    CHECK(rows[0].render == "        indented");
+TEST_CASE("the view stays put while the cursor is on screen") {
+    Kite k(7, 20);  // 5 rows of text
+    k.open("ten.txt", "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n");
+    k.press(keys::down, 4);
+    CHECK(k.line(0) == "0");
+    CHECK(k.cursor() == "row 4, col 0");
+    k.press(keys::down).press(keys::up, 3);
+    CHECK(k.line(0) == "1");
+    CHECK(k.cursor() == "row 1, col 0");
 }
 
-TEST_CASE("tabs after text go to the next stop, and a full stop still moves") {
-    Row r{"ab\tc\t\td", ""};
-    update_render(r);
-    CHECK(r.render == "ab      c               d");
-    Row full{"12345678\tx", ""};
-    update_render(full);
-    CHECK(full.render == "12345678        x");
-    CHECK(cx_to_rx(r, 0) == 0);
-    CHECK(cx_to_rx(r, 2) == 2);
-    CHECK(cx_to_rx(r, 3) == 8);
-    CHECK(cx_to_rx(r, 4) == 9);
-    CHECK(cx_to_rx(r, 5) == 16);
-    CHECK(cx_to_rx(r, 6) == 24);
-    CHECK(cx_to_rx(r, 7) == 25);
+TEST_CASE("a long line scrolls sideways, and back") {
+    Kite k(5, 10);
+    k.open("long.txt", "0123456789abcdef\nshort\n");
+    k.press(keys::end);
+    CHECK(k.line(0) == "789abcdef");
+    CHECK(k.cursor() == "row 0, col 9");
+    CHECK(k.line(1) == "");
+    k.press(keys::home);
+    CHECK(k.line(0) == "0123456789");
+    CHECK(k.line(1) == "short");
+    CHECK(k.cursor() == "row 0, col 0");
 }
 
-TEST_CASE("no tabs: render is chars, and rx is cx") {
-    Row r{"plain text", ""};
-    update_render(r);
-    CHECK(r.render == "plain text");
-    CHECK(cx_to_rx(r, 6) == 6);
+TEST_CASE("sideways scrolling counts the columns tabs take on screen") {
+    Kite k(5, 10);
+    k.open("tabs.txt", "\t\tx\n");
+    k.press(keys::right, 2);  // on the x, 16 columns in
+    CHECK(k.line(0) == "         x");
+    CHECK(k.cursor() == "row 0, col 9");
 }
 
-TEST_CASE("scroll back up and left") {
-    Editor e = sized(3, 5);
-    e.rows = std::vector<Row>(10, Row{"0123456789", "0123456789"});
-    e.rowoff = 6;
-    e.coloff = 4;
-    e.cy = 2;
-    e.cx = 1;
-    scroll(e);
-    CHECK(e.rowoff == 2);
-    CHECK(e.coloff == 1);
-    CHECK(e.rx == 1);
+TEST_CASE("moving down from a long line to a short one scrolls left, just enough") {
+    Kite k(5, 10);
+    k.open("long.txt", "0123456789abcdef\nshort\n");
+    k.press(keys::end).press(keys::down);  // the cursor snaps to column 5
+    CHECK(k.line(0) == "56789abcde");
+    CHECK(k.line(1) == "");
+    CHECK(k.cursor() == "row 1, col 0");
 }
 
-TEST_CASE("scroll right by render columns, so tabs count") {
-    Editor e = sized(3, 10);
-    Row r{"\t\tx", ""};
-    update_render(r);
-    e.rows = {r};
-    e.cx = 2;  // on the x, at render column 16
-    scroll(e);
-    CHECK(e.rx == 16);
-    CHECK(e.coloff == 7);
+TEST_CASE("the line past the end can be scrolled to") {
+    Kite k(4, 20);  // 2 rows of text
+    k.open("abc.txt", "a\nb\nc\n");
+    k.press(keys::down, 3);
+    CHECK(k.rows(0, 2) == "c\n~\n");
+    CHECK(k.cursor() == "row 1, col 0");
 }
 
-TEST_CASE("the cursor on screen leaves the offsets alone") {
-    Editor e = sized(5, 20);
-    e.rows = std::vector<Row>(10, Row{"x", "x"});
-    e.rowoff = 2;
-    e.cy = 4;
-    scroll(e);
-    CHECK(e.rowoff == 2);
-    CHECK(e.coloff == 0);
+TEST_CASE("Page Down in a long file keeps the cursor on screen") {
+    Kite k(6, 20);  // 4 rows of text
+    std::string text;
+    for (int i = 0; i < 20; ++i) {
+        text += std::to_string(i) + "\n";
+    }
+    k.open("twenty.txt", text);
+    k.press(keys::page_down);
+    CHECK(k.rows(0, 4) == "1\n2\n3\n4\n");
+    CHECK(k.cursor() == "row 3, col 0");
+    k.press(keys::page_down).press(keys::page_up);
+    CHECK(k.rows(0, 4) == "4\n5\n6\n7\n");
+    CHECK(k.cursor() == "row 0, col 0");
 }
 
-TEST_CASE("the line past the end has rx 0, and can be scrolled to") {
-    Editor e = sized(2, 20);
-    e.rows = std::vector<Row>(3, Row{"abc", "abc"});
-    e.cy = 3;
-    e.cx = 0;
-    scroll(e);
-    CHECK(e.rx == 0);
-    CHECK(e.rowoff == 2);
-}
+}  // namespace ktest

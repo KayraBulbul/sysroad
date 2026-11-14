@@ -4,7 +4,7 @@
 #include <format>
 #include <fstream>
 
-#include "editor.hpp"
+#include "kite.hpp"
 
 std::string rows_to_string(const std::vector<Row>& rows) {
     std::string text;
@@ -40,19 +40,4 @@ bool save_file(Editor& e) {
     e.dirty = false;
     set_status(e, std::format("{} bytes written to disk", text.size()));
     return true;
-}
-
-std::string status_bar(const Editor& e) {
-    auto width = static_cast<std::size_t>(e.screen_cols);
-    std::string name = e.filename.empty() ? "[No Name]" : e.filename;
-    std::string left =
-        std::format("{:.20} - {} lines{}", name, e.rows.size(), e.dirty ? " (modified)" : "");
-    std::string right = std::format("{}/{}", e.cy + 1, e.rows.size());
-    if (left.size() > width) {
-        left.resize(width);
-    }
-    if (left.size() + right.size() <= width) {
-        return left + std::string(width - left.size() - right.size(), ' ') + right;
-    }
-    return left + std::string(width - left.size(), ' ');
 }

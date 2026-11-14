@@ -50,12 +50,18 @@ func TestLessonsSolutionsPassStartersFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	checkSolutions(t, c)
+}
+
+// checkSolutions runs every code lesson of c: lessons on their own, and
+// each project's lessons in order in one folder.
+func checkSolutions(t *testing.T, c *Course) {
 	cache := t.TempDir()
 	// Each lesson runs two compilers at once, so this keeps about one per
 	// core: more and the ASan test binaries crowd their 10s limit.
 	sem := make(chan struct{}, max(1, runtime.NumCPU()/2))
 	for _, l := range c.Lessons() {
-		if !l.HasCode() {
+		if !l.HasCode() || l.Project() != nil {
 			continue
 		}
 		t.Run(l.ID, func(t *testing.T) {
@@ -82,20 +88,11 @@ func TestLessonsSolutionsPassStartersFail(t *testing.T) {
 			if r.OK {
 				t.Errorf("starter passes Run — the lesson has nothing to do:\n%s", r.Output)
 			}
-
 			sol, err := l.Solution()
 			if err != nil {
 				t.Fatal(err)
 			}
-			for name, data := range sol {
-				p := filepath.Join(e.WorkDir(l), filepath.FromSlash(name))
-				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(p, data, 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
+			writeFiles(t, e.WorkDir(l), sol)
 			r, err = e.Run(ctx, l, ModeSubmit)
 			if err != nil {
 				t.Fatal(err)
@@ -110,6 +107,70 @@ func TestLessonsSolutionsPassStartersFail(t *testing.T) {
 				t.Fatal("result wasn't saved")
 			}
 		})
+	}
+	for _, p := range c.Projects() {
+		t.Run(p.ID, func(t *testing.T) {
+			t.Parallel()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			walkProject(t, &Engine{DataDir: t.TempDir(), CacheDir: cache}, p)
+		})
+	}
+}
+
+// walkProject takes a project's lessons in order in one folder: before a
+// lesson's reference is there, Run must fail; with exactly the reference in
+// the folder, Submit must pass, earlier lessons' tests included.
+func walkProject(t *testing.T, e *Engine, p *Project) {
+	for _, l := range p.Lessons {
+		walkLesson(t, e, l)
+	}
+}
+
+func walkLesson(t *testing.T, e *Engine, l *Lesson) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	r, err := e.Run(ctx, l, ModeRun)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.OK {
+		t.Errorf("%s: the previous reference passes Run — the lesson has nothing to do:\n%s", l.ID, stripANSI(r.Output))
+	}
+	ref, err := l.Solution()
+	if err != nil {
+		t.Fatal(err)
+	}
+	have, _ := e.WorkFiles(l)
+	for _, f := range have {
+		if _, ok := ref[f]; !ok {
+			os.Remove(filepath.Join(e.WorkDir(l), filepath.FromSlash(f)))
+		}
+	}
+	writeFiles(t, e.WorkDir(l), ref)
+	r, err = e.Run(ctx, l, ModeSubmit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.OK || r.Total == 0 {
+		t.Fatalf("%s: the reference fails Submit: %s\n%s", l.ID, r.Summary, stripANSI(r.Output))
+	}
+	if err := e.SaveSnapshot(l); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeFiles(t *testing.T, dir string, files map[string][]byte) {
+	t.Helper()
+	for name, data := range files {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

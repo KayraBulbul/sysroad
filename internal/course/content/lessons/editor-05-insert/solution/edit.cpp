@@ -1,15 +1,21 @@
 #include <iterator>
 
-#include "editor.hpp"
+#include "kite.hpp"
 
 namespace {
+
 auto at(Editor& e, int y) {
     return e.rows.begin() + y;
 }
+
+bool past_the_end(const Editor& e) {
+    return static_cast<std::size_t>(e.cy) == e.rows.size();
+}
+
 }  // namespace
 
 void insert_char(Editor& e, char c) {
-    if (static_cast<std::size_t>(e.cy) == e.rows.size()) {
+    if (past_the_end(e)) {
         e.rows.push_back(Row{});  // typing on the line past the end adds it
     }
     Row& row = e.rows[e.cy];
@@ -19,7 +25,7 @@ void insert_char(Editor& e, char c) {
 }
 
 void insert_newline(Editor& e) {
-    if (static_cast<std::size_t>(e.cy) == e.rows.size()) {
+    if (past_the_end(e)) {
         e.rows.push_back(Row{});
     } else {
         Row& row = e.rows[e.cy];
@@ -27,6 +33,7 @@ void insert_newline(Editor& e) {
         row.chars.resize(static_cast<std::size_t>(e.cx));
         update_render(row);
         update_render(rest);
+        // Last: inserting can move every row, and `row` with them.
         e.rows.insert(std::next(at(e, e.cy)), std::move(rest));
     }
     ++e.cy;
@@ -34,7 +41,7 @@ void insert_newline(Editor& e) {
 }
 
 void delete_char(Editor& e) {
-    if (static_cast<std::size_t>(e.cy) == e.rows.size() || (e.cx == 0 && e.cy == 0)) {
+    if (past_the_end(e) || (e.cx == 0 && e.cy == 0)) {
         return;
     }
     if (e.cx > 0) {
@@ -51,4 +58,19 @@ void delete_char(Editor& e) {
     update_render(above);
     e.rows.erase(at(e, e.cy));
     --e.cy;
+}
+
+void delete_forward(Editor& e) {
+    if (past_the_end(e)) {
+        return;
+    }
+    Row& row = e.rows[e.cy];
+    if (static_cast<std::size_t>(e.cx) < row.chars.size()) {
+        row.chars.erase(static_cast<std::size_t>(e.cx), 1);
+        update_render(row);
+    } else if (static_cast<std::size_t>(e.cy) + 1 < e.rows.size()) {
+        row.chars += e.rows[e.cy + 1].chars;  // join the next line on
+        update_render(row);
+        e.rows.erase(at(e, e.cy + 1));
+    }
 }

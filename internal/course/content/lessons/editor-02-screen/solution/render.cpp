@@ -1,13 +1,13 @@
 #include <format>
 
-#include "editor.hpp"
+#include "kite.hpp"
 
-std::string draw_screen(const Editor& e) {
+std::string draw_screen(Editor& e) {
     std::string out = "\x1b[?25l\x1b[H";  // hide the cursor, go to the top left
     auto cols = static_cast<std::size_t>(e.screen_cols);
     for (int y = 0; y < e.screen_rows; ++y) {
         if (static_cast<std::size_t>(y) < e.rows.size()) {
-            out += e.rows[y].render.substr(0, cols);
+            out += e.rows[y].chars.substr(0, cols);
         } else if (e.rows.empty() && y == e.screen_rows / 3) {
             std::string_view welcome = kWelcome.substr(0, cols);
             std::size_t padding = (cols - welcome.size()) / 2;
