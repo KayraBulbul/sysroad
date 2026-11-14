@@ -170,7 +170,7 @@ Only one window runs at a time: launching it again brings the open one forward.
 | `r s h v R u [ ] d` | lesson, outside the editor | the same, plus `d` for done on hand-checked steps |
 | `Ctrl+H` / `Ctrl+L` / `Ctrl+J` | lesson | focus the lesson, the editor, the output |
 | `Ctrl+B` | lesson | hide or show the lesson pane |
-| `Shift+Tab` | lesson | next editor tab (files, then the solution if open) |
+| `Shift+Tab` | editor | next editor tab (files, then the solution if open) |
 | `j/k`, `g/G` | lesson, outside the editor | scroll the lesson |
 | `Esc` | outside the editor | up a level: lesson → phase → dashboard |
 | mouse back/forward, `Alt+←/→` | anywhere | back and forward through the pages you visited |

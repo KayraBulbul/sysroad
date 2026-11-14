@@ -302,8 +302,9 @@
       return;
     }
     const mod = e.ctrlKey || e.metaKey;
-    // Shift+Tab cycles the editor tabs (files, then solution or diff).
-    if (e.key === "Tab" && e.shiftKey && !mod && !e.altKey && !typing && workspace.tabs.length > 1) {
+    // Shift+Tab in the editor cycles its tabs (files, then solution or
+    // diff). Elsewhere it stays the browser's reverse focus move.
+    if (e.key === "Tab" && e.shiftKey && !mod && !e.altKey && inEditor(t) && workspace.tabs.length > 1) {
       e.preventDefault();
       e.stopPropagation();
       workspace.select((workspace.active + 1) % workspace.tabs.length);
