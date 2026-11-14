@@ -311,6 +311,7 @@ phases:
 
   - id: p5
     title: Performance, caches & linking
+    summary: Measure honestly, write cache-friendly loops, make your wc as fast as GNU's, then see how the linker builds a program by writing a mini readelf.
     chapters:
       - id: perf-caches
         title: Caches & the memory mountain
@@ -375,6 +376,7 @@ phases:
 
   - id: p6
     title: Processes & the shell
+    summary: fork, exec, wait, pipes and signals, then build conch, your own shell with pipelines and job control.
     chapters:
       - id: proc-basics
         title: fork, exec, wait & pipes
@@ -446,6 +448,7 @@ phases:
 
   - id: p7
     title: Virtual memory & allocators
+    summary: Address spaces, page tables, the TLB and mmap, C++ allocators and pmr, then write your own malloc.
     chapters:
       - id: vm
         title: mmap, paging & the TLB
@@ -511,6 +514,7 @@ phases:
 
   - id: p8
     title: Concurrency
+    summary: Threads, atomics and memory order, locks built on a futex, then a thread pool and green threads.
     chapters:
       - id: conc-threads
         title: Threads, atomics & memory order
@@ -565,6 +569,7 @@ phases:
 
   - id: p9
     title: Networking
+    summary: Sockets, then poll, epoll and kqueue, then an HTTP/1.1 server on your own event loop.
     chapters:
       - id: net-sockets
         title: Sockets & echo servers
@@ -620,6 +625,7 @@ phases:
 
   - id: p10
     title: Storage
+    summary: What fsync really promises, a crash-safe key-value store with a write-ahead log, then an LSM tree or a B+tree.
     chapters:
       - id: store-files
         title: Files, fsync & crash consistency
@@ -674,6 +680,7 @@ phases:
 
   - id: p11
     title: Interpreters
+    summary: A tree-walking interpreter, then a bytecode VM with a garbage collector, then a language of your own.
     chapters:
       - id: interp-tree
         title: A tree-walking interpreter
@@ -728,6 +735,7 @@ phases:
 
   - id: p12
     title: C & kernels
+    summary: C for C++ programmers, then the xv6 kernel labs on system calls, page tables, traps, locks and the file system.
     chapters:
       - id: c-for-cpp
         title: C for C++ programmers
