@@ -1,5 +1,6 @@
 ---
 title: Redirections
+base: shell-02-builtins
 kind: capstone
 program: conch
 minutes: 45

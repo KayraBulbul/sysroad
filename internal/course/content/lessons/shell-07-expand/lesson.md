@@ -1,5 +1,6 @@
 ---
 title: Variables and quoting
+base: shell-06-jobs
 kind: capstone
 program: conch
 minutes: 60

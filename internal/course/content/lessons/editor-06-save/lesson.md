@@ -1,5 +1,6 @@
 ---
 title: "Saving, and the unsaved-changes flag"
+base: editor-05-insert
 kind: capstone
 program: kite
 minutes: 35

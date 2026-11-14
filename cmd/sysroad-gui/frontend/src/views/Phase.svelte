@@ -73,16 +73,6 @@
 </div>
 
 <style>
-  .page {
-    height: 100%;
-    overflow-y: auto;
-    scrollbar-gutter: stable both-edges;
-  }
-  .col {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 36px 24px 80px;
-  }
   .eyebrow {
     font-size: 11.5px;
     color: var(--fg-dim);
@@ -206,8 +196,5 @@
     color: var(--fg-dim);
     width: 6ch;
     text-align: right;
-  }
-  .m.xp {
-    width: 6ch;
   }
 </style>

@@ -101,8 +101,6 @@ func (m *Side) updateLesson(l *course.Lesson, key tea.KeyMsg) tea.Cmd {
 	return cmd
 }
 
-func (m *Side) Init() tea.Cmd { return m.core.init() }
-
 // selectable is the list j/k moves through: current, other in-progress, upcoming.
 func (m *Side) selectable() []app.Ref {
 	cur, ok := m.app.Current()
@@ -217,11 +215,7 @@ func (m *Side) viewLesson(l *course.Lesson, w int) string {
 	}
 	footer := m.lv.hints(&m.core)
 	if m.flash != "" && m.lv.confirm == "" {
-		st := sGood
-		if m.flashErr {
-			st = sErr
-		}
-		footer = " " + st.Render(m.flash)
+		footer = " " + m.flashText()
 	}
 	return strings.Join(lines[:m.h-1], "\n") + "\n" + trunc(footer, w+1)
 }
@@ -364,11 +358,7 @@ func (m *Side) renderFocus(r app.Ref, w int, line func(string), block func(strin
 
 func (m *Side) footer(w int) string {
 	if m.flash != "" {
-		st := sGood
-		if m.flashErr {
-			st = sErr
-		}
-		return " " + trunc(st.Render(m.flash), w)
+		return " " + trunc(m.flashText(), w)
 	}
 	hints := keyHints([][2]string{{"spc", "done"}, {"t", "timer"}, {"n", "note"}, {"j/k", "pick"}, {"o", "open"}, {"q", ""}})
 	return trunc(spread(hints, m.syncStatus(), w+1), w+1)

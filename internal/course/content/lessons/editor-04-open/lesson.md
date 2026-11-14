@@ -1,5 +1,6 @@
 ---
 title: Opening files and scrolling
+base: editor-03-cursor
 kind: capstone
 program: kite
 minutes: 35

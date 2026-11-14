@@ -159,12 +159,3 @@ func (a *App) ResetQuiz(l *course.Lesson) error {
 	all[l.ID] = [][]int{} // an empty attempt, not "never attempted"
 	return a.saveQuizPicks(all)
 }
-
-// QuizModTime lets views notice answers given in another process.
-func (a *App) QuizModTime() int64 {
-	st, err := os.Stat(a.quizPath())
-	if err != nil {
-		return 0
-	}
-	return st.ModTime().UnixNano()
-}

@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/KayraBulbul/sysroad/internal/app"
 	"github.com/KayraBulbul/sysroad/internal/course"
 )
 
@@ -114,10 +113,4 @@ func (v *lessonView) quizLines(l *course.Lesson, w int) []string {
 		add(sDim.Render(fmt.Sprintf("%d/%d answered", q.Solved, q.Total)))
 	}
 	return out
-}
-
-// QuizText renders a quiz's questions for the CLI.
-func QuizText(a *app.App, l *course.Lesson, w int) string {
-	v := lessonView{app: a, id: l.ID}
-	return strings.Join(v.quizLines(l, w), "\n")
 }

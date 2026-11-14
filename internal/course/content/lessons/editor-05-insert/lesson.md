@@ -1,5 +1,6 @@
 ---
 title: Inserting and deleting text
+base: editor-04-open
 kind: capstone
 program: kite
 minutes: 30

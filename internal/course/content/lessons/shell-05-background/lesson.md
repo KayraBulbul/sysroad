@@ -1,5 +1,6 @@
 ---
 title: Background jobs
+base: shell-04-pipes
 kind: capstone
 program: conch
 minutes: 45

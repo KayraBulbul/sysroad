@@ -136,11 +136,6 @@
     border-top-color: var(--accent);
     animation: spin 0.7s linear infinite;
   }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
   .body {
     margin: 0;
     padding: 12px 16px 20px;

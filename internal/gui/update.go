@@ -271,15 +271,7 @@ func buildEnv() []string {
 		filepath.Join(home, "go", "bin"),
 		"/opt/homebrew/bin", "/usr/local/go/bin", "/usr/local/bin",
 	)
-	seen := map[string]bool{}
-	var path []string
-	for _, d := range dirs {
-		if d != "" && !seen[d] {
-			seen[d] = true
-			path = append(path, d)
-		}
-	}
-	env := []string{"PATH=" + strings.Join(path, string(os.PathListSeparator))}
+	env := []string{"PATH=" + joinPath(dirs)}
 	for _, kv := range os.Environ() {
 		if !strings.HasPrefix(kv, "PATH=") {
 			env = append(env, kv)

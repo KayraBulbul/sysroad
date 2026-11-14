@@ -1,5 +1,6 @@
 ---
 title: "mini readelf: sections and symbols"
+base: link-06-readelf-header
 minutes: 50
 files: [sections.cpp]
 program: readelf

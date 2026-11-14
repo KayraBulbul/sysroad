@@ -53,7 +53,8 @@ func newCore(a *app.App) core {
 // Dirty reports whether there are changes that haven't been synced yet.
 func (c *core) Dirty() bool { return c.sync.Unsynced() }
 
-func (c *core) init() tea.Cmd {
+// Init starts the tick and the first sync for both views.
+func (c *core) Init() tea.Cmd {
 	if c.sync.Begin() {
 		return tea.Batch(tick(), syncCmd(c.sync))
 	}
@@ -70,6 +71,14 @@ func (c *core) fail(err error) {
 	if err != nil {
 		c.flash, c.flashErr, c.flashAt = err.Error(), true, time.Now()
 	}
+}
+
+// flashText is the flash message, red for an error.
+func (c *core) flashText() string {
+	if c.flashErr {
+		return sErr.Render(c.flash)
+	}
+	return sGood.Render(c.flash)
 }
 
 func (c *core) check(err error) {
@@ -189,7 +198,8 @@ func (c *core) toggleStatus(id string, s store.Status) {
 	c.check(c.app.ToggleStatus(id, s))
 }
 
-func editorCommand() string {
+// EditorCommand is $VISUAL, else $EDITOR, else nvim or vi.
+func EditorCommand() string {
 	for _, v := range []string{"VISUAL", "EDITOR"} {
 		if e := os.Getenv(v); e != "" {
 			return e
@@ -210,7 +220,7 @@ func edit(what, id, content, suffix string) tea.Cmd {
 	f.WriteString(content)
 	f.Close()
 	// Run through sh so EDITOR values with arguments ("code -w") work.
-	cmd := exec.Command("sh", "-c", editorCommand()+` "$1"`, "sh", f.Name())
+	cmd := exec.Command("sh", "-c", EditorCommand()+` "$1"`, "sh", f.Name())
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return editorDoneMsg{what: what, id: id, path: f.Name(), err: err}
 	})

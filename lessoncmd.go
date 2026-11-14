@@ -102,7 +102,7 @@ func runLesson(dir string, args []string, mode course.Mode) error {
 			emit(paint("90", "Under the hood is unlocked: sysroad lesson "+l.ID) + "\n")
 		}
 		if gitsync.IsRepo(dir) {
-			if err := syncWithRetry(dir, 20*time.Second); err != nil {
+			if err := gitsync.SyncWait(dir, 20*time.Second); err != nil {
 				emit(paint("90", "(not synced yet: "+err.Error()+")") + "\n")
 			}
 		}
@@ -185,7 +185,7 @@ func runQuiz(dir string, args []string) error {
 			if o := res.Outcome; o.Completed {
 				emit(paint("33", fmt.Sprintf("+%d XP · Lv %d (%d/%d)", o.XPGained, o.Level, o.Into, o.Span)) + "\n")
 				if gitsync.IsRepo(dir) {
-					if err := syncWithRetry(dir, 20*time.Second); err != nil {
+					if err := gitsync.SyncWait(dir, 20*time.Second); err != nil {
 						emit(paint("90", "(not synced yet: "+err.Error()+")") + "\n")
 					}
 				}

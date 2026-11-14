@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -105,23 +107,17 @@ func (p *Progress) Streak(now time.Time) (current, longest int) {
 	if len(p.Active) == 0 {
 		return 0, 0
 	}
-	day := func(t time.Time) string { return Day(t) }
 	d := now
-	if !p.Active[day(d)] {
+	if !p.Active[Day(d)] {
 		d = d.AddDate(0, 0, -1)
 	}
-	for p.Active[day(d)] {
+	for p.Active[Day(d)] {
 		current++
 		d = d.AddDate(0, 0, -1)
 	}
-	days := make([]string, 0, len(p.Active))
-	for k := range p.Active {
-		days = append(days, k)
-	}
-	sort.Strings(days)
 	run := 0
 	var prev time.Time
-	for _, k := range days {
+	for _, k := range slices.Sorted(maps.Keys(p.Active)) {
 		t, _ := time.ParseInLocation("2006-01-02", k, time.Local)
 		if run > 0 && prev.AddDate(0, 0, 1).Format("2006-01-02") == k {
 			run++
@@ -177,7 +173,7 @@ func Append(path string, e Event) error {
 	}
 	e.T = e.T.UTC().Truncate(time.Second)
 	if e.Host == "" {
-		e.Host = hostname()
+		e.Host = Hostname()
 	}
 	data, err := json.Marshal(e)
 	if err != nil {
@@ -194,7 +190,8 @@ func Append(path string, e Event) error {
 	return f.Close()
 }
 
-func hostname() string {
+// Hostname is this machine's name without its domain.
+func Hostname() string {
 	h, _ := os.Hostname()
 	if i := strings.IndexByte(h, '.'); i > 0 {
 		h = h[:i]

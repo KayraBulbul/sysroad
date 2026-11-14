@@ -1,5 +1,6 @@
 ---
 title: "Build types, warnings and sanitizers"
+base: cmake-03-targets
 minutes: 25
 build: cmake
 files: [CMakeLists.txt]

@@ -87,12 +87,8 @@ func ensureGitignore(p string) error {
 }
 
 func hostnameSafe() string {
-	h, _ := os.Hostname()
-	if i := strings.IndexByte(h, '.'); i > 0 {
-		h = h[:i]
+	if h := store.Hostname(); h != "" {
+		return h
 	}
-	if h == "" {
-		h = "other"
-	}
-	return h
+	return "other"
 }

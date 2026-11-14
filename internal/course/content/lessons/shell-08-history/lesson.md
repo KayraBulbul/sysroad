@@ -1,5 +1,6 @@
 ---
 title: History and line editing
+base: shell-07-expand
 kind: capstone
 program: conch
 minutes: 60

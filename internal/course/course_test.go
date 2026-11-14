@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -50,11 +51,21 @@ func TestLessonsSolutionsPassStartersFail(t *testing.T) {
 		t.Fatal(err)
 	}
 	cache := t.TempDir()
+	// Each lesson runs two compilers at once, so this keeps about one per
+	// core: more and the ASan test binaries crowd their 10s limit.
+	sem := make(chan struct{}, max(1, runtime.NumCPU()/2))
 	for _, l := range c.Lessons() {
 		if !l.HasCode() {
 			continue
 		}
 		t.Run(l.ID, func(t *testing.T) {
+			// Lessons that time things run one at a time, before the rest
+			// start, so nothing slows their measurements.
+			if !l.Meta.Optimize {
+				t.Parallel()
+			}
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			if l.Meta.Build == "cmake" {
 				if _, _, err := CMakeTools(); err != nil {
 					t.Skip("no cmake")

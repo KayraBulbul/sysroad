@@ -1,5 +1,6 @@
 ---
 title: "-E, -T, -v, -A: showing the invisible"
+base: cpp-11-cat-squeeze
 minutes: 15
 files: [cat.cpp]
 run:

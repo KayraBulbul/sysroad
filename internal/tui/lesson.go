@@ -276,7 +276,7 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 			return nil, true
 		}
 		c.changed()
-		cmd := exec.Command("sh", "-c", editorCommand()+` "$1"`, "sh", l.Meta.Files[0])
+		cmd := exec.Command("sh", "-c", EditorCommand()+` "$1"`, "sh", l.Meta.Files[0])
 		cmd.Dir = dir
 		return tea.ExecProcess(cmd, func(err error) tea.Msg { return lessonEditDoneMsg{err} }), true
 	case "o":
@@ -473,6 +473,19 @@ func (v *lessonView) applyJump(body []string) {
 	v.jump = ""
 }
 
+// visibleBody scrolls body to fit h lines, marking the last one when
+// there's more below.
+func (v *lessonView) visibleBody(body []string, h int) []string {
+	v.applyJump(body)
+	maxScroll := max(len(body)-h, 0)
+	v.scroll = min(max(v.scroll, 0), maxScroll)
+	lines := append([]string{}, body[v.scroll:min(v.scroll+h, len(body))]...)
+	if len(lines) == h && maxScroll > 0 && v.scroll < maxScroll {
+		lines[h-1] = sDim.Render(fmt.Sprintf("↓ more (j/k scroll · %d%%)", 100*v.scroll/maxScroll))
+	}
+	return lines
+}
+
 func langOf(name string) string {
 	switch filepath.Ext(name) {
 	case ".cpp", ".cc", ".hpp", ".h":
@@ -532,15 +545,7 @@ func (v *lessonView) screen(w, h int) []string {
 	if outH > 0 {
 		bodyH-- // separator
 	}
-	body := v.bodyLines(w)
-	v.applyJump(body)
-	maxScroll := max(len(body)-bodyH, 0)
-	v.scroll = min(max(v.scroll, 0), maxScroll)
-	visible := body[v.scroll:min(v.scroll+bodyH, len(body))]
-	lines := append([]string{}, visible...)
-	if len(lines) == bodyH && maxScroll > 0 && v.scroll < maxScroll {
-		lines[len(lines)-1] = sDim.Render(fmt.Sprintf("↓ more (j/k scroll · %d%%)", 100*v.scroll/maxScroll))
-	}
+	lines := v.visibleBody(v.bodyLines(w), bodyH)
 	for len(lines) < bodyH {
 		lines = append(lines, "")
 	}
@@ -598,21 +603,11 @@ func LessonText(a *app.App, id string, w int) string {
 	return strings.Join(v.bodyLines(w), "\n")
 }
 
-// EditorCommand is $VISUAL, else $EDITOR, else nvim or vi.
-func EditorCommand() string { return editorCommand() }
-
 // split is the wide layout: the lesson on the left, the output on the right.
 func (v *lessonView) split(w, h int) []string {
 	lw := min(w*52/100, 96)
 	rw := w - lw - 3
-	body := v.bodyLines(lw)
-	v.applyJump(body)
-	maxScroll := max(len(body)-h, 0)
-	v.scroll = min(max(v.scroll, 0), maxScroll)
-	left := append([]string{}, body[v.scroll:min(v.scroll+h, len(body))]...)
-	if len(left) == h && maxScroll > 0 && v.scroll < maxScroll {
-		left[h-1] = sDim.Render(fmt.Sprintf("↓ more (j/k scroll · %d%%)", 100*v.scroll/maxScroll))
-	}
+	left := v.visibleBody(v.bodyLines(lw), h)
 
 	out := v.outputLines(rw)
 	right := []string{sDim.Render("Output")}

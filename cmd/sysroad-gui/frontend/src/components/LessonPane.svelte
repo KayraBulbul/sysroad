@@ -209,9 +209,7 @@
     padding: 0 7px;
     border-radius: 4px;
   }
-  .xp {
-    color: var(--yellow);
-  }
+  .xp,
   .warn {
     color: var(--yellow);
   }

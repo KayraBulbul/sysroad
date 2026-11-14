@@ -2,6 +2,7 @@ package gui
 
 import (
 	_ "embed"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -156,13 +157,5 @@ func WatchTheme(dir string, onChange func(Theme), stop <-chan struct{}) error {
 }
 
 func sameTheme(a, b Theme) bool {
-	if a.Name != b.Name || a.Mode != b.Mode || len(a.Colors) != len(b.Colors) {
-		return false
-	}
-	for k, v := range a.Colors {
-		if b.Colors[k] != v {
-			return false
-		}
-	}
-	return true
+	return a.Name == b.Name && a.Mode == b.Mode && maps.Equal(a.Colors, b.Colors)
 }
