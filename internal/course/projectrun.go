@@ -28,7 +28,8 @@ func (e *Engine) runProject(ctx context.Context, l *Lesson, mode Mode) (*Result,
 		return nil, err
 	}
 	if len(srcs) == 0 {
-		return &Result{Stage: "compile", Summary: "no .cpp files in " + work}, nil
+		return &Result{Stage: "compile", Summary: "✗ your project has no .cpp files yet",
+			Output: "Every .cpp file in your project folder is compiled, the program and the tests both. Write the code in one.\n"}, nil
 	}
 	cxx, err := Compiler()
 	if err != nil {
@@ -161,7 +162,8 @@ func (e *Engine) runProject(ctx context.Context, l *Lesson, mode Mode) (*Result,
 // projectSuites writes the tests a project lesson's Run or Submit uses into
 // dir, a folder per lesson: for Run the lesson's own visible tests, for
 // Submit every test of this and the project's earlier lessons, less what
-// the lessons up to this one retire.
+// the lessons up to this one retire. Each folder gets the helpers as of its
+// lesson.
 func projectSuites(l *Lesson, mode Mode, dir string) ([]suite, error) {
 	if err := os.RemoveAll(dir); err != nil {
 		return nil, err
@@ -185,7 +187,7 @@ func projectSuites(l *Lesson, mode Mode, dir string) ([]suite, error) {
 			continue
 		}
 		s := suite{lesson: x, earlier: x != l, dir: filepath.Join(dir, x.ID), exclude: gone.Cases}
-		tests, err := x.tests()
+		tests, err := x.suiteTests()
 		if err != nil {
 			return nil, err
 		}
@@ -200,8 +202,7 @@ func projectSuites(l *Lesson, mode Mode, dir string) ([]suite, error) {
 			if err := os.WriteFile(p, tests[name], 0o644); err != nil {
 				return nil, err
 			}
-			// Headers in tests/ are shared helpers the test files include.
-			if strings.HasSuffix(name, ".cpp") {
+			if isTestFile(name) {
 				s.files = append(s.files, p)
 			}
 		}

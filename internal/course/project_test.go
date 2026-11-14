@@ -13,6 +13,9 @@ import (
 // tally is a three-lesson fixture project (testdata/tally): lesson 2 adds
 // a type and a source in a subfolder, lesson 3 changes a signature, drops a
 // function, deletes a file and retires a test file, a test case and a check.
+// Lesson 1's test helper sample.hpp carries forward to lesson 2; lesson 3
+// replaces it with one lesson 1's tests would fail on, so its Submit only
+// passes if each lesson's tests get the helpers as of that lesson.
 func tally(t *testing.T) *Course {
 	t.Helper()
 	c, err := LoadFS(os.DirFS("testdata/tally"))
@@ -69,11 +72,24 @@ func TestProjectContractNamesWhatDoesntMatch(t *testing.T) {
 		"✓ int count_words(const std::string&);",
 		"✗ struct Stats { … };\n    not declared in tally.hpp",
 		"✗ int count_lines(const std::string&);\n    tally.hpp declares it differently:",
-		"✗ Stats stats(const std::string&);",
+		"✗ Stats stats(const std::string&);\n    needs Stats, which tally.hpp doesn't declare yet",
 	} {
 		if !strings.Contains(r.Output, want) {
 			t.Errorf("output lacks %q:\n%s", want, r.Output)
 		}
+	}
+}
+
+// A header and nothing else: Run says to write a .cpp file, not where the
+// folder is.
+func TestProjectWithOnlyAHeaderSaysWhatToWrite(t *testing.T) {
+	c := tally(t)
+	e := &Engine{DataDir: t.TempDir(), CacheDir: t.TempDir()}
+	words := c.Lesson("tally-01-words")
+	writeFiles(t, e.WorkDir(words), map[string][]byte{"tally.hpp": []byte("int count_words(const std::string&);\n")})
+	r := run(t, e, words, ModeRun)
+	if r.OK || r.Summary != "✗ your project has no .cpp files yet" || !strings.Contains(r.Output, "Every .cpp file") {
+		t.Fatalf("summary %q\n%s", r.Summary, r.Output)
 	}
 }
 
@@ -196,7 +212,9 @@ retires:
 `),
 		"lessons/one/solution/proj.hpp":      {Data: []byte("int f();\n")},
 		"lessons/one/tests/visible_test.cpp": {Data: []byte(`TEST_CASE("adds up") {}` + "\n")},
-		"lessons/two/lesson.md":              lesson("project: proj\nbase: old\ncontract:\n  header: other.hpp\n  drops: [g]\nretires:\n  - {lesson: one, tests: [nope.cpp], cases: [\"subtracts*\"], checks: [missing]}\n"),
+		"lessons/one/tests/help.hpp":         {Data: []byte("// helps\n")},
+		"lessons/two/tests/help.hpp":         {Data: []byte("// helps\n")},
+		"lessons/two/lesson.md":              lesson("project: proj\nbase: old\ncontract:\n  header: other.hpp\n  drops: [g]\nretires:\n  - {lesson: one, tests: [nope.cpp, help.hpp], cases: [\"subtracts*\"], checks: [missing]}\n"),
 		"lessons/two/starter/data.txt":       {Data: []byte("x")},
 		"lessons/old/lesson.md":              lesson("files: [a.cpp]\n"),
 		"lessons/old/starter/a.cpp":          {Data: []byte("a")},
@@ -218,6 +236,8 @@ retires:
 		"two: only a project's first lesson can have a starter/",
 		"two: contract drops g, which no earlier lesson added",
 		"two: retires one's tests/nope.cpp, which it doesn't have",
+		"two: retires one's tests/help.hpp, a helper: only .cpp test files can be retired",
+		"two: tests/help.hpp is the same as one's, so delete it",
 		`two: retires test cases "subtracts*", which match none of one's`,
 		`two: retires check "missing", which one's checks.yaml doesn't have`,
 	} {

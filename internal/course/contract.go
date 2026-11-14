@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 // The contract check runs before the tests build: it names the contract
@@ -92,6 +93,19 @@ func (e *Engine) checkContract(ctx context.Context, cxx string, flags []string, 
 		}()
 	}
 	wg.Wait()
+	// A function whose signature uses a contract type that's missing fails
+	// with whatever the compiler makes of the unknown name; say why instead.
+	for i, it := range items {
+		if fails[i] == "" || it.IsType() {
+			continue
+		}
+		for j, t := range items {
+			if t.IsType() && fails[j] != "" && usesName(it.Sig, t.Name) {
+				fails[i] = "needs " + t.Name + ", which " + header + " doesn't declare yet"
+				break
+			}
+		}
+	}
 
 	r := &Result{Stage: "contract", Total: len(items)}
 	var b strings.Builder
@@ -114,6 +128,17 @@ func (e *Engine) checkContract(ctx context.Context, cxx string, flags []string, 
 	r.Summary = "✗ " + header + " doesn't match the lesson's contract"
 	r.Output = b.String()
 	return r
+}
+
+// usesName reports whether a C++ signature mentions name as a whole word.
+func usesName(sig, name string) bool {
+	word := func(r rune) bool { return r == '_' || r == ':' || unicode.IsLetter(r) || unicode.IsDigit(r) }
+	for _, w := range strings.FieldsFunc(sig, func(r rune) bool { return !word(r) }) {
+		if w == name || strings.TrimPrefix(w, "::") == name {
+			return true
+		}
+	}
+	return false
 }
 
 // contractProblem says what's wrong with one item, from the compiler's

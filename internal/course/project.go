@@ -1,6 +1,7 @@
 package course
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"regexp"
@@ -98,6 +99,61 @@ func (p *Project) prev(l *Lesson) *Lesson {
 
 // upTo is the project's lessons from the first through l.
 func (p *Project) upTo(l *Lesson) []*Lesson { return p.Lessons[:p.index(l)+1] }
+
+// isTestFile: only the .cpp files in tests/ are test files; the rest are
+// helpers they include.
+func isTestFile(name string) bool { return strings.HasSuffix(name, ".cpp") }
+
+// helper is a test helper as a project lesson's tests see it, and the
+// lesson whose tests/ it comes from.
+type helper struct {
+	data []byte
+	from *Lesson
+}
+
+// helpers are the test helpers a project lesson's tests see: every helper
+// in the tests/ of the project's lessons up to l, a later lesson's
+// replacing an earlier one's of the same path. They carry forward even
+// from a lesson whose tests are all retired.
+func (l *Lesson) helpers() (map[string]helper, error) {
+	out := map[string]helper{}
+	for _, x := range l.project.upTo(l) {
+		own, err := x.tests()
+		if err != nil {
+			return nil, err
+		}
+		for name, data := range own {
+			if !isTestFile(name) {
+				out[name] = helper{data, x}
+			}
+		}
+	}
+	return out, nil
+}
+
+// suiteTests is what a lesson's tests build from: its own test files with,
+// in a project, the helpers as of that lesson, so a helper a later lesson
+// changes can't break this lesson's tests.
+func (l *Lesson) suiteTests() (map[string][]byte, error) {
+	own, err := l.tests()
+	if err != nil || l.project == nil {
+		return own, err
+	}
+	hs, err := l.helpers()
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]byte{}
+	for name, h := range hs {
+		out[name] = h.data
+	}
+	for name, data := range own {
+		if isTestFile(name) {
+			out[name] = data
+		}
+	}
+	return out, nil
+}
 
 // ContractItem is one type or function in force in a project.
 type ContractItem struct {
@@ -272,6 +328,15 @@ func (c *Course) validateProjectLesson(l *Lesson) []string {
 			add("only a project's first lesson can have a starter/")
 		}
 	}
+	if prev := p.prev(l); prev != nil {
+		inherited, _ := prev.helpers()
+		own, _ := l.tests()
+		for _, name := range sortedKeys(own) {
+			if h, ok := inherited[name]; ok && !isTestFile(name) && bytes.Equal(h.data, own[name]) {
+				add("tests/%s is the same as %s's, so delete it", name, h.from.ID)
+			}
+		}
+	}
 	if sol, err := l.Solution(); err != nil {
 		add("%v", err)
 	} else if _, ok := sol[p.Header]; !ok && p.Header != "" {
@@ -309,8 +374,11 @@ func (c *Course) validateProjectLesson(l *Lesson) []string {
 		}
 		tests, _ := x.tests()
 		for _, f := range r.Tests {
-			if _, ok := tests[f]; !ok {
+			switch _, ok := tests[f]; {
+			case !ok:
 				add("retires %s's tests/%s, which it doesn't have", x.ID, f)
+			case !isTestFile(f):
+				add("retires %s's tests/%s, a helper: only .cpp test files can be retired", x.ID, f)
 			}
 		}
 		names := testCaseNames(tests)

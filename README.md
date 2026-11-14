@@ -275,6 +275,9 @@ The course lives in `internal/course/content/` and is embedded in the binary:
   files, `cases:` doctest name patterns, `checks:` names; only `lesson:` retires them
   all). `solution/` is laid over the previous lesson's reference, so it holds only what
   the lesson adds or changes. Only the first lesson may have a `starter/` (data files).
+  Test helpers (the non-`.cpp` files in `tests/`) carry forward the same way: a lesson's
+  tests see the helpers of every lesson up to it, so a helper goes only where it first
+  appears or changes, and a copy fails `go test`.
   `make test` walks each project in order in one folder: before a lesson's reference is
   there Run must fail, and with it Submit must pass, earlier lessons' tests included.
 - `tests/visible_*.cpp` (Run and Submit) and `tests/hidden_*.cpp` (Submit only): doctest
