@@ -58,14 +58,21 @@ bool KeyReader::fill(bool wait) {
     }
 }
 
+// Whether bytes that decode as Escape could still become a sequence: a
+// lone ESC, or an unfinished ESC [ or ESC O, not too long to be one.
+static bool could_be_sequence(const std::string& bytes) {
+    return bytes.size() == 1 || (bytes.size() < 8 && (bytes[1] == '[' || (bytes[1] == 'O' && bytes.size() == 2)));
+}
+
 int KeyReader::next() {
     if (pending_.empty()) {
         fill(true);
     }
     auto [key, used] = decode_key(pending_);
-    // An escape sequence can arrive in pieces. If all that's here so far
-    // reads as Escape, give the rest a tenth of a second to turn up.
-    if (key == kEsc && pending_.size() < 8 && fill(false)) {
+    // An escape sequence can arrive in pieces. While all that's here reads
+    // as Escape and could still be the start of one, give the rest a tenth
+    // of a second at a time to turn up.
+    while (key == kEsc && could_be_sequence(pending_) && fill(false)) {
         std::tie(key, used) = decode_key(pending_);
     }
     pending_.erase(0, used);

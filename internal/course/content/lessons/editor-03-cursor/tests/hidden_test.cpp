@@ -88,4 +88,19 @@ TEST_CASE("an arrow that arrives in two pieces still moves the cursor") {
     CHECK(kite.wait_exit() == 0);
 }
 
+TEST_CASE("an arrow that arrives in three pieces still moves the cursor") {
+    write_file("hello.txt", "hello\n");
+    KitePty kite(6, 20, {"hello.txt"});
+    REQUIRE_MESSAGE(kite.wait_until([](const Term& t) { return t.line(0) == "hello"; }), kite.shown());
+    kite.type("\x1b");
+    usleep(20'000);
+    kite.type("[");
+    usleep(20'000);
+    kite.type("C");
+    bool moved = kite.wait_until([](const Term& t) { return t.cursor_col() == 1; });
+    CHECK_MESSAGE(moved, (std::string("the cursor should be at column 1, after one Right. It's at ") + kite.term().cursor()));
+    kite.type("\x11");
+    CHECK(kite.wait_exit() == 0);
+}
+
 }  // namespace ktest
