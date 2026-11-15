@@ -23,6 +23,13 @@ if (cursor < text.size()) {
 }
 ```
 
-Waiting for the rest of an escape sequence, with `VMIN` 1: after a
-decode that gives Escape, `poll` the fd for 50 ms; if something came,
-read it and decode again.
+Waiting for the rest of an escape sequence, with `VMIN` 1: while what's
+pending decodes as Escape and could still become a sequence (a lone
+ESC, or `ESC [` or `ESC O` and not yet long), `poll` the fd for 50 ms;
+if something came, read it and decode again; if not, it's Escape.
+
+```cpp
+bool could_be_sequence(const std::string& b) {
+    return b.size() == 1 || (b.size() < 8 && (b[1] == '[' || (b[1] == 'O' && b.size() == 2)));
+}
+```

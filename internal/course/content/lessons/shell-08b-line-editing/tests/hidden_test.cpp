@@ -63,6 +63,29 @@ TEST_CASE("an arrow that arrives in two pieces is still an arrow") {
     CHECK_MESSAGE(printed(c, "[abX]"), c.output());
 }
 
+TEST_CASE("an arrow that arrives in three pieces is still an arrow") {
+    Conch c;
+    REQUIRE(c.prompt());
+    c.send("echo [ab]");
+    c.send("\x1b");
+    usleep(10'000);
+    c.send("[");
+    usleep(10'000);
+    c.send("D");  // ESC, [ and D apart: still Left
+    c.send("X" + keys::enter);
+    CHECK_MESSAGE(printed(c, "[abX]"), c.output());
+}
+
+TEST_CASE("Escape on its own, then text, is Escape and the text") {
+    Conch c;
+    REQUIRE(c.prompt());
+    c.send("echo [e");
+    c.send("\x1b");
+    usleep(300'000);  // long enough to be the Escape key, which does nothing here
+    c.send("f]" + keys::enter);
+    CHECK_MESSAGE(printed(c, "[ef]"), c.output());
+}
+
 TEST_CASE("keys that aren't text do nothing to the line") {
     Conch c;
     REQUIRE(c.prompt());

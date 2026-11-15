@@ -58,8 +58,15 @@ void write_all(const std::string& s) {
     }
 }
 
-// Reads one key, giving the rest of an escape sequence 50 ms to arrive.
-// -1 at the end of input.
+// Whether bytes that decode as Escape could still become a sequence: a
+// lone ESC, or an unfinished ESC [ or ESC O, not too long to be one.
+bool could_be_sequence(const std::string& bytes) {
+    return bytes.size() == 1 || (bytes.size() < 8 && (bytes[1] == '[' || (bytes[1] == 'O' && bytes.size() == 2)));
+}
+
+// Reads one key. While what's here is Escape that could still be the
+// start of a sequence, gives the rest 50 ms at a time to arrive: a
+// sequence can come in several pieces. -1 at the end of input.
 int read_key(int fd, std::string& pending) {
     char buf[32];
     while (pending.empty()) {
@@ -71,13 +78,17 @@ int read_key(int fd, std::string& pending) {
         }
     }
     auto [key, used] = decode_key(pending);
-    pollfd p{fd, POLLIN, 0};
-    if (key == kEsc && pending.size() < 8 && poll(&p, 1, 50) > 0) {
-        ssize_t n = read(fd, buf, sizeof buf);
-        if (n > 0) {
-            pending.append(buf, static_cast<size_t>(n));
-            std::tie(key, used) = decode_key(pending);
+    while (key == kEsc && could_be_sequence(pending)) {
+        pollfd p{fd, POLLIN, 0};
+        if (poll(&p, 1, 50) <= 0) {
+            break;  // nothing more came: it was the Escape key
         }
+        ssize_t n = read(fd, buf, sizeof buf);
+        if (n <= 0) {
+            break;
+        }
+        pending.append(buf, static_cast<size_t>(n));
+        std::tie(key, used) = decode_key(pending);
     }
     pending.erase(0, used > 0 ? used : 1);
     return key;

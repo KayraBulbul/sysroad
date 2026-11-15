@@ -22,7 +22,11 @@ for bash, and linenoise for redis-cli.
 `decode_key` and your key values into conch's folder by hand (conch is
 a project of its own, so nothing comes across by itself), and keep the
 idea of your key reader: when what's read so far decodes as Escape,
-give the rest of a sequence a moment to arrive.
+give the rest of a sequence a moment to arrive, and keep doing so while
+it still decodes as Escape and could be the start of one. Over a slow
+link `ESC`, `[` and `D` can arrive separately, and `ESC [` alone is
+still Escape. A lone ESC, or ESC followed by ordinary text, is Escape
+after at most one wait.
 
 **Reading a line**, when conch is talking to a terminal, now happens in
 raw mode, switched on for the line and off again before the command
