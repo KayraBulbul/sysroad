@@ -71,7 +71,8 @@ int run_line(Shell& sh, const std::string& line);
 ```
 
 And in a `.cpp` file, `int main()`, with no parameters, ending in
-`return`: the tests call your `main` renamed, and only the real `main`
+`return`: the tests call your `main` renamed, as `int main()` (with
+parameters, Run says the tests can't call it), and only the real `main`
 returns 0 when it runs off its end. The tests run your whole program
 on scripts and on a terminal of their own, and call `run_line` on a
 `Shell sh;` of their own to check what only the shell process itself

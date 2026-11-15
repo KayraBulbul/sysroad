@@ -246,3 +246,54 @@ retires:
 		}
 	}
 }
+
+func TestWrongMainNamesTheSignatureTheTestsUse(t *testing.T) {
+	for _, tc := range []struct {
+		out    string
+		params string
+		ok     bool
+	}{
+		{"/usr/bin/ld: visible_test.cpp.o: in function `f()':\nvisible_test.cpp:4: undefined reference to `sysroad_student_main()'\nclang++: error: linker command failed with exit code 1", "", true},
+		{"ld.lld: error: undefined symbol: sysroad_student_main(int, char**)\n>>> referenced by visible_test.cpp:4", "int, char**", true},
+		{"Undefined symbols for architecture arm64:\n  \"sysroad_student_main()\", referenced from:\n      f() in visible_test.cpp.o\nld: symbol(s) not found", "", true},
+		{"visible_test.cpp:4: undefined reference to `sysroad_student_main()'\nvisible_test.cpp:5: undefined reference to `count_lines(int)'", "", false},
+		{"visible_test.cpp:5: undefined reference to `count_lines(int)'", "", false},
+	} {
+		params, ok := wrongMain(tc.out)
+		if ok != tc.ok || params != tc.params {
+			t.Errorf("wrongMain(%q) = %q, %v; want %q, %v", tc.out, params, ok, tc.params, tc.ok)
+		}
+	}
+}
+
+// A main declared with other parameters than the tests call it with: Run
+// says how to declare it, instead of showing the linker.
+func TestProjectWithTheWrongMainSaysHowToDeclareIt(t *testing.T) {
+	needCompiler(t)
+	for _, tc := range []struct{ tests, mine, want string }{
+		{"int sysroad_student_main(int, char**);", "int main() { return 0; }", "✗ the tests call main as int main(int, char**)"},
+		{"int sysroad_student_main();", "int main(int argc, char** argv) { return argc > 0 && argv ? 0 : 1; }", "✗ the tests call main as int main()"},
+	} {
+		fsys := fstest.MapFS{
+			"course.yaml":                      {Data: []byte("title: t\nphases:\n  - id: p\n    title: p\n    chapters:\n      - id: c\n        title: c\n        lessons:\n          - {id: solo-1, title: Solo}\n")},
+			"lessons/solo-1/lesson.md":         {Data: []byte("---\nproject: solo\ncontract:\n  header: solo.hpp\n  functions:\n    - {name: answer, sig: \"int()\"}\n---\nBody.\n")},
+			"lessons/solo-1/solution/solo.hpp": {Data: []byte("int answer();\n")},
+			"lessons/solo-1/tests/visible_test.cpp": {Data: []byte("#include \"doctest.h\"\n#include \"solo.hpp\"\n" + tc.tests +
+				"\nTEST_CASE(\"main is there\") { CHECK(&sysroad_student_main != nullptr); CHECK(answer() == 42); }\n")},
+		}
+		c, err := LoadFS(fsys)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e := &Engine{DataDir: t.TempDir(), CacheDir: t.TempDir()}
+		l := c.Lesson("solo-1")
+		writeFiles(t, e.WorkDir(l), map[string][]byte{
+			"solo.hpp": []byte("int answer();\n"),
+			"main.cpp": []byte("#include \"solo.hpp\"\nint answer() { return 42; }\n" + tc.mine + "\n"),
+		})
+		r := run(t, e, l, ModeRun)
+		if r.Summary != tc.want || !strings.Contains(r.Output, "declare it as") || strings.Contains(r.Output, "undefined") {
+			t.Errorf("summary %q\n%s", r.Summary, r.Output)
+		}
+	}
+}
