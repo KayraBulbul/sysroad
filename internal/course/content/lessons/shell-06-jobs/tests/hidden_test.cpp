@@ -13,8 +13,7 @@ namespace shtest {
 TEST_CASE("Ctrl-C at the prompt doesn't end the shell") {
     Conch c;
     REQUIRE(c.prompt());
-    c.send("\x03");
-    usleep(100'000);
+    c.send("\x03");  // at the prompt: the line is thrown away, nothing more
     c.line("echo here");
     CHECK_MESSAGE(c.expect("here"), c.output());
     c.line("exit");
@@ -24,8 +23,10 @@ TEST_CASE("Ctrl-C at the prompt doesn't end the shell") {
 TEST_CASE("Ctrl-Z stops a whole pipeline, and $? is 128 plus SIGTSTP") {
     Conch c;
     REQUIRE(c.prompt());
-    c.line("sleep 5 | sleep 5");
-    usleep(200'000);
+    {
+        std::string why = c.start_job("sleep 5 | sleep 5");
+        REQUIRE_MESSAGE(why.empty(), why);
+    }
     c.send("\x1a");
     REQUIRE_MESSAGE(c.expect("[1] Stopped  sleep 5 | sleep 5"), c.output());
     REQUIRE(c.prompt());
@@ -36,13 +37,17 @@ TEST_CASE("Ctrl-Z stops a whole pipeline, and $? is 128 plus SIGTSTP") {
 TEST_CASE("a second job stopped gets the next number") {
     Conch c;
     REQUIRE(c.prompt());
-    c.line("sleep 5");
-    usleep(200'000);
+    {
+        std::string why = c.start_job("sleep 5");
+        REQUIRE_MESSAGE(why.empty(), why);
+    }
     c.send("\x1a");
     REQUIRE(c.expect("[1] Stopped  sleep 5"));
     REQUIRE(c.prompt());
-    c.line("sleep 6");
-    usleep(200'000);
+    {
+        std::string why = c.start_job("sleep 6");
+        REQUIRE_MESSAGE(why.empty(), why);
+    }
     c.send("\x1a");
     CHECK_MESSAGE(c.expect("[2] Stopped  sleep 6"), c.output());
 }
@@ -58,11 +63,25 @@ TEST_CASE("the terminal's settings come back after a job") {
     CHECK(c.wait() == 0);
 }
 
+TEST_CASE("after a job stops, the shell has the terminal back") {
+    Conch c;
+    REQUIRE(c.prompt());
+    {
+        std::string why = c.start_job("sleep 5");
+        REQUIRE_MESSAGE(why.empty(), why);
+    }
+    c.send("\x1a");
+    REQUIRE(c.expect("Stopped"));
+    CHECK_MESSAGE(c.shell_in_foreground(), "the shell should take the terminal back (tcsetpgrp to its own group)");
+}
+
 TEST_CASE("wait on a stopped job returns at once") {
     Conch c;
     REQUIRE(c.prompt());
-    c.line("sleep 5");
-    usleep(200'000);
+    {
+        std::string why = c.start_job("sleep 5");
+        REQUIRE_MESSAGE(why.empty(), why);
+    }
     c.send("\x1a");
     REQUIRE(c.expect("[1] Stopped  sleep 5"));
     REQUIRE(c.prompt());

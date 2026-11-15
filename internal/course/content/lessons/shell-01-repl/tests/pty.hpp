@@ -90,6 +90,59 @@ class Pty {
         }
     }
 
+    // The process group the terminal's foreground belongs to, asked
+    // through our side of it (TIOCGPGRP), or -1.
+    pid_t foreground() const { return ::tcgetpgrp(master_); }
+
+    // Waits up to ms for a job to have the terminal: a process group other
+    // than the shell's (which leads the session, so its group is its PID)
+    // in the foreground. Then gives the job a moment more to set its
+    // signals back to the defaults before a test presses Ctrl-Z or Ctrl-C.
+    bool job_in_foreground(int ms = 3000) {
+        if (foreground() == -1) {
+            // This system won't say through the pty's other side (some BSDs
+            // answer only the terminal's own session): a fixed pause, then.
+            pause(300);
+            return true;
+        }
+        auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+        for (;;) {
+            pid_t fg = foreground();
+            if (fg > 0 && fg != pid_) {
+                break;
+            }
+            if (std::chrono::steady_clock::now() > until) {
+                return false;
+            }
+            read_some(10);
+        }
+        pause(100);
+        return true;
+    }
+
+    // Reads what the terminal shows for ms.
+    void pause(int ms) {
+        auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+        while (std::chrono::steady_clock::now() < until) {
+            read_some(10);
+        }
+    }
+
+    // Waits up to ms for the shell's own group to have the terminal again.
+    bool shell_in_foreground(int ms = 3000) {
+        if (foreground() == -1) {
+            return true;  // no way to ask here: trust the prompt
+        }
+        auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+        while (foreground() != pid_) {
+            if (std::chrono::steady_clock::now() > until) {
+                return false;
+            }
+            read_some(10);
+        }
+        return true;
+    }
+
     // Everything the terminal has shown so far.
     const std::string& output() {
         while (read_some(0)) {

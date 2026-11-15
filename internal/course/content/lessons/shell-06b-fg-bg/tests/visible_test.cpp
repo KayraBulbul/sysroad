@@ -1,7 +1,5 @@
 #include "doctest.h"
 
-#include <unistd.h>
-
 #include "conch_pty.hpp"
 #include "conch_run.hpp"
 
@@ -10,14 +8,14 @@ namespace shtest {
 TEST_CASE("fg brings a stopped job back, and Ctrl-C ends it") {
     Conch c;
     REQUIRE(c.prompt());
-    c.line("sleep 5");
-    usleep(200'000);
+    std::string why = c.start_job("sleep 5");
+    REQUIRE_MESSAGE(why.empty(), why);
     c.send("\x1a");
     REQUIRE_MESSAGE(c.expect("[1] Stopped  sleep 5"), c.output());
     REQUIRE(c.prompt());
-    c.line("fg");
+    why = c.start_job("fg");
+    REQUIRE_MESSAGE(why.empty(), why);
     CHECK_MESSAGE(c.expect("sleep 5"), c.output());
-    usleep(200'000);
     c.send("\x03");
     REQUIRE_MESSAGE(c.prompt(), c.output());
     c.line("jobs");
@@ -28,8 +26,8 @@ TEST_CASE("fg brings a stopped job back, and Ctrl-C ends it") {
 TEST_CASE("exit warns once about stopped jobs, and leaves the second time") {
     Conch c;
     REQUIRE(c.prompt());
-    c.line("sleep 5");
-    usleep(200'000);
+    std::string why = c.start_job("sleep 5");
+    REQUIRE_MESSAGE(why.empty(), why);
     c.send("\x1a");
     REQUIRE(c.expect("Stopped"));
     REQUIRE(c.prompt());

@@ -1,27 +1,29 @@
 #include "doctest.h"
 
-#include <unistd.h>
-
 #include <fstream>
 
 #include "conch_pty.hpp"
 
 namespace shtest {
 
+#define START(c, line)                          \
+    do {                                        \
+        std::string why_ = (c).start_job(line); \
+        REQUIRE_MESSAGE(why_.empty(), why_);    \
+    } while (0)
+
 TEST_CASE("bg carries a stopped job on in the background") {
     Conch c;
     REQUIRE(c.prompt());
-    c.line("sleep 0.6");
-    usleep(150'000);
+    START(c, "sleep 1");
     c.send("\x1a");
-    REQUIRE_MESSAGE(c.expect("[1] Stopped  sleep 0.6"), c.output());
+    REQUIRE_MESSAGE(c.expect("[1] Stopped  sleep 1"), c.output());
     REQUIRE(c.prompt());
     c.line("bg");
-    CHECK_MESSAGE(c.expect("[1] sleep 0.6 &"), c.output());
+    CHECK_MESSAGE(c.expect("[1] sleep 1 &"), c.output());
     REQUIRE(c.prompt());
-    usleep(800'000);
-    c.line("");
-    CHECK_MESSAGE(c.expect("[1] Done  sleep 0.6"), c.output());
+    // It goes on in the background, so it ends, and conch says so.
+    CHECK_MESSAGE(c.line_until("", "[1] Done  sleep 1", 4000), c.output());
     c.line("exit");
     CHECK(c.wait() == 0);
 }
@@ -29,25 +31,21 @@ TEST_CASE("bg carries a stopped job on in the background") {
 TEST_CASE("fg %n picks a job; it may stop again and keeps its number") {
     Conch c;
     REQUIRE(c.prompt());
-    c.line("sleep 5 | sleep 5");
-    usleep(200'000);
+    START(c, "sleep 5 | sleep 5");
     c.send("\x1a");
     REQUIRE_MESSAGE(c.expect("[1] Stopped  sleep 5 | sleep 5"), c.output());
     REQUIRE(c.prompt());
-    c.line("sleep 6");
-    usleep(200'000);
+    START(c, "sleep 6");
     c.send("\x1a");
     REQUIRE(c.expect("[2] Stopped  sleep 6"));
     REQUIRE(c.prompt());
-    c.line("fg %1");
+    START(c, "fg %1");
     REQUIRE(c.expect("sleep 5 | sleep 5"));
-    usleep(200'000);
     c.send("\x1a");
     CHECK_MESSAGE(c.expect("[1] Stopped  sleep 5 | sleep 5"), c.output());
     REQUIRE(c.prompt());
-    c.line("fg %1");
+    START(c, "fg %1");
     REQUIRE(c.expect("sleep 5 | sleep 5"));
-    usleep(200'000);
     c.send("\x03");
     REQUIRE_MESSAGE(c.prompt(), c.output());
     c.line("jobs");
@@ -62,13 +60,10 @@ TEST_CASE("a background job that reads the terminal is stopped, and fg gives it 
     REQUIRE(c.prompt());
     c.line("sh reader.sh &");
     REQUIRE(c.prompt());
-    usleep(300'000);
-    c.line("jobs");
-    CHECK_MESSAGE(c.expect("[1] Stopped  sh reader.sh"), c.output());
+    CHECK_MESSAGE(c.line_until("jobs", "[1] Stopped  sh reader.sh"), c.output());
     REQUIRE(c.prompt());
-    c.line("fg");
+    START(c, "fg");
     REQUIRE(c.expect("sh reader.sh"));
-    usleep(200'000);
     c.line("typed");
     CHECK_MESSAGE(c.expect("got typed"), c.output());
     REQUIRE_MESSAGE(c.prompt(), c.output());

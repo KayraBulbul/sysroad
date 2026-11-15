@@ -9,9 +9,10 @@ namespace shtest {
 TEST_CASE("the commands of a pipeline run at the same time") {
     Shell sh;
     auto start = std::chrono::steady_clock::now();
-    in_shell(sh, "sleep 0.4 | sleep 0.4 | sleep 0.4");
+    in_shell(sh, "sleep 0.6 | sleep 0.6 | sleep 0.6");
     auto took = std::chrono::steady_clock::now() - start;
-    CHECK_MESSAGE(took < std::chrono::milliseconds(1000), "three 0.4 s sleeps took over a second: one after another?");
+    // At once, about 0.6 s; one after another, 1.8 s.
+    CHECK_MESSAGE(took < std::chrono::milliseconds(1200), "three 0.6 s sleeps took over 1.2 s: one after another?");
 }
 
 TEST_CASE("no pipe ends stay open in the shell") {
