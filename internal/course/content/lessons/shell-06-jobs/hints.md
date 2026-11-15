@@ -1,4 +1,4 @@
-`init_job_control` is 6.2.6's, working on `sh.tty`:
+Getting ready for job control is 6.2.6's, on the terminal (fd 0):
 
 ```cpp
 while (tcgetpgrp(sh.tty) != getpgrp()) {
@@ -13,25 +13,29 @@ if (getpgrp() != getpid()) {
 tcsetpgrp(sh.tty, getpgrp());
 ```
 ---
-One function can record anything `waitpid` tells you about a job:
+Your job gains a process group (`pgid`), whether it's stopped and by
+which signal, and room for saved terminal settings (a `termios`).
+Waiting for a foreground job: for each PID in order, loop on
+`waitpid(pid, &st, WUNTRACED)` until it has ended or the job has
+stopped. `WIFSTOPPED(st)` and `WSTOPSIG(st)` say it stopped; anything
+else is an ending, as before.
+---
+Around the wait, when there's job control: `tcgetattr` the shell's
+settings, `tcsetpgrp(tty, job.pgid)`, wait, then (if the job stopped)
+`tcgetattr` into the job, `tcsetpgrp(tty, getpgrp())`, and
+`tcsetattr(tty, TCSADRAIN, &shells)`. Put it in a function: next
+lesson's `fg` does the same dance.
+---
+Starting a job, in the parent after each `fork`:
 
 ```cpp
-static void update(Job& job, pid_t pid, int st) {
-    // find pid's index i, then:
-    if (WIFSTOPPED(st))        { job.stopped = true; job.stop_signal = WSTOPSIG(st); }
-    else if (WIFCONTINUED(st)) { job.stopped = false; }
-    else                       { job.ended[i] = true; job.statuses[i] = decode(st); }
+if (job.pgid == 0) {               // the first process leads the group
+    job.pgid = pid;
+    if (foreground) tcsetpgrp(tty, job.pgid);
 }
+setpgid(pid, job.pgid);
 ```
 
-Waiting for a foreground job: for each PID in order, loop on
-`waitpid(pid, &st, WUNTRACED)` and `update` until it has ended or the
-job has stopped.
----
-`run_foreground` and `fg` share the dance around the wait:
-`tcgetattr` the shell's modes, `tcsetpgrp(sh.tty, job.pgid)`, (for
-`fg`: `kill(-job.pgid, SIGCONT)`), wait, `tcsetpgrp(sh.tty,
-getpgrp())`, `tcsetattr`. Only when `sh.interactive`.
----
-A job that stops in `fg` already has a number: keep it. Give it a new
-one only if it's 0 (it stopped the first time it ran).
+and in the child, first thing: `setpgid(0, pgid)` (0 for the first),
+`tcsetpgrp(tty, getpgrp())` for a foreground job, then
+`signal(sig, SIG_DFL)` for the five.

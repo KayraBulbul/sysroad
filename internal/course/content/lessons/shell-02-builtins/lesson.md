@@ -1,9 +1,9 @@
 ---
 title: "cd, exit and other builtins"
 kind: capstone
+project: conch
 program: conch
-minutes: 40
-files: [builtins.cpp]
+minutes: 45
 run:
   interactive: true
 deeper:
@@ -12,7 +12,7 @@ deeper:
   - title: "bash's builtins, documented"
     url: https://www.gnu.org/software/bash/manual/html_node/Shell-Builtin-Commands.html
 ---
-Try `cd /tmp` in last milestone's conch, then `pwd`. You're still
+Try `cd /tmp` in last lesson's conch, then `pwd`. You're still
 where you were. `cd` ran as a program, in a child, and changed the
 *child's* folder, which vanished with it a moment later. The current
 folder is per process, and a child can't change its parent's.
@@ -24,9 +24,11 @@ its environment, which every later command inherits (`export`,
 `unset`). Others, like `type`, are builtins because only the shell
 knows the answer.
 
-`exec.cpp` now checks `find_builtin` before forking: if it finds one,
-it calls it in the shell and uses what it returns as `$?`. You write
-the builtins and the table that `find_builtin` looks in:
+So before forking, conch looks the first word up in a table of
+builtins. If it's there, conch calls it, in the shell, and what it
+returns is `$?`. A table of names and functions (a `std::map` from
+`std::string` to a function pointer, say) keeps that one lookup. These
+six come first:
 
 ```text
 cd [DIR]        no DIR: $HOME; "-": $OLDPWD, and print where you land.
@@ -46,13 +48,23 @@ type NAME...    "NAME is a shell builtin", "NAME is /path/to/it" (the PATH
                 not found" on stderr with status 1
 ```
 
-`exit` doesn't leave on the spot: it sets `sh.exiting` and
-`sh.exit_code`, and `main` stops the loop. Messages go to stderr,
-output to stdout, through `std::cout` and `std::cerr`.
+`exit` shouldn't leave on the spot, with `std::exit`: the shell has
+things to do on the way out in later lessons, and `run_line` is also
+called by the tests, which don't want to end. Let it mark the shell as
+finished, with the code to leave with, and have `main` stop the loop.
+Messages go to stderr and output to stdout, through `std::cerr` and
+`std::cout`. A builtin's output is in `std::cout`'s buffer until it's
+flushed, so flush after each builtin: the next command writes to the
+same stdout, straight to the fd.
+
+## Contract
+
+Nothing new. The tests run scripts through your program, and `cd` in a
+`Shell` of their own.
 
 ## Assignment
 
-- [ ] `cd` and `pwd`, including `cd` with no argument, `cd -`, and setting `PWD` and `OLDPWD`
-- [ ] `exit`, with no number, a number, a bad number and too many
-- [ ] `export` and `unset`
-- [ ] `type`, and `find_builtin` returning each of the six
+- [ ] `cd` and `pwd` work on the shell's own folder, including `cd` with no argument, `cd -`, and setting `PWD` and `OLDPWD`
+- [ ] `exit` ends conch with no number, a number, or a bad number (2); with too many it complains and conch carries on
+- [ ] `export` and `unset` change the environment that later commands get, and `export` rejects bad names
+- [ ] `type` says which of the six names are builtins, where a program is, or that a name isn't found

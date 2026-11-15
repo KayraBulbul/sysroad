@@ -1,127 +1,76 @@
 #include "doctest.h"
 
-#include <fcntl.h>
 #include <unistd.h>
 
 #include <climits>
-#include <cstdio>
 #include <cstdlib>
 #include <string>
 
-#include "shell.hpp"
+#include "conch_run.hpp"
 
-// Where the tests started: cd moves us, and the files stay here.
-static const std::string kHere = [] {
+namespace shtest {
+
+inline std::string cwd_now() {
     char dir[PATH_MAX];
-    return std::string(getcwd(dir, sizeof dir));
-}();
-
-// Runs a builtin with stdout and stderr in files; returns its status.
-static int quietly(Shell& sh, const std::vector<std::string>& argv, std::string* out = nullptr) {
-    std::fflush(nullptr);
-    int saved1 = dup(1), saved2 = dup(2);
-    int o = open((kHere + "/bi-out.txt").c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    int e = open((kHere + "/bi-err.txt").c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    dup2(o, 1);
-    dup2(e, 2);
-    close(o);
-    close(e);
-    int status = find_builtin(argv[0])(sh, argv);
-    std::fflush(nullptr);
-    dup2(saved1, 1);
-    dup2(saved2, 2);
-    close(saved1);
-    close(saved2);
-    if (out != nullptr) {
-        out->clear();
-        FILE* f = std::fopen((kHere + "/bi-out.txt").c_str(), "r");
-        for (int c; (c = std::fgetc(f)) != EOF;) {
-            *out += static_cast<char>(c);
-        }
-        std::fclose(f);
-    }
-    return status;
+    return getcwd(dir, sizeof dir) != nullptr ? dir : "";
 }
 
-struct BackToStart {
-    char dir[PATH_MAX];
-    BackToStart() {
-        getcwd(dir, sizeof dir);
-    }
-    ~BackToStart() {
-        chdir(dir);
-    }
-};
-
-TEST_CASE("cd: OLDPWD, PWD, and cd -") {
-    BackToStart back;
-    Shell sh;
-    REQUIRE(quietly(sh, {"cd", "/"}) == 0);
-    CHECK(std::string(std::getenv("PWD")) == "/");
-    CHECK(std::string(std::getenv("OLDPWD")) == back.dir);
-    std::string out;
-    CHECK(quietly(sh, {"cd", "-"}, &out) == 0);
-    CHECK(out == std::string(back.dir) + "\n");
-    char now[PATH_MAX];
-    getcwd(now, sizeof now);
-    CHECK(std::string(now) == back.dir);
+TEST_CASE("cd - goes back and says where; cd sets PWD and OLDPWD") {
+    std::string start = cwd_now();
+    Ran r = conch("cd /\nprintenv PWD OLDPWD\ncd -\npwd\n");
+    CHECK(r.out == "/\n" + start + "\n" + start + "\n" + start + "\n");
 }
 
-TEST_CASE("cd: errors leave the folder alone") {
-    BackToStart back;
-    Shell sh;
-    CHECK(quietly(sh, {"cd", "/no/such/folder"}) == 1);
-    CHECK(quietly(sh, {"cd", "a", "b"}) == 1);
-    char now[PATH_MAX];
-    getcwd(now, sizeof now);
-    CHECK(std::string(now) == back.dir);
+TEST_CASE("cd with too many arguments, or none and no HOME") {
+    Ran many = conch("cd a b\npwd\n");
+    CHECK(many.out == cwd_now() + "\n");
+    CHECK(contains(many.err, "conch: cd:"));
+    Ran home = conch("unset HOME\ncd\n");
+    CHECK(home.status == 1);
+    CHECK(contains(home.err, "conch: cd:"));
 }
 
-TEST_CASE("pwd") {
-    BackToStart back;
-    Shell sh;
-    std::string out;
-    CHECK(quietly(sh, {"pwd"}, &out) == 0);
-    CHECK(out == std::string(back.dir) + "\n");
+TEST_CASE("exit: no number, a bad number, too many, and only the low 8 bits") {
+    CHECK(conch("false\nexit\necho never\n").status == 1);
+    Ran bad = conch("exit lots\necho never\n");
+    CHECK(bad.status == 2);
+    CHECK(bad.out == "");
+    CHECK(bad.err == "conch: exit: lots: numeric argument required\n");
+    Ran many = conch("exit 1 2\necho still here\n");
+    CHECK(many.out == "still here\n");
+    CHECK(contains(many.err, "conch: exit:"));
+    CHECK(conch("exit 258\n").status == 2);
 }
 
-TEST_CASE("exit: no number, a bad number, too many") {
-    Shell sh;
-    sh.last_status = 4;
-    quietly(sh, {"exit"});
-    CHECK(sh.exiting);
-    CHECK(sh.exit_code == 4);
-    Shell bad;
-    quietly(bad, {"exit", "abc"});
-    CHECK(bad.exiting);
-    CHECK(bad.exit_code == 2);
-    Shell many;
-    CHECK(quietly(many, {"exit", "1", "2"}) == 1);
-    CHECK_FALSE(many.exiting);
-    Shell big;
-    quietly(big, {"exit", "258"});
-    CHECK(big.exit_code == 2);
+TEST_CASE("export: values, a name alone, and bad names") {
+    Ran r = conch("export SR_A=1 SR_B=x=y SR_EMPTY 1BAD=x\nprintenv SR_A SR_B SR_EMPTY\n");
+    CHECK(r.out == "1\nx=y\n\n");
+    CHECK(r.err == "conch: export: 1BAD=x: not a valid name\n");
+    CHECK(conch("export 1BAD=x\n").status == 1);
+    CHECK(conch("export A-B=x\n").status == 1);
+    CHECK(conch("export =x\n").status == 1);
 }
 
-TEST_CASE("export and unset") {
-    Shell sh;
-    CHECK(quietly(sh, {"export", "SYSROAD_A=1", "SYSROAD_B=x=y"}) == 0);
-    CHECK(std::string(std::getenv("SYSROAD_A")) == "1");
-    CHECK(std::string(std::getenv("SYSROAD_B")) == "x=y");
-    CHECK(quietly(sh, {"export", "SYSROAD_EMPTY"}) == 0);
-    REQUIRE(std::getenv("SYSROAD_EMPTY") != nullptr);
-    CHECK(std::string(std::getenv("SYSROAD_EMPTY")).empty());
-    CHECK(quietly(sh, {"export", "1BAD=x"}) == 1);
-    CHECK(std::getenv("1BAD") == nullptr);
-    CHECK(quietly(sh, {"unset", "SYSROAD_A", "SYSROAD_B"}) == 0);
-    CHECK(std::getenv("SYSROAD_A") == nullptr);
-    CHECK(std::getenv("SYSROAD_B") == nullptr);
+TEST_CASE("unset removes several at once") {
+    Ran r = conch("export SR_X=1 SR_Y=2\nunset SR_X SR_Y\nprintenv SR_X\nprintenv SR_Y\necho [done]\n");
+    CHECK(r.out == "[done]\n");
 }
 
-TEST_CASE("type: builtins, programs, and neither") {
-    Shell sh;
-    std::string out;
-    CHECK(quietly(sh, {"type", "pwd", "sh"}, &out) == 0);
-    CHECK(out.rfind("pwd is a shell builtin\nsh is /", 0) == 0);
-    CHECK(quietly(sh, {"type", "sh", "no-such-command-anywhere"}, &out) == 1);
+TEST_CASE("type: builtins, programs, names with a slash, and neither") {
+    Ran r = conch("type pwd sh /bin/sh no-such-command-anywhere\n");
+    CHECK(r.out.rfind("pwd is a shell builtin\nsh is /", 0) == 0);
+    CHECK(contains(r.out, "/bin/sh is /bin/sh\n"));
+    CHECK(r.err == "conch: type: no-such-command-anywhere: not found\n");
+    CHECK(r.status == 1);
+    write_file("not-exec.txt", "x\n");
+    CHECK(conch("type ./not-exec.txt\n").status == 1);
 }
+
+TEST_CASE("every builtin is one") {
+    Ran r = conch("type cd pwd exit export unset type\n");
+    CHECK(r.out ==
+          "cd is a shell builtin\npwd is a shell builtin\nexit is a shell builtin\n"
+          "export is a shell builtin\nunset is a shell builtin\ntype is a shell builtin\n");
+}
+
+}  // namespace shtest

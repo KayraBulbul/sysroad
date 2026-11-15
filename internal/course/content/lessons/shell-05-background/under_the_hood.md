@@ -5,7 +5,7 @@ its table between commands. A non-interactive bash doesn't report at
 all; conch reports anyway, so you can see it working.
 
 **`$!` and `wait $pid`.** `$!` is the PID of the last background job
-(conch gets it in milestone 7), and `wait $!` waits for that one. The
+(conch gets it in the quoting lesson), and `wait $!` waits for that one. The
 pattern `cmd & pid=$!; ...; wait $pid` is how scripts run things in
 parallel. `wait -n` (bash) waits for whichever job ends first.
 
@@ -13,7 +13,7 @@ parallel. `wait -n` (bash) waits for whichever job ends first.
 shell would share stdin, and whichever read first would win. POSIX
 settles it: an asynchronous list in a non-interactive shell gets
 `/dev/null` as stdin, unless you redirect it yourself. With job
-control (next milestone), the terminal itself stops a background job
+control (next lesson), the terminal itself stops a background job
 that tries to read, with `SIGTTIN`.
 
 **`nohup` and `disown`.** When an interactive shell exits, it sends

@@ -2,7 +2,7 @@
   stdin: "echo 'single   $HOME | ;'\n"
   stdout: "single   $HOME | ;\n"
 - name: double quotes expand variables
-  stdin: "X=world\necho \"hello $X\" ${X}s\n"
+  stdin: "export X=world\necho \"hello $X\" ${X}s\n"
   stdout: "hello world worlds\n"
 - name: $? after each command
   stdin: "false; echo $?\ntrue; echo $?\n"
@@ -10,13 +10,9 @@
 - name: a backslash quotes one character
   stdin: "echo a\\ b \\$HOME c\\\\d\n"
   stdout: "a b $HOME c\\d\n"
-- name: an assignment before a command is for that command only
-  stdin: "X=inner sh -c 'echo $X'\necho [$X]\n"
-  stdout: "inner\n[]\n"
-- name: export makes a shell variable an environment variable
-  stdin: "V=1\nsh -c 'echo [$V]'\nexport V\nsh -c 'echo [$V]'\n"
-  stdout: "[]\n[1]\n"
-  hidden: true
+- name: quoted operators are just text
+  stdin: "echo \"a|b\" 'c;d' e\\&f \"x > y\"\n"
+  stdout: "a|b c;d e&f x > y\n"
 - name: an empty quoted word is still a word
   stdin: "printf '[%s]' '' \"\" x; echo\n"
   stdout: "[][][x]\n"
@@ -26,7 +22,7 @@
   stdout: "[x]\n"
   hidden: true
 - name: no word splitting after expansion
-  stdin: "X='a b'\nprintf '[%s]' $X; echo\n"
+  stdin: "export X='a b'\nprintf '[%s]' $X; echo\n"
   stdout: "[a b]\n"
   hidden: true
 - name: tilde
@@ -37,10 +33,6 @@
   stdin: "echo 'oops\necho $?\n"
   stdout: "2\n"
   hidden: true
-- name: quoted operators are just text
-  stdin: "echo \"a|b\" 'c;d' e\\&f \"x > y\"\n"
-  stdout: "a|b c;d e&f x > y\n"
-  hidden: true
 - name: escapes inside double quotes
   stdin: "echo \"\\$X \\\"q\\\" \\\\ \\n\"\n"
   stdout: "$X \"q\" \\ \\n\n"
@@ -50,30 +42,18 @@
   stdout: "bang\ndollar\n"
   hidden: true
 - name: a redirection target can be a variable
-  stdin: "F=out.txt\necho hi > \"$F\"\ncat out.txt\n"
+  stdin: "export F=out.txt\necho hi > \"$F\"\ncat out.txt\n"
   stdout: "hi\n"
   hidden: true
-- name: assignments see earlier ones on the same line
-  stdin: "A=1; B=$A$A\necho $B\n"
-  stdout: "11\n"
+- name: expansion happens when the command runs, not when the line is read
+  stdin: "export A=1; echo $A; export A=2; echo $A\n"
+  stdout: "1\n2\n"
   hidden: true
-- name: an assignment before export stays
-  stdin: "X=hi export X\nsh -c 'echo [$X]'\necho [$X]\n"
-  stdout: "[hi]\n[hi]\n"
+- name: quotes and a # don't start a comment
+  stdin: "echo '#not' \"#a\" b\\#c # but this does\n"
+  stdout: "#not #a b#c\n"
   hidden: true
-- name: an assignment before another builtin is for that builtin only
-  stdin: "HOME=/ cd\npwd\nA=tmp type cd > /dev/null\necho [$A]\n"
-  stdout: "/\n[]\n"
-  hidden: true
-- name: each assignment sees the ones before it
-  stdin: "A=1 B=$A printenv B\necho [$A]\n"
-  stdout: "1\n[]\n"
-  hidden: true
-- name: a builtin's own change to a temporary variable stays
-  stdin: "PWD=bogus cd /\necho $PWD\n"
-  stdout: "/\n"
-  hidden: true
-- name: cd's PWD stays even when it equals the temporary value
-  stdin: "export PWD=/bad\nPWD=/ cd /\necho $PWD\n"
-  stdout: "/\n"
+- name: a $ that starts nothing stays
+  stdin: "echo a$ $ $-x \"$\"\n"
+  stdout: "a$ $ $-x $\n"
   hidden: true

@@ -1,0 +1,25 @@
+- name: a builtin's output into a file, and the shell's stdout comes back
+  stdin: "type cd > t.txt\necho back\ncat t.txt\n"
+  stdout: "back\ncd is a shell builtin\n"
+- name: a builtin's errors into a file
+  stdin: "cd /no/such/folder 2> err.txt\ncat err.txt\n"
+  stdout: "conch: cd: /no/such/folder: No such file or directory\n"
+- name: cd with a redirection still moves the shell
+  stdin: "cd sub > /dev/null\nls\n"
+  files:
+    sub/inner.txt: ""
+  stdout: "inner.txt\n"
+- name: a builtin with a file that can't be opened
+  stdin: "pwd > no/such/dir/x\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: an fd number the system can't have, on a builtin
+  stdin: "type cd 999999999>out.txt\n"
+  stdout: ""
+  exit: 1
+  hidden: true
+- name: appending a builtin's output
+  stdin: "type pwd > p.txt\ntype cd >> p.txt\ncat p.txt\n"
+  stdout: "pwd is a shell builtin\ncd is a shell builtin\n"
+  hidden: true

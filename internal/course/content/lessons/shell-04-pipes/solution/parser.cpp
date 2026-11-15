@@ -1,11 +1,6 @@
 #include <cctype>
-#include <string>
 
-#include "shell.hpp"
-
-static bool is_redirect(const Token& t) {
-    return t.kind == Token::Op && (t.text[0] == '<' || t.text[0] == '>');
-}
+#include "conch.hpp"
 
 static bool all_digits(const std::string& s) {
     if (s.empty() || s.size() > 4) {
@@ -17,6 +12,10 @@ static bool all_digits(const std::string& s) {
         }
     }
     return true;
+}
+
+static bool is_redirect(const Token& t) {
+    return t.kind == Token::Op && (t.text[0] == '<' || t.text[0] == '>');
 }
 
 // Reads the redirection at tokens[i] and its target, and moves i past both.
@@ -69,9 +68,6 @@ List parse(const std::vector<Token>& tokens) {
             cmd.redirects.push_back(read_redirect(tokens, i));
             continue;
         }
-        if (t.text == "&") {
-            throw SyntaxError("unexpected &");
-        }
         end_command(t.text);
         ++i;
         if (t.text == "|") {
@@ -82,15 +78,15 @@ List parse(const std::vector<Token>& tokens) {
         step = Step{};
     }
     if (!empty(cmd)) {
-        end_command("");
+        end_command("end of line");
         list.push_back(std::move(step));
     } else if (!step.pipeline.commands.empty()) {
         throw SyntaxError("unexpected end of line after |");
-    } else if (!list.empty() && (list.back().next == Step::And || list.back().next == Step::Or)) {
+    } else if (!list.empty() && list.back().next != Step::Then) {
         throw SyntaxError("unexpected end of line");
     }
     if (!list.empty() && list.back().next == Step::Then) {
-        list.back().next = Step::End;
+        list.back().next = Step::End;  // a ; at the end of the line is fine
     }
     return list;
 }

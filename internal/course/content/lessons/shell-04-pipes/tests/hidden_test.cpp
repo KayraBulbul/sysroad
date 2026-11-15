@@ -1,93 +1,63 @@
 #include "doctest.h"
 
-#include <fcntl.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
-#include <chrono>
-#include <fstream>
-#include <iterator>
-#include <string>
+#include <climits>
 
-#include "shell.hpp"
+#include "conch_run.hpp"
 
-static int lowest_free_fd() {
-    int fd = open("/dev/null", O_RDONLY);
-    close(fd);
-    return fd;
+namespace shtest {
+
+TEST_CASE("a pipeline that can't be started fails, says why, and runs none of it") {
+    Ran r = conch("true | true | true && echo not-here\n", [] {
+        rlimit lim{};
+        getrlimit(RLIMIT_NOFILE, &lim);
+        lim.rlim_cur = lowest_free_fd() + 2;  // room for one pipe, not two
+        setrlimit(RLIMIT_NOFILE, &lim);
+    });
+    CHECK(r.status == 1);
+    CHECK(r.out == "");
+    CHECK_MESSAGE(r.err.rfind("conch: pipe:", 0) == 0, r.err);
 }
 
-TEST_CASE("parse: redirections stay with their command") {
-    List list = parse(tokenize("cat < in | sort > out 2>&1"));
-    REQUIRE(list.size() == 1);
-    const auto& cmds = list[0].pipeline.commands;
-    REQUIRE(cmds.size() == 2);
-    REQUIRE(cmds[0].redirects.size() == 1);
-    CHECK(cmds[0].redirects[0].path == "in");
-    CHECK(cmds[1].redirects.size() == 2);
-}
-
-TEST_CASE("parse: a trailing ; is fine, and an empty line is nothing") {
-    List list = parse(tokenize("echo a;"));
-    REQUIRE(list.size() == 1);
-    CHECK(list[0].next == Step::End);
-    CHECK(parse(tokenize("")).empty());
-    CHECK(parse(tokenize("   # just a comment")).empty());
-}
-
-TEST_CASE("parse: syntax errors") {
-    for (const char* line : {"| cat", "cat |", "a | | b", "; a", "a ;; b", "a &&", "|| b", "a && && b"}) {
-        CHECK_THROWS_AS_MESSAGE(parse(tokenize(line)), SyntaxError, line);
-    }
-}
-
-TEST_CASE("run_list: skipped commands keep $? as it was") {
+TEST_CASE("a builtin in a pipeline runs in a child, so cd there doesn't move the shell") {
+    char before[PATH_MAX];
+    REQUIRE(getcwd(before, sizeof before) != nullptr);
     Shell sh;
-    run_list(sh, parse(tokenize("false && echo no && echo no")));
-    CHECK(sh.last_status == 1);
-    run_list(sh, parse(tokenize("false || true || echo no")));
-    CHECK(sh.last_status == 0);
-    run_list(sh, parse(tokenize("true && false || true")));
-    CHECK(sh.last_status == 0);
+    in_shell(sh, "cd / | true");
+    char after[PATH_MAX];
+    REQUIRE(getcwd(after, sizeof after) != nullptr);
+    CHECK(std::string(after) == before);
 }
 
-TEST_CASE("run_pipeline runs the commands at the same time") {
+TEST_CASE("skipped commands leave $? as it was") {
     Shell sh;
-    auto start = std::chrono::steady_clock::now();
-    run_list(sh, parse(tokenize("sleep 0.4 | sleep 0.4 | sleep 0.4")));
-    CHECK(std::chrono::steady_clock::now() - start < std::chrono::milliseconds(1000));
+    CHECK(in_shell(sh, "false && echo no && echo no").status == 1);
+    CHECK(in_shell(sh, "false || true || echo no").status == 0);
+    CHECK(in_shell(sh, "true && false || true").status == 0);
+    CHECK(in_shell(sh, "false; false || false").status == 1);
 }
 
-TEST_CASE("no pipe ends leak") {
+TEST_CASE("a pipeline's status is its last command's, even when an earlier one fails") {
     Shell sh;
-    int before = lowest_free_fd();
-    for (int i = 0; i < 20; ++i) {
-        run_list(sh, parse(tokenize("true | true | true")));
-    }
-    CHECK(lowest_free_fd() == before);
+    CHECK(in_shell(sh, "false | true").status == 0);
+    CHECK(in_shell(sh, "true | false").status == 1);
 }
 
-TEST_CASE("a pipeline that can't be started fails, and says why") {
-    pid_t pid = fork();
-    if (pid == 0) {
-        int out = open("pf-out.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        int err = open("pf-err.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        dup2(out, 1);
-        dup2(err, 2);
-        close(out);
-        close(err);
-        rlimit r{};
-        getrlimit(RLIMIT_NOFILE, &r);
-        r.rlim_cur = lowest_free_fd() + 2;  // room for one pipe, not two
-        setrlimit(RLIMIT_NOFILE, &r);
-        Shell sh;
-        run_line(sh, "true | true | true && echo not-here");
-        _exit(sh.last_status);
+TEST_CASE("lots of pipelines with few fds to spare") {
+    std::string script;
+    for (int i = 0; i < 100; ++i) {
+        script += "echo x | cat | cat > /dev/null\n";
     }
-    CHECK(shell_status(wait_for(pid)) == 1);
-    std::ifstream o("pf-out.txt"), e("pf-err.txt");
-    std::string out((std::istreambuf_iterator<char>(o)), std::istreambuf_iterator<char>());
-    std::string err((std::istreambuf_iterator<char>(e)), std::istreambuf_iterator<char>());
-    CHECK(out.empty());
-    CHECK_MESSAGE(err.find("pipe") != std::string::npos, err);
+    script += "echo survived\n";
+    Ran r = conch(script, [] {
+        rlimit lim{};
+        getrlimit(RLIMIT_NOFILE, &lim);
+        lim.rlim_cur = lowest_free_fd() + 8;
+        setrlimit(RLIMIT_NOFILE, &lim);
+    });
+    CHECK_MESSAGE(r.out == "survived\n", (std::string("a leak of fds would run out: ") + r.err));
 }
+
+}  // namespace shtest

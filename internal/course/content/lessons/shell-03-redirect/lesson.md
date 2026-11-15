@@ -1,60 +1,68 @@
 ---
 title: Redirections
-base: shell-02-builtins
 kind: capstone
+project: conch
 program: conch
 minutes: 45
-files: [parser.cpp, redirect.cpp]
 run:
   interactive: true
 deeper:
   - title: "Redirection, in the POSIX shell spec"
     url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_07
-  - title: "fcntl(2): F_DUPFD_CLOEXEC"
-    url: https://man7.org/linux/man-pages/man2/fcntl.2.html
+  - title: "open(2) (man7.org)"
+    url: https://man7.org/linux/man-pages/man2/open.2.html
 ---
-Time for `>`. The course's lexer now splits a line into **tokens**:
-words, and the redirection operators `<`, `>`, `>>`, `<&` and `>&`,
-each with the fd number written in front of it, if any. Operators
-don't need spaces around them: `echo hi>out.txt` and `2>&1` both work.
+Time for `>`. A line is no longer just words: it has **operators**
+too. This lesson, the redirections:
+
+```text
+<  FILE      read fd 0 from FILE            <&  N     fd 0 becomes a copy of fd N
+>  FILE      write fd 1 to FILE (emptied)   >&  N     fd 1 becomes a copy of fd N
+>> FILE      append fd 1 to FILE
+```
+
+Each can have an fd number written right before it: `2> err.txt`,
+`2>&1`, `3< in.txt`. Without one, it's fd 0 for `<` and `<&`, and fd 1
+for the rest.
+
+**Tokens.** First the line is split into **tokens**: words, and
+operators with their fd number. Operators don't need spaces around
+them, so `echo hi>out.txt` is three tokens, and a word ends where an
+operator starts. Digits right before a `<` or `>` are its fd number,
+not a word: `2>&1` is one operator and a word, while `a2>f` is the
+word `a2` and `>`. More than 9 digits is a syntax error, rather than a
+number that doesn't fit in an `int`.
 
 ```text
 sort -r <in.txt 2>>log
-→ Word "sort", Word "-r", Op "<", Word "in.txt", Op ">>" (fd 2), Word "log"
+→ word "sort", word "-r", op "<", word "in.txt", op ">>" (fd 2), word "log"
 ```
 
-**Parsing** turns tokens into a `Command`: its words in `argv`, and
-its `redirects` in order. Each operator takes the next token as its
-target, which must be a word: a file name, or for `<&` and `>&` an fd
-number. Anything else is a `SyntaxError`, which `run_line` reports as
-`conch: syntax error: ...` with status 2. The fd defaults to 0 for
-`<` and `<&`, and 1 for the rest.
+**Parsing** turns the tokens into a command: its words, and its
+redirections in order, wherever they are in the line (`> f echo hi`
+works). Each operator takes the next token as its target, which must
+be a word: a file name, or for `<&` and `>&` an fd number. Anything
+else is a **syntax error**: conch prints `conch: syntax error:` and
+what's wrong to stderr, and the line's status is 2.
 
-**Applying** them is lesson 6.1.5: for each in order, `open` and
-`dup2`, or just `dup2` for `<&` and `>&`, throwing
-`std::system_error` named after the file (or fd) when it fails. An
-external command applies them in the child after the fork, so a
-failure there ends the child with status 1.
+**Applying** them is lesson 6.1.5: in the child, after the fork and
+before the `exec`, for each redirection in order, `open` the file and
+`dup2` it onto the fd, or just `dup2` for `<&` and `>&`. Order matters:
+`cmd > f 2>&1` sends both to `f`, while `cmd 2>&1 > f` sends stderr
+where stdout *was*. When one fails, the child prints `conch:`, the file
+(or the fd number, for `>&`), and the reason, then exits with 1. A
+command with no words, just `> f`, still makes the file.
 
-A builtin is harder. `type cd > t.txt` runs *in the shell*, so the
-redirection changes the shell's own stdout, and it has to be put back
-afterwards or every later command writes to `t.txt`. That's
-`SavedFds`: before applying, it copies each fd the redirections will
-touch somewhere out of the way, and its destructor puts them back.
-Copy with `fcntl(fd, F_DUPFD_CLOEXEC, n)`: the copy lands at fd `n` or
-above, and it's close-on-exec, so no command the shell runs later
-inherits it. Make `n` at least 10, out of the way, and above every fd
-the redirections name, so a copy can never stand in for one of them:
-`pwd 1>&10` with fd 10 closed must still fail. If an fd wasn't open at all
-(`fcntl` fails with `EBADF`), remember that, and close it again at the
-end. Any other failure is different: with an fd limit of 10 or less,
-there's no fd 10 to be had, so try again with a minimum just above every
-fd the redirections name (so a copy can't stand in for one of them),
-and if there's still no room, throw, before anything has been changed.
+Builtins get their redirections next lesson: they run inside the shell,
+which makes them harder. Until then, they ignore them.
+
+## Contract
+
+Nothing new.
 
 ## Assignment
 
-- [ ] `parse_command` collects words and redirections, with the right default fds, and throws `SyntaxError` for a missing or wrong target
-- [ ] `apply_redirects` applies them in order, throwing `std::system_error` named after the file or fd
-- [ ] `SavedFds` saves each affected fd once, as a close-on-exec copy at 10 or above (or anywhere, if the limit is lower), throws if it can't, and restores (or closes) them in its destructor
-- [ ] Run conch and try `ls > files.txt`, `cat < files.txt`, and `cat nothing 2>&1 > /dev/null`
+- [ ] A line splits into words and the five redirection operators, with or without spaces, and with an fd number before an operator
+- [ ] Each operator takes the word after it; a missing or wrong target is a syntax error, reported on stderr with status 2
+- [ ] An external command's redirections apply in its child, in order, with the right default fds
+- [ ] A redirection that fails prints `conch: FILE: reason` (or the fd number) and gives status 1, and `> FILE` alone makes the file

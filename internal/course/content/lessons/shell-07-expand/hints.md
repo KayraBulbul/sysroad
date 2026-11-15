@@ -21,9 +21,10 @@ if (c == '\'') {
 
 and the word is `line.substr(start, i - start)`.
 ---
-`expand_word` walks the word again, building `out`, with a flag `kept`
+Expanding walks the word again, building `out`, with a flag `kept`
 that turns true for any quote, backslash or plain character. At the
-end, `!kept && out.empty()` means the word vanishes.
+end, `!kept && out.empty()` means the word vanishes: return
+`std::optional<std::string>`, with `std::nullopt` for that.
 ---
 Put the `$` handling in one helper that both the unquoted and the
 double-quoted parts call:
@@ -34,4 +35,11 @@ static size_t expand_dollar(const std::string& word, size_t i,
                             const Shell& sh, std::string& out);
 ```
 
-`lookup_var(sh, name).value_or("")` gives a variable's value.
+A function that looks a variable up, giving `std::optional<std::string>`,
+is worth having now: next lesson it looks in the shell's own variables
+first. For now it's `getenv`, with `.value_or("")` for the unset case.
+---
+Expanding at run time: just before a pipeline runs, make a copy of it
+with every word expanded (dropping the ones that vanish) and every
+redirection's target expanded, and run the copy. Keep the words as
+written in the job's text.

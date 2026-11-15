@@ -1,9 +1,3 @@
-**Why fd 10.** POSIX lets scripts name fds 0 to 9 in redirections
-(`3>log`), so shells keep their own private fds at 10 and above.
-bash saves fds this way for every redirected builtin, and uses 255
-for the script it's reading. That's the fd you met in 6.1.5's leak
-test: `ls -l /proc/$$/fd` in bash shows it.
-
 **Redirecting the shell itself.** `exec > log` (no command) applies a
 redirection to the shell permanently, and every later command
 inherits it: the classic way for a script to log everything it does.

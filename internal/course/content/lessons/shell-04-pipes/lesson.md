@@ -1,10 +1,9 @@
 ---
 title: Pipelines
-base: shell-03-redirect
 kind: capstone
+project: conch
 program: conch
-minutes: 50
-files: [parser.cpp, pipeline.cpp]
+minutes: 60
 run:
   interactive: true
 deeper:
@@ -16,40 +15,53 @@ deeper:
 Now conch learns `|`, and the three ways to join commands on one line:
 
 ```text
+a | b        a's stdout is b's stdin, and both run at once
 a ; b        run a, then b
 a && b       run b only if a succeeded ($? is 0)
 a || b       run b only if a failed
 ```
 
-The lexer hands you `|`, `;`, `&&` and `||` as operators too. Parsing
-now builds two levels: a **pipeline** is commands joined by `|`, and a
-**list** is pipelines joined by the other three. `shell.hpp` has the
-shapes: a `List` is a vector of `Step`s, and each `Step` holds a
-`Pipeline` and the operator that follows it (`End` for the last). An
-operator with nothing before it (`| cat`, `; a`), or with nothing after
-it except at the end of the line for `;`, is a `SyntaxError`.
+**Tokens.** Your lexer learns four more operators: `|`, `||`, `&&` and
+`;`. Like the redirections, they end a word and need no spaces around
+them. (A single `&` comes next lesson.)
 
-`run_list` walks the steps. Whether a step runs depends on the
-operator *before* it and on `$?` right then. A skipped step leaves `$?`
-alone, so `false && a && b || c` skips `a` and `b` and still runs
-`c`.
+**Parsing** builds two levels now: a **pipeline** is commands joined by
+`|`, and a **list** is pipelines joined by `;`, `&&` and `||`. One
+shape that works: a list is a vector of steps, and each step holds a
+pipeline and the operator that follows it, with "end of line" for the
+last. A command can't be empty: an operator with nothing before it
+(`| cat`, `; a`, `a | | b`) is a syntax error, and so is `|`, `&&` or
+`||` at the end of the line. A `;` at the end is fine.
 
-`run_pipeline` is lesson 6.1.7's pipeline, with conch's commands. A
-single builtin (or a command with no words) runs in the shell, so
-`cd` still works. Anything else runs in children, connected by pipes:
-fork every command, giving each its pipe ends in the child, close
-every end in the parent, then wait for them all. The pipeline's status
-is the last command's. If a `pipe` or `fork` fails halfway (out of fds,
-say), don't run half a pipeline: kill and reap the commands already
-started, print `conch: pipe: <strerror>` and return 1. In the child,
-`exec_command` does the rest: it
-applies the command's redirections (after the pipes, so `cmd | cat >
-out` works) and runs it. That includes builtins, which in a pipeline
-run in their child: `exit 4 | cat` ends only that child, as in bash.
+**Running a list.** Whether a step runs depends on the operator
+*before* it and on `$?` right then. A skipped step leaves `$?` alone,
+so `false && a && b || c` skips `a` and `b` and still runs `c`. After
+`exit`, nothing more on the line runs.
+
+**Running a pipeline** is lesson 6.1.7's pipeline, with conch's
+commands. A single builtin still runs in the shell, so `cd` still
+works. Anything else runs in children, connected by pipes: fork every
+command, giving each its pipe ends in the child, close every end in the
+parent as soon as the child has it, then wait for them all. The
+pipeline's status is the last command's. In the child, apply the
+command's redirections *after* the pipe's `dup2`s, so `cmd | cat > out`
+works. A builtin in a pipeline runs in its child, like any other
+command there: `exit 4 | cat` ends only that child, and `cd / | true`
+moves nobody, as in bash.
+
+If a `pipe` or `fork` fails halfway (out of fds, say), don't run half a
+pipeline: kill and reap the commands already started, print
+`conch: pipe:` (or `fork:`) and the reason, and give the pipeline
+status 1.
+
+## Contract
+
+Nothing new. Some tests run pipelines in a `Shell` of their own, timing
+them and checking the test process's fds afterwards.
 
 ## Assignment
 
-- [ ] `parse` splits commands at `|` and pipelines at `;`, `&&` and `||`, and throws `SyntaxError` for an empty command between operators
-- [ ] `run_list` runs each pipeline only when the operator before it allows, and stops when `exit` has run
-- [ ] `run_pipeline` runs a lone builtin in the shell, and anything else as concurrent children joined by pipes, returning the last one's status
-- [ ] No pipe end leaks, `yes | head` finishes, and a pipeline that can't be started returns 1 with a message
+- [ ] `|`, `;`, `&&` and `||` split a line, with or without spaces, and an empty command between them is a syntax error
+- [ ] Each pipeline in a list runs only when the operator before it allows; a skipped one leaves `$?` alone, and `exit` ends the list
+- [ ] A lone builtin runs in the shell; any other pipeline runs as children joined by pipes, all at once, with the last one's status
+- [ ] The shell keeps no pipe ends open, `yes | head` finishes, and a pipeline that can't be started runs nothing, says why and has status 1

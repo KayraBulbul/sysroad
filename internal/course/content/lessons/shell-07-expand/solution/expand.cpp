@@ -1,9 +1,10 @@
 #include <unistd.h>
 
 #include <cctype>
+#include <cstdlib>
 #include <string>
 
-#include "shell.hpp"
+#include "conch.hpp"
 
 static bool name_start(char c) {
     return std::isalpha(static_cast<unsigned char>(c)) || c == '_';
@@ -49,6 +50,13 @@ static size_t expand_dollar(const std::string& word, size_t i, const Shell& sh, 
     }
     out += '$';  // a $ that starts nothing stays a $
     return i + 1;
+}
+
+std::optional<std::string> lookup_var(const Shell&, const std::string& name) {
+    if (const char* value = std::getenv(name.c_str())) {
+        return std::string(value);
+    }
+    return std::nullopt;
 }
 
 std::optional<std::string> expand_word(const std::string& word, const Shell& sh) {

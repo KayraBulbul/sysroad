@@ -1,39 +1,27 @@
 #include "doctest.h"
 
 #include <chrono>
+#include <regex>
 
-#include "helpers.hpp"
-#include "shell.hpp"
+#include "conch_run.hpp"
 
-TEST_CASE("a background job goes in the table, and the shell carries on") {
+namespace shtest {
+
+TEST_CASE("a background job: its number and PID on stderr, and the shell carries on at once") {
     Shell sh;
     auto start = std::chrono::steady_clock::now();
-    {
-        Captured cap;
-        run_line(sh, "sleep 0.3 &");
-    }
-    CHECK(std::chrono::steady_clock::now() - start < std::chrono::milliseconds(200));
-    CHECK(sh.last_status == 0);
-    REQUIRE(sh.jobs.size() == 1);
-    CHECK(sh.jobs[0].number == 1);
-    CHECK(sh.jobs[0].text == "sleep 0.3");
-    CHECK(Captured::err() == "[1] " + std::to_string(sh.jobs[0].pids.back()) + "\n");
-    {
-        Captured cap;
-        run_line(sh, "wait");
-    }
-    CHECK(sh.jobs.empty());
+    Ran r = in_shell(sh, "sleep 0.3 &");
+    CHECK_MESSAGE(std::chrono::steady_clock::now() - start < std::chrono::milliseconds(200),
+                  "the shell waited for the background job");
+    CHECK(r.status == 0);
+    CHECK_MESSAGE(std::regex_match(r.err, std::regex(R"(\[1\] [0-9]+\n)")),
+                  (std::string("expected [1] and a PID on stderr, got: ") + r.err));
+    in_shell(sh, "wait");
 }
 
-TEST_CASE("notify_jobs reports a finished job once") {
-    Shell sh;
-    {
-        Captured cap;
-        run_line(sh, "true &");
-        usleep(300'000);
-        notify_jobs(sh);
-        notify_jobs(sh);
-    }
-    CHECK(Captured::out() == "[1] Done  true\n");
-    CHECK(sh.jobs.empty());
+TEST_CASE("a finished job is reported once, before the next line") {
+    Ran r = conch("true &\nsleep 0.3\necho next\necho again\n");
+    CHECK(r.out == "[1] Done  true\nnext\nagain\n");
 }
+
+}  // namespace shtest

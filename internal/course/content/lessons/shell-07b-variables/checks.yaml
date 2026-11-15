@@ -1,0 +1,46 @@
+- name: a shell variable
+  stdin: "X=world\necho \"hello $X\" ${X}s\n"
+  stdout: "hello world worlds\n"
+- name: an assignment before a command is for that command only
+  stdin: "X=inner sh -c 'echo $X'\necho [$X]\n"
+  stdout: "inner\n[]\n"
+- name: export makes a shell variable an environment variable
+  stdin: "V=1\nsh -c 'echo [$V]'\nexport V\nsh -c 'echo [$V]'\n"
+  stdout: "[]\n[1]\n"
+- name: assignments see earlier ones on the same line
+  stdin: "A=1; B=$A$A\necho $B\n"
+  stdout: "11\n"
+  hidden: true
+- name: an assignment before export stays
+  stdin: "X=hi export X\nsh -c 'echo [$X]'\necho [$X]\n"
+  stdout: "[hi]\n[hi]\n"
+  hidden: true
+- name: an assignment before another builtin is for that builtin only
+  stdin: "HOME=/ cd\npwd\nA=tmp type cd > /dev/null\necho [$A]\n"
+  stdout: "/\n[]\n"
+  hidden: true
+- name: each assignment sees the ones before it
+  stdin: "A=1 B=$A printenv B\necho [$A]\n"
+  stdout: "1\n[]\n"
+  hidden: true
+- name: a builtin's own change to a temporary variable stays
+  stdin: "PWD=bogus cd /\necho $PWD\n"
+  stdout: "/\n"
+  hidden: true
+- name: cd's PWD stays even when it equals the temporary value
+  stdin: "export PWD=/bad\nPWD=/ cd /\necho $PWD\n"
+  stdout: "/\n"
+  hidden: true
+- name: setting an exported variable keeps it exported
+  stdin: "export E=1\nE=2\nprintenv E\n"
+  stdout: "2\n"
+  hidden: true
+- name: unset removes a shell variable too
+  stdin: "S=1\nunset S\necho [$S]\n"
+  stdout: "[]\n"
+  hidden: true
+- name: a quoted name isn't an assignment
+  stdin: "'A'=1\n"
+  stdout: ""
+  exit: 127
+  hidden: true

@@ -3,33 +3,38 @@
 #include <unistd.h>
 
 #include <climits>
-#include <cstdlib>
 #include <string>
 
-#include "shell.hpp"
+#include "conch_run.hpp"
 
-TEST_CASE("the builtins exist, and nothing else does") {
-    for (const char* name : {"cd", "pwd", "exit", "export", "unset", "type"}) {
-        CHECK_MESSAGE(find_builtin(name) != nullptr, name);
-    }
-    CHECK(find_builtin("ls") == nullptr);
-    CHECK(find_builtin("") == nullptr);
+namespace shtest {
+
+// Where the tests run, to come back to after a cd.
+inline std::string here() {
+    char dir[PATH_MAX];
+    return getcwd(dir, sizeof dir) != nullptr ? dir : "";
 }
 
 TEST_CASE("cd changes the shell's own folder") {
-    char before[PATH_MAX];
-    REQUIRE(getcwd(before, sizeof before) != nullptr);
+    std::string start = here();
     Shell sh;
-    CHECK(find_builtin("cd")(sh, {"cd", "/"}) == 0);
-    char now[PATH_MAX];
-    REQUIRE(getcwd(now, sizeof now) != nullptr);
-    CHECK(std::string(now) == "/");
-    chdir(before);
+    CHECK(in_shell(sh, "cd /").status == 0);
+    CHECK_MESSAGE(here() == "/", "cd ran in a child, so the shell didn't move");
+    CHECK(in_shell(sh, "pwd").out == "/\n");
+    chdir(start.c_str());
 }
 
-TEST_CASE("exit sets the shell to leave") {
-    Shell sh;
-    find_builtin("exit")(sh, {"exit", "7"});
-    CHECK(sh.exiting);
-    CHECK(sh.exit_code == 7);
+TEST_CASE("a builtin's errors go to stderr, and its status is $?") {
+    Ran r = conch("cd /no/such/folder\n");
+    CHECK(r.out == "");
+    CHECK(r.err == "conch: cd: /no/such/folder: No such file or directory\n");
+    CHECK(r.status == 1);
 }
+
+TEST_CASE("exit stops conch, with its number") {
+    Ran r = conch("echo before\nexit 3\necho never\n");
+    CHECK(r.out == "before\n");
+    CHECK(r.status == 3);
+}
+
+}  // namespace shtest

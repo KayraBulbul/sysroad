@@ -9,7 +9,7 @@
   stdin: "true\n\ntrue\n   \nhistory\n"
   stdout: "    1  true\n    2  history\n"
   hidden: true
-- name: everything from earlier milestones still works
+- name: everything from earlier lessons still works
   stdin: "X=1; echo \"$X\" | tr 1 2 > out.txt && cat < out.txt\n"
   stdout: "2\n"
   hidden: true

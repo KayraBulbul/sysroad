@@ -1,24 +1,21 @@
-`feed` is one `switch` on the key. `std::string::insert(cursor_, 1,
-c)` and `erase(pos, n)` do the editing; after an insert, move the
-cursor right. Ctrl-letter keys are `ctrl_key('a')` and so on, from
-`keys.hpp`.
+A `std::vector<std::string>` in your `Shell`, and one function that
+adds a line by the rules: return early for a line with nothing but
+spaces and tabs (`line.find_first_not_of(" \t") == npos`) or one equal
+to `history.back()`; push it; if there are more than 1000, erase the
+first.
 ---
-History browsing needs two members, already in the header:
-`browsing_`, the index shown (`SIZE_MAX` while you're on the new
-line), and `draft_`. The first Up saves `text_` in `draft_` and starts
-at `history_->size()`; each Up moves one older; Down moves newer, and
-past the end puts `draft_` back.
+`history N`: check the count is all digits (and not absurdly long)
+before `std::stoul`, then start from `size() - N` if that's above 0.
+`std::snprintf(buf, sizeof buf, "%5zu", i + 1)` makes the number.
 ---
-```cpp
-std::string out = "\r" + prompt + text_ + "\x1b[K";
-if (cursor_ < text_.size()) {
-    out += "\x1b[" + std::to_string(text_.size() - cursor_) + "D";
-}
-```
+Loading: `std::ifstream` and `std::getline`, adding each line through
+the same function. A file that isn't there gives no lines, which is
+fine.
 ---
-`save_history`: `open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0600)` (plus
-`fchmod(fd, 0600)`, in case an old `.tmp` had other bits), `write`
-every line, `close`, then `std::rename(tmp.c_str(), path.c_str())`. If
-a write fails, keep the old file. `load_history` reads with
-`std::getline` and calls `add_history` on each line, so the same rules
-apply.
+Saving: `open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0600)`, then
+`fchmod(fd, 0600)` (a `.tmp` left over from before keeps its old bits
+otherwise), `write` every line with its `\n`, `close`, and
+`std::rename(tmp, path)`. If a write fails, close and keep the old
+file. In `main`, save after the loop, so `exit` and the end of input
+both get there: let `exit` end the loop rather than return from
+`main`.

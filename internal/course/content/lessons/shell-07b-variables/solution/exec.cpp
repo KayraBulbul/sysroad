@@ -1,0 +1,136 @@
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <cerrno>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <iostream>
+#include <optional>
+#include <system_error>
+
+#include "conch.hpp"
+
+int run_line(Shell& sh, const std::string& line) {
+    List list;
+    try {
+        list = parse(tokenize(line));
+    } catch (const SyntaxError& e) {
+        std::cerr << "conch: syntax error: " << e.what() << '\n';
+        return sh.last_status = 2;
+    }
+    return run_list(sh, list);  // nothing at all for a blank line or a comment
+}
+
+int shell_status(int wstatus) {
+    if (WIFSIGNALED(wstatus)) {
+        return 128 + WTERMSIG(wstatus);
+    }
+    return WEXITSTATUS(wstatus);
+}
+
+// A variable as it was before a builtin's prefix assignment.
+struct SavedVar {
+    std::string name;
+    std::optional<std::string> var;  // in sh.vars, before
+    std::optional<std::string> env;  // in the environment, before
+};
+
+// exit, export and unset are POSIX "special" builtins: assignments in
+// front of them stay, as they do with no command at all. For the others
+// (X=1 cd ...) they last only as long as the builtin, as in bash.
+static bool keeps_assignments(const Command& c) {
+    return c.argv.empty() || c.argv[0] == "exit" || c.argv[0] == "export" || c.argv[0] == "unset";
+}
+
+int run_in_shell(Shell& sh, const Command& c) {
+    sh.builtin_set.clear();
+    std::vector<SavedVar> saved_vars;
+    for (const auto& [name, value] : c.assignments) {
+        if (keeps_assignments(c)) {
+            set_var(sh, name, value);
+            continue;
+        }
+        SavedVar old{name, std::nullopt, std::nullopt};
+        if (auto it = sh.vars.find(name); it != sh.vars.end()) {
+            old.var = it->second;
+            sh.vars.erase(it);
+        }
+        if (const char* e = std::getenv(name.c_str())) {
+            old.env = e;
+        }
+        saved_vars.push_back(old);
+        setenv(name.c_str(), value.c_str(), 1);  // the builtin and what it runs see it
+    }
+    struct Restore {
+        Shell& sh;
+        std::vector<SavedVar>& vars;
+        ~Restore() {
+            for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
+                bool set_by_builtin = std::find(sh.builtin_set.begin(), sh.builtin_set.end(),
+                                                it->name) != sh.builtin_set.end();
+                if (set_by_builtin) {
+                    continue;  // cd set PWD itself: keep that, not the old value
+                }
+                if (it->env) {
+                    setenv(it->name.c_str(), it->env->c_str(), 1);
+                } else {
+                    unsetenv(it->name.c_str());
+                }
+                if (it->var) {
+                    sh.vars[it->name] = *it->var;
+                }
+            }
+        }
+    } restore{sh, saved_vars};
+    std::optional<SavedFds> saved;
+    try {
+        saved.emplace(c.redirects);
+        apply_redirects(c.redirects);
+    } catch (const std::system_error& e) {
+        std::cerr << "conch: " << e.what() << '\n';
+        return 1;
+    }
+    if (c.argv.empty()) {
+        return 0;
+    }
+    int status = find_builtin(c.argv[0])(sh, c.argv);
+    std::cout.flush();  // before the fds go back
+    std::fflush(nullptr);
+    return status;
+}
+
+[[noreturn]] void exec_command(Shell& sh, const Command& c) {
+    for (const auto& [name, value] : c.assignments) {
+        setenv(name.c_str(), value.c_str(), 1);  // for this command only
+    }
+    try {
+        apply_redirects(c.redirects);
+    } catch (const std::system_error& e) {
+        std::cerr << "conch: " << e.what() << '\n';
+        _exit(1);
+    }
+    if (c.argv.empty()) {
+        _exit(0);  // only redirections: "> file" makes the file
+    }
+    if (Builtin builtin = find_builtin(c.argv[0])) {
+        int status = builtin(sh, c.argv);  // in this child, in a pipeline
+        std::cout.flush();
+        std::fflush(nullptr);
+        _exit(status);
+    }
+    std::vector<char*> args;
+    for (const auto& a : c.argv) {
+        args.push_back(const_cast<char*>(a.c_str()));
+    }
+    args.push_back(nullptr);
+    execvp(args[0], args.data());
+    int err = errno;
+    if (err == ENOENT) {
+        std::cerr << "conch: " << c.argv[0] << ": command not found\n";
+        _exit(127);
+    }
+    std::cerr << "conch: " << c.argv[0] << ": " << std::strerror(err) << '\n';
+    _exit(126);
+}

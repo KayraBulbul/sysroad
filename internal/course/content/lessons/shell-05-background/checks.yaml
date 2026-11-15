@@ -22,15 +22,17 @@
 - name: wait %n returns the job's status
   stdin: "sh exit3.sh &\nwait %1 || echo failed\n"
   files:
-    exit3.sh: "sleep 0.1; exit 3\n"
+    exit3.sh: "sleep 0.3; exit 3\n"
   stdout: "failed\n"
   hidden: true
 - name: a background job doesn't read the shell's input
-  stdin: "cat &\nwait\necho still mine\n"
-  stdout: "still mine\n"
+  stdin: "cat &\nsleep 0.3\necho still mine\n"
+  stdout: "[1] Done  cat\nstill mine\n"
   hidden: true
 - name: a background pipeline, with redirections
-  stdin: "printf b\\na\\n | sort > sorted.txt &\nwait\ncat sorted.txt\n"
+  stdin: "sleep 0.3 | sort letters.txt > sorted.txt &\nwait\ncat sorted.txt\n"
+  files:
+    letters.txt: "b\na\n"
   stdout: "a\nb\n"
   hidden: true
 - name: "& in the middle of a line"

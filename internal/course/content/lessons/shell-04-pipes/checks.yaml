@@ -1,5 +1,7 @@
 - name: a pipeline
-  stdin: "printf b\\na\\nc\\n | sort | head -n 2\n"
+  stdin: "cat letters.txt | sort | head -n 2\n"
+  files:
+    letters.txt: "b\na\nc\n"
   stdout: "a\nb\n"
 - name: "; runs one after another"
   stdin: "echo one; echo two ;echo three\n"
