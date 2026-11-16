@@ -14,7 +14,8 @@
 namespace {
 
 // Raw mode for as long as it lives: keys arrive one at a time, unechoed,
-// and Ctrl-C is just a key.
+// and Ctrl-C is just a key. TCSADRAIN, not TCSAFLUSH, both ways: flushing
+// would throw away what's been typed ahead.
 class RawMode {
   public:
     explicit RawMode(int fd) : fd_(fd) {
@@ -64,30 +65,38 @@ bool could_be_sequence(const std::string& bytes) {
     return bytes.size() == 1 || (bytes.size() < 8 && (bytes[1] == '[' || (bytes[1] == 'O' && bytes.size() == 2)));
 }
 
-// Reads one key. While what's here is Escape that could still be the
-// start of a sequence, gives the rest 50 ms at a time to arrive: a
-// sequence can come in several pieces. -1 at the end of input.
-int read_key(int fd, std::string& pending) {
-    char buf[32];
-    while (pending.empty()) {
-        ssize_t n = read(fd, buf, sizeof buf);
-        if (n > 0) {
-            pending.append(buf, static_cast<size_t>(n));
-        } else if (n == 0 || errno != EINTR) {
-            return -1;
+// Reads one byte onto the end of bytes. False at the end of input.
+bool read_byte(int fd, std::string& bytes) {
+    for (;;) {
+        char c;
+        ssize_t n = read(fd, &c, 1);
+        if (n == 1) {
+            bytes += c;
+            return true;
         }
+        if (n == -1 && errno == EINTR) {
+            continue;
+        }
+        return false;
+    }
+}
+
+// Reads one key, a byte at a time, and no more than the key needs: what's
+// typed ahead stays in the terminal, for the next line or for the command
+// that runs next. While what's here is Escape that could still be the
+// start of a sequence, gives the next byte 50 ms at a time to arrive.
+// pending holds a byte read past the key (ESC then x: Escape, then x).
+// -1 at the end of input.
+int read_key(int fd, std::string& pending) {
+    if (pending.empty() && !read_byte(fd, pending)) {
+        return -1;
     }
     auto [key, used] = decode_key(pending);
     while (key == kEsc && could_be_sequence(pending)) {
         pollfd p{fd, POLLIN, 0};
-        if (poll(&p, 1, 50) <= 0) {
+        if (poll(&p, 1, 50) <= 0 || !read_byte(fd, pending)) {
             break;  // nothing more came: it was the Escape key
         }
-        ssize_t n = read(fd, buf, sizeof buf);
-        if (n <= 0) {
-            break;
-        }
-        pending.append(buf, static_cast<size_t>(n));
         std::tie(key, used) = decode_key(pending);
     }
     pending.erase(0, used > 0 ? used : 1);
@@ -99,9 +108,7 @@ int read_key(int fd, std::string& pending) {
 std::optional<std::string> read_edited_line(Shell& sh, const std::string& prompt) {
     RawMode raw(sh.tty);
     LineEditor editor(sh.history);
-    // Bytes read but not used yet: keys typed ahead, or a paste, belong to
-    // the next lines, so they outlive this one.
-    static std::string pending;
+    std::string pending;  // at most the rest of an unfinished key
     write_all(editor.render(prompt));
     for (;;) {
         int key = read_key(sh.tty, pending);

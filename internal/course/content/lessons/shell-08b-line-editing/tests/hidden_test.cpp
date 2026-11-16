@@ -52,6 +52,21 @@ TEST_CASE("lines typed ahead, or pasted, all run") {
     CHECK_MESSAGE(printed(c, "[c]"), c.output());
 }
 
+TEST_CASE("what's typed ahead goes to the command that runs next, not to conch") {
+    Conch c;
+    REQUIRE(c.prompt());
+    c.send("cat\rhello\r");  // in one write, as a paste arrives
+    // cat is still running, and hello is waiting in the terminal for it.
+    CHECK_MESSAGE(c.expect("hello", 2000),
+                  (std::string("cat should read hello and print it back while it runs; conch read it first: ") +
+                   c.output()));
+    c.send(keys::ctrl_c);  // end cat
+    REQUIRE_MESSAGE(c.prompt(), c.output());
+    c.line("echo [after]");
+    CHECK_MESSAGE(printed(c, "[after]"), c.output());
+    CHECK_MESSAGE(!contains(c.output(), "hello: command not found"), "hello was run as a command: conch kept it");
+}
+
 TEST_CASE("an arrow that arrives in two pieces is still an arrow") {
     Conch c;
     REQUIRE(c.prompt());

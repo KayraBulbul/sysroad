@@ -30,8 +30,11 @@ after at most one wait.
 
 **Reading a line**, when conch is talking to a terminal, now happens in
 raw mode, switched on for the line and off again before the command
-runs: commands expect the terminal as it normally is. Reading waits for
-each key (`VMIN` 1, `VTIME` 0 is fine here). Each key goes to the line
+runs: commands expect the terminal as it normally is. Switch with
+`TCSADRAIN` both ways, not the `TCSAFLUSH` kite used: flushing throws
+away input that's waiting, and here that input may be the next line, or
+meant for the command. Reading waits for each key (`VMIN` 1, `VTIME` 0
+is fine here). Each key goes to the line
 being edited, which is plain state, a string and a cursor, with no
 terminal in it:
 
@@ -48,9 +51,13 @@ Ctrl-D          end of input on an empty line, else Delete
 ```
 
 Keys can arrive several at once: a paste, or a line typed ahead while
-the last command ran. Keep the bytes you've read but not used for the
-next line, rather than dropping them when a line ends. Other keys (F5,
-Page Up, other control keys) do nothing. Up stops at the
+the last command ran. Read one key's worth at a time, a byte per
+`read`, and for an escape sequence a byte at a time while it could
+still become one, so what's typed ahead stays in the terminal for
+whoever reads it next. That's the rule from conch's first lesson
+again, where conch read its input a byte at a time so that `head` could
+have the rest: paste `cat` and a line of text, and the text is `cat`'s,
+not a command for conch. Other keys (F5, Page Up, other control keys) do nothing. Up stops at the
 oldest line, and Down does nothing when you aren't in the history.
 
 After every key, redraw the whole line: `\r`, the prompt and the text,
@@ -71,4 +78,4 @@ all, and look at what the edited commands print.
 - [ ] Every key in the table edits the line as described, and other keys do nothing
 - [ ] Up and Down walk the history, newest first, and Down past the newest gives back what you were typing
 - [ ] The line is redrawn after each key, with the cursor in place; Ctrl-C starts a new line, and Ctrl-D on an empty line ends conch
-- [ ] Keys typed ahead, or pasted, aren't lost: they go to the next lines
+- [ ] conch reads one key's worth at a time, so what's typed ahead or pasted goes to whoever reads the terminal next: the next line, or the command that runs
