@@ -526,7 +526,9 @@
     const mod = e.ctrlKey || e.metaKey;
     // Shift+Tab in the editor cycles its tabs (files, then solution or
     // diff). Elsewhere it stays the browser's reverse focus move.
-    if (e.key === "Tab" && e.shiftKey && !mod && !e.altKey && inEditor(t) && workspace.tabs.length > 1) {
+    // WebKitGTK reports Shift+Tab (GTK's ISO_Left_Tab) with key
+    // "Unidentified", so the physical key decides.
+    if ((e.key === "Tab" || e.code === "Tab") && e.shiftKey && !mod && !e.altKey && inEditor(t) && workspace.tabs.length > 1) {
       e.preventDefault();
       e.stopPropagation();
       workspace.select((workspace.active + 1) % workspace.tabs.length);
