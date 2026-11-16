@@ -66,7 +66,7 @@ sysroad edit             # or open its file in $EDITOR directly
 | `v` | `sysroad solution` | peek at the solution (the sidebar asks first) |
 | `R` | `sysroad reset` | put the starter code back; your files move to `.local/reset-backup/` |
 | `C` | `sysroad catchup` | project lessons: catch up to the reference (see below) |
-| `e` | `sysroad edit` | open the lesson's file in `$EDITOR` |
+| `e` | `sysroad edit` | open the lesson's file in `$EDITOR`, outside the sidebar (see below) |
 | `1`–`9` | `sysroad quiz` | answer a quiz (the next unanswered question) |
 
 The shell commands act on the lesson whose folder you're in, else the current one, or
@@ -74,6 +74,11 @@ take a lesson ID. `sysroad run` exits non-zero on failure, so it works as an edi
 keymap; the sidebar picks up the result either way. In the sidebar `j/k` scrolls the
 lesson, `J/K` scrolls the output, `[`/`]` browse lessons, `c` goes back to the current
 one and `S` syncs.
+
+The sidebar's `e` keeps the lesson on screen. It sends the file to an nvim already open
+inside the data repo. Without one, it opens the editor in a new herdr or tmux pane
+beside the sidebar, or in a new terminal window. If none of those works, the editor runs
+in the sidebar's own pane, the way full-screen mode does.
 
 ### Projects
 

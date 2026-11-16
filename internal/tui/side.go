@@ -93,6 +93,11 @@ func (m *Side) updateLesson(l *course.Lesson, key tea.KeyMsg) tea.Cmd {
 			return nil
 		case "n":
 			return m.editNote(l.ID)
+		case "e":
+			if dir, file, ok := m.lv.editTarget(&m.core, l); ok {
+				return openBeside(m.app.Dir, dir, file)
+			}
+			return nil
 		case "S":
 			return m.syncNow()
 		}
@@ -143,6 +148,16 @@ func (m *Side) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case lessonEditDoneMsg:
 		m.fail(msg.err)
+		return m, nil
+	case besideMsg:
+		if msg.inPlace != nil {
+			return m, tea.ExecProcess(msg.inPlace, func(err error) tea.Msg { return lessonEditDoneMsg{err} })
+		}
+		if msg.err != nil {
+			m.fail(msg.err)
+		} else {
+			m.say("Opened in %s", msg.where)
+		}
 		return m, nil
 	}
 	if cmd, handled := m.core.update(msg); handled {
