@@ -192,6 +192,25 @@ func (v *lessonView) workPath() string {
 	return v.app.Engine.WorkDir(l)
 }
 
+// editTarget prepares the lesson's folder and names the file to edit.
+func (v *lessonView) editTarget(c *core, l *course.Lesson) (dir, file string, ok bool) {
+	if !l.HasCode() {
+		return "", "", false
+	}
+	dir, err := v.app.Touch(l)
+	if err != nil {
+		c.fail(err)
+		return "", "", false
+	}
+	c.changed()
+	file, err = v.app.EditFile(l)
+	if err != nil {
+		c.fail(err)
+		return "", "", false
+	}
+	return dir, file, true
+}
+
 // key handles the lesson keys. handled=false lets the caller try its own.
 func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 	if v.confirm != "" {
@@ -297,18 +316,8 @@ func (v *lessonView) key(c *core, k string, bodyH int) (tea.Cmd, bool) {
 		}
 		return nil, true
 	case "e":
-		if !l.HasCode() {
-			return nil, true
-		}
-		dir, err := v.app.Touch(l)
-		if err != nil {
-			c.fail(err)
-			return nil, true
-		}
-		c.changed()
-		file, err := v.app.EditFile(l)
-		if err != nil {
-			c.fail(err)
+		dir, file, ok := v.editTarget(c, l)
+		if !ok {
 			return nil, true
 		}
 		cmd := exec.Command("sh", "-c", EditorCommand()+` "$1"`, "sh", file)
