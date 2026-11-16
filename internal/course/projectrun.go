@@ -150,6 +150,9 @@ func (e *Engine) runProject(ctx context.Context, l *Lesson, mode Mode) (*Result,
 	jobs.wait()
 	for si, s := range suites {
 		if links[si].err != nil {
+			if params, ok := wrongMain(string(links[si].out)); ok {
+				return wrongMainResult(params), nil
+			}
 			return cantBuild(s, links[si]), nil
 		}
 	}
@@ -234,6 +237,43 @@ func missingMain(out string) bool {
 		}
 	}
 	return found
+}
+
+// wrongMain reports whether a test link failed only because the tests call
+// your main (renamed sysroad_student_main) with other parameters than yours
+// has, and returns the parameters they call it with: GNU ld, lld and ld64
+// all name the symbol demangled, as sysroad_student_main(int, char**).
+func wrongMain(out string) (params string, ok bool) {
+	const name = "sysroad_student_main("
+	found := false
+	for _, line := range strings.Split(stripANSI(out), "\n") {
+		line = strings.TrimSpace(line)
+		undefined := strings.Contains(line, "undefined reference to") || strings.Contains(line, "undefined symbol:") ||
+			strings.HasSuffix(line, "referenced from:")
+		if !undefined {
+			continue
+		}
+		i := strings.Index(line, name)
+		if i < 0 {
+			return "", false // something else is missing
+		}
+		rest := line[i+len(name):]
+		j := strings.Index(rest, ")")
+		if j < 0 {
+			return "", false
+		}
+		params, found = rest[:j], true
+	}
+	return params, found
+}
+
+// wrongMainResult says how the tests call main, when yours is declared
+// with other parameters.
+func wrongMainResult(params string) *Result {
+	want := "int main(" + params + ")"
+	return &Result{Stage: "compile", Summary: "✗ the tests call main as " + want,
+		Output: "The tests start your program by calling its main, renamed, as " + want +
+			", so it has to be declared exactly that way. Yours takes other parameters: declare it as " + want + ".\n"}
 }
 
 func suiteObjects(s suite) []string {

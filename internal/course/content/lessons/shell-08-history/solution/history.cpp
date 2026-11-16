@@ -7,7 +7,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "shell.hpp"
+#include "conch.hpp"
 
 static const size_t kHistoryMax = 1000;
 

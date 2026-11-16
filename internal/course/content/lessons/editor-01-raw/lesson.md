@@ -68,8 +68,9 @@ Every `.cpp` file in the folder is compiled into kite, so name and
 split your files as you like. The tests compile them too, with your
 `main` renamed, then start it on a terminal of their own (a
 pseudo-terminal) and check the terminal's settings while it runs. They
-call it as `main(argc, argv)`, so give it both parameters, though kite
-won't look at them until it opens files. And end it with `return 0;`:
+call it as `int main(int argc, char** argv)`, so give it both
+parameters, though kite won't look at them until it opens files (with
+other parameters, Run says the tests can't call it). And end it with `return 0;`:
 only the real `main` returns 0 when it runs off its end, and the
 renamed one is an ordinary function.
 

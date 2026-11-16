@@ -77,11 +77,11 @@ one and `S` syncs.
 
 ### Projects
 
-Some chapters build one program over several lessons, like the kite text editor. Their
-lessons share one folder, `work/<project>/`, which starts empty: you write every file,
+Some chapters build one program over several lessons: the kite text editor and the conch
+shell. Their lessons share one folder, `work/<project>/`, which starts empty: you write every file,
 the header and `main.cpp` included, and the course never writes into it. Each lesson
-names a few functions and types its tests use, declared in the project's header (say
-`kite.hpp`); the rest of the design is yours. Run checks your header against that list
+names a few functions and types its tests use, declared in the project's header
+(`kite.hpp`, `conch.hpp`); the rest of the design is yours. Run checks your header against that list
 first and says what's missing or declared differently. `sysroad path` prints the
 project folder and `sysroad edit` opens the file you changed last.
 
@@ -259,7 +259,7 @@ The course lives in `internal/course/content/` and is embedded in the binary:
   an optional `run:` sample, `deeper:` links, `program:` to name the program, and
   `optimize: true` for lessons that time things, which builds the program with -O2 and no
   sanitizers) and the brief, ending in `## Assignment`. `run: {interactive: true}` hands
-  the program the terminal after the visible tests (the editor capstone); the TUI and CLI
+  the program the terminal after the visible tests (the editor and shell capstones); the TUI and CLI
   run it in place, the desktop app in a terminal window.
 - `starter/` and `solution/`: the files. `solution/` holds only the files the solution
   adds or changes; the rest come from the starter, and `solution_removes: [path]` in the

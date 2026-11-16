@@ -27,7 +27,7 @@
   stdin: "echo first\necho last"
   stdout: "first\nlast\n"
   hidden: true
-- name: arguments with odd characters
-  stdin: "printf [%s] a|b c;d e&f $HOME\n"
-  stdout: "[a|b][c;d][e&f][$HOME]"
+- name: no input at all
+  stdin: ""
+  stdout: ""
   hidden: true

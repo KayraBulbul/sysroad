@@ -1,88 +1,61 @@
 #include "doctest.h"
 
-#include <unistd.h>
-
 #include <cstdlib>
 
-#include "shell.hpp"
+#include "conch_run.hpp"
 
-static std::vector<std::string> words(const std::string& line) {
-    std::vector<std::string> out;
-    for (const Token& t : tokenize(line)) {
-        out.push_back(t.text);
-    }
-    return out;
-}
+namespace shtest {
 
-using Words = std::vector<std::string>;
-
-TEST_CASE("tokenize: quotes hide operators and #") {
-    CHECK(words("a '|' \"&&\" \; '#' b#c") == Words{"a", "'|'", "\"&&\"", "\;", "'#'", "b#c"});
-    CHECK(words("echo \"a\"'b'c|d") == Words{"echo", "\"a\"'b'c", "|", "d"});
-    CHECK(words("echo \"say \\\"hi\\\"\"") == Words{"echo", "\"say \\\"hi\\\"\""});
-}
-
-TEST_CASE("tokenize: unclosed quotes") {
-    CHECK_THROWS_AS(tokenize("echo 'abc"), SyntaxError);
-    CHECK_THROWS_AS(tokenize("echo \"abc"), SyntaxError);
-    CHECK_THROWS_AS(tokenize("echo \"abc\\\""), SyntaxError);
-}
-
-TEST_CASE("tokenize: what counts as an assignment") {
-    CHECK(tokenize("A_1=x")[0].assignment);
-    CHECK(tokenize("_=x")[0].assignment);
-    CHECK(tokenize("A=")[0].assignment);
-    CHECK_FALSE(tokenize("1A=x")[0].assignment);
-    CHECK_FALSE(tokenize("=x")[0].assignment);
-    CHECK_FALSE(tokenize("'A'=x")[0].assignment);
-    CHECK_FALSE(tokenize("A-B=x")[0].assignment);
-    CHECK(tokenize("A='x y'")[0].assignment);
-}
-
-TEST_CASE("expand_word: double quotes") {
+TEST_CASE("inside double quotes, a backslash only escapes \" \\ $ and `") {
+    setenv("X", "v", 1);
     Shell sh;
-    sh.vars["X"] = "v";
-    CHECK(expand_word("\"\\$X \\\" \\\\ \\n\"", sh) == "$X \" \\ \\n");
-    CHECK(expand_word("\"'$X'\"", sh) == "'v'");
-    CHECK(expand_word("'\"$X\"'", sh) == "\"$X\"");
-    CHECK(expand_word("\"$NOT_SET_ANYWHERE\"", sh) == "");
+    CHECK(in_shell(sh, "printf [%s] \"\\$X \\\" \\\\ \\n \\`\"").out == "[$X \" \\ \\n `]");
+    CHECK(in_shell(sh, "printf [%s] \"'$X'\" '\"$X\"'").out == "['v'][\"$X\"]");
 }
 
-TEST_CASE("expand_word: dollars") {
+TEST_CASE("$! is the last background job's PID") {
     Shell sh;
-    sh.vars["N"] = "n";
-    sh.last_background = 4242;
-    CHECK(expand_word("$$", sh) == std::to_string(getpid()));
-    CHECK(expand_word("$!", sh) == "4242");
-    CHECK(expand_word("a$", sh) == "a$");
-    CHECK(expand_word("$", sh) == "$");
-    CHECK(expand_word("$-x", sh) == "$-x");
-    CHECK(expand_word("$N.$N", sh) == "n.n");
-    CHECK(expand_word("$N_", sh) == std::nullopt);  // the name is N_
-    CHECK_THROWS_AS(expand_word("${N", sh), SyntaxError);
+    Ran started = in_shell(sh, "sleep 0.1 &");
+    std::string pid = started.err.substr(started.err.find(' ') + 1);
+    CHECK(in_shell(sh, "echo $!").out == pid);
+    in_shell(sh, "wait");
 }
 
-TEST_CASE("expand_word: environment variables, and shell ones first") {
+TEST_CASE("a name runs as far as letters, digits and _ go") {
+    setenv("N", "n", 1);
+    unsetenv("N_");
     Shell sh;
-    setenv("SYSROAD_EXPAND", "env", 1);
-    CHECK(expand_word("$SYSROAD_EXPAND", sh) == "env");
-    sh.vars["SYSROAD_EXPAND_LOCAL"] = "local";
-    CHECK(expand_word("$SYSROAD_EXPAND_LOCAL", sh) == "local");
+    CHECK(in_shell(sh, "printf [%s] $N.$N $N_ x").out == "[n.n][x]");
 }
 
-TEST_CASE("expand_word: tilde") {
+TEST_CASE("${ with no } is a syntax error, when the command runs") {
     Shell sh;
+    Ran r = in_shell(sh, "echo ${N");
+    CHECK(r.status == 2);
+    CHECK(r.err.rfind("conch: syntax error:", 0) == 0);
+}
+
+TEST_CASE("~ only at the very start of an unquoted word") {
     setenv("HOME", "/h", 1);
-    CHECK(expand_word("~", sh) == "/h");
-    CHECK(expand_word("~/a", sh) == "/h/a");
-    CHECK(expand_word("x~", sh) == "x~");
-    CHECK(expand_word("'~'", sh) == "~");
-    CHECK(expand_word("~user", sh) == "~user");
+    Shell sh;
+    CHECK(in_shell(sh, "printf [%s] ~ ~/a x~ '~' \"~\" ~user").out == "[/h][/h/a][x~][~][~][~user]");
 }
 
-TEST_CASE("expand_word: a word that vanishes") {
+TEST_CASE("a word made only of unset variables vanishes; quotes keep it") {
+    unsetenv("SR_NOT_SET");
     Shell sh;
-    CHECK(expand_word("$NOT_SET_ANYWHERE$ALSO_NOT", sh) == std::nullopt);
-    CHECK(expand_word("''$NOT_SET_ANYWHERE", sh) == "");
-    CHECK(expand_word("\\$NOT_SET_ANYWHERE", sh) == "$NOT_SET_ANYWHERE");
+    CHECK(in_shell(sh, "printf [%s] $SR_NOT_SET$SR_NOT_SET x").out == "[x]");
+    CHECK(in_shell(sh, "printf [%s] ''$SR_NOT_SET x").out == "[][x]");
+    CHECK(in_shell(sh, "printf [%s] \\$SR_NOT_SET").out == "[$SR_NOT_SET]");
 }
+
+TEST_CASE("a command made only of unset variables runs nothing") {
+    unsetenv("SR_NOT_SET");
+    Shell sh;
+    in_shell(sh, "false");
+    Ran r = in_shell(sh, "$SR_NOT_SET");
+    CHECK(r.err == "");
+    CHECK(r.status == 0);
+}
+
+}  // namespace shtest

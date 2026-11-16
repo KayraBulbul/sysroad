@@ -1,14 +1,14 @@
 - name: a background job, and wait
-  stdin: "sleep 0.3 &\necho started\nwait\necho after\n"
+  stdin: "sleep 1 &\necho started\nwait\necho after\n"
   stdout: "started\nafter\n"
 - name: jobs lists what's running
-  stdin: "sleep 0.3 &\njobs\nwait\njobs\necho done\n"
-  stdout: "[1] Running  sleep 0.3\ndone\n"
+  stdin: "sleep 1 &\njobs\nwait\njobs\necho done\n"
+  stdout: "[1] Running  sleep 1\ndone\n"
 - name: Done is reported before the next command
-  stdin: "true &\nsleep 0.3\necho next\n"
+  stdin: "true &\nsleep 0.6\necho next\n"
   stdout: "[1] Done  true\nnext\n"
 - name: a job that failed
-  stdin: "sh exit3.sh &\nsleep 0.3\necho next\n"
+  stdin: "sh exit3.sh &\nsleep 0.6\necho next\n"
   files:
     exit3.sh: "exit 3\n"
   stdout: "[1] Exit 3  sh exit3.sh\nnext\n"
@@ -16,29 +16,31 @@
   stdin: "sleep 2 &\necho not waiting\n"
   stdout: "not waiting\n"
 - name: job numbers count up, and start again
-  stdin: "sleep 0.2 &\nsleep 0.2 &\njobs\nwait\nsleep 0.1 &\njobs\nwait\n"
-  stdout: "[1] Running  sleep 0.2\n[2] Running  sleep 0.2\n[1] Running  sleep 0.1\n"
+  stdin: "sleep 1 &\nsleep 1 &\njobs\nwait\nsleep 1 &\njobs\n"
+  stdout: "[1] Running  sleep 1\n[2] Running  sleep 1\n[1] Running  sleep 1\n"
   hidden: true
 - name: wait %n returns the job's status
   stdin: "sh exit3.sh &\nwait %1 || echo failed\n"
   files:
-    exit3.sh: "sleep 0.1; exit 3\n"
+    exit3.sh: "sleep 0.8; exit 3\n"
   stdout: "failed\n"
   hidden: true
 - name: a background job doesn't read the shell's input
-  stdin: "cat &\nwait\necho still mine\n"
-  stdout: "still mine\n"
+  stdin: "cat &\nsleep 0.6\necho still mine\n"
+  stdout: "[1] Done  cat\nstill mine\n"
   hidden: true
 - name: a background pipeline, with redirections
-  stdin: "printf b\\na\\n | sort > sorted.txt &\nwait\ncat sorted.txt\n"
+  stdin: "sleep 1 | sort letters.txt > sorted.txt &\nwait\ncat sorted.txt\n"
+  files:
+    letters.txt: "b\na\n"
   stdout: "a\nb\n"
   hidden: true
 - name: "& in the middle of a line"
-  stdin: "sleep 0.2 & echo right away\nwait\n"
+  stdin: "sleep 1 & echo right away\nwait\n"
   stdout: "right away\n"
   hidden: true
 - name: a job killed by a signal
-  stdin: "sh term.sh &\nsleep 0.3\necho next\n"
+  stdin: "sh term.sh &\nsleep 0.6\necho next\n"
   files:
     term.sh: "kill -TERM $$\n"
   stdout: "[1] SIGTERM  sh term.sh\nnext\n"

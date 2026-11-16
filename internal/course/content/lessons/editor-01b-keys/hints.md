@@ -26,11 +26,20 @@ pending bytes:
 int KeyReader::next() {
     if (pending_.empty()) fill(true);        // read until something comes
     auto [key, used] = decode_key(pending_);
-    if (key == 27 && pending_.size() < 8 && fill(false)) {
-        std::tie(key, used) = decode_key(pending_);   // the rest arrived
+    while (key == 27 && could_be_sequence(pending_) && fill(false)) {
+        std::tie(key, used) = decode_key(pending_);   // more of it arrived
     }
     pending_.erase(0, used);
     return key;
+}
+```
+
+where a sequence is still possible for a lone ESC, or an unfinished
+`ESC [` or `ESC O` that isn't absurdly long:
+
+```cpp
+bool could_be_sequence(const std::string& b) {
+    return b.size() == 1 || (b.size() < 8 && (b[1] == '[' || (b[1] == 'O' && b.size() == 2)));
 }
 ```
 

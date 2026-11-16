@@ -53,10 +53,13 @@ every sequence starts with. Only time tells them apart: a sequence's
 bytes arrive together, in one `read` or within a moment, and an Escape
 press is followed by nothing. So a key reader keeps the bytes it has
 read but not used yet, and when what it has decodes as Escape, it
-reads once more, which waits at most a tenth of a second (`VTIME`), and
-decodes again. ESC on its own, ESC followed by an unfinished sequence,
-or ESC followed by anything else (Alt-x sends `\x1bx`) is Escape, using
-1 byte.
+reads again, which waits at most a tenth of a second (`VTIME`), and
+decodes again. It keeps doing so while what it has still decodes as
+Escape and could be the start of a sequence (a lone ESC, or an
+unfinished `ESC [` or `ESC O`): over a slow link, `ESC`, `[` and `A`
+can each arrive on their own. When nothing more comes, it's Escape.
+ESC on its own, ESC followed by an unfinished sequence, or ESC followed
+by anything else (Alt-x sends `\x1bx`) is Escape, using 1 byte.
 
 kite now prints the **name** of each key, one per line. The tests type
 at it and read the names, so spell them like this:

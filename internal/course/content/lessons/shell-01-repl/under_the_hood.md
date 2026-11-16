@@ -2,8 +2,8 @@
 mustn't read ahead: the commands it runs share that input, and
 `head -n 1` on the next line expects to get the line after it. bash
 reads a pipe one byte at a time, and for a file it reads a block and
-then `lseek`s back to the end of the line it used. conch's `main.cpp`
-reads one byte at a time, which is slow but always right.
+then `lseek`s back to the end of the line it used. conch reads one
+byte at a time, which is slow but always right.
 
 **Interactive or not.** A shell decides whether it's interactive with
 `isatty`: a terminal on stdin (and stderr, in bash) means a person is

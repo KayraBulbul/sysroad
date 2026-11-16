@@ -1,3 +1,4 @@
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -6,14 +7,22 @@
 #include <cstring>
 #include <iostream>
 
-#include "shell.hpp"
+#include "conch.hpp"
 
-void run_line(Shell& sh, const std::string& line) {
+int run_line(Shell& sh, const std::string& line) {
     std::vector<std::string> words = split_words(line);
-    if (words.empty()) {
-        return;  // a blank line or a comment
+    if (!words.empty()) {  // a blank line or a comment runs nothing
+        sh.last_status = run_command(words);
     }
-    sh.last_status = run_command(words);
+    return sh.last_status;
+}
+
+// $? for a status from waitpid: the exit code, or 128 plus the signal.
+static int shell_status(int wstatus) {
+    if (WIFSIGNALED(wstatus)) {
+        return 128 + WTERMSIG(wstatus);
+    }
+    return WEXITSTATUS(wstatus);
 }
 
 int run_command(const std::vector<std::string>& argv) {
@@ -29,7 +38,6 @@ int run_command(const std::vector<std::string>& argv) {
         return 1;
     }
     if (pid == 0) {
-        signal(SIGPIPE, SIG_DFL);
         execvp(args[0], args.data());
         int err = errno;
         if (err == ENOENT) {
@@ -39,5 +47,12 @@ int run_command(const std::vector<std::string>& argv) {
         std::cerr << "conch: " << argv[0] << ": " << std::strerror(err) << '\n';
         _exit(126);
     }
-    return shell_status(wait_for(pid));
+    int wstatus = 0;
+    while (waitpid(pid, &wstatus, 0) == -1) {
+        if (errno != EINTR) {
+            std::cerr << "conch: waitpid: " << std::strerror(errno) << '\n';
+            return 1;
+        }
+    }
+    return shell_status(wstatus);
 }

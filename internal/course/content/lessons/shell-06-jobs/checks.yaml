@@ -1,16 +1,11 @@
-- name: without a terminal, there's no job control
-  stdin: "fg\n"
-  stdout: ""
-  exit: 1
-- name: background jobs still work without it
-  stdin: "sleep 0.2 &\njobs\nwait\necho done\n"
-  stdout: "[1] Running  sleep 0.2\ndone\n"
+- name: background jobs still work without a terminal
+  stdin: "sleep 1 &\njobs\nwait\necho done\n"
+  stdout: "[1] Running  sleep 1\ndone\n"
 - name: Done is still reported
-  stdin: "true &\nsleep 0.3\necho next\n"
+  stdin: "true &\nsleep 0.6\necho next\n"
   stdout: "[1] Done  true\nnext\n"
   hidden: true
-- name: bg without job control
-  stdin: "bg\n"
-  stdout: ""
-  exit: 1
+- name: a background job still can't read a script's input
+  stdin: "cat &\nsleep 0.6\necho still mine\n"
+  stdout: "[1] Done  cat\nstill mine\n"
   hidden: true

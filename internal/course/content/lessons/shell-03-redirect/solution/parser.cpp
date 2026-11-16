@@ -1,7 +1,6 @@
 #include <cctype>
-#include <string>
 
-#include "shell.hpp"
+#include "conch.hpp"
 
 static bool all_digits(const std::string& s) {
     if (s.empty() || s.size() > 4) {
@@ -39,15 +38,15 @@ static Redirect read_redirect(const std::vector<Token>& tokens, size_t& i) {
 }
 
 Command parse_command(const std::vector<Token>& tokens) {
-    Command cmd;
+    Command c;
     size_t i = 0;
     while (i < tokens.size()) {
         if (tokens[i].kind == Token::Word) {
-            cmd.argv.push_back(tokens[i].text);
+            c.argv.push_back(tokens[i].text);
             ++i;
         } else {
-            cmd.redirects.push_back(read_redirect(tokens, i));
+            c.redirects.push_back(read_redirect(tokens, i));
         }
     }
-    return cmd;
+    return c;
 }

@@ -1,46 +1,38 @@
 #include "doctest.h"
 
-#include <fcntl.h>
-#include <unistd.h>
-
 #include <csignal>
-#include <cstdio>
 
-#include "shell.hpp"
+#include "conch_run.hpp"
 
-using Words = std::vector<std::string>;
+namespace shtest {
 
-TEST_CASE("split_words: # only starts a comment at the start of a word") {
-    CHECK(split_words("echo a#b #c d") == Words{"echo", "a#b"});
-    CHECK(split_words("# all comment").empty());
-    CHECK(split_words("   ").empty());
-    CHECK(split_words("\tx\t") == Words{"x"});
-}
-
-TEST_CASE("run_command: not found is 127") {
-    int saved = dup(2);
-    int null = open("/dev/null", O_WRONLY);
-    dup2(null, 2);
-    close(null);
-    int status = run_command({"surely-not-a-command-anywhere"});
-    std::fflush(stderr);
-    dup2(saved, 2);
-    close(saved);
-    CHECK(status == 127);
-}
-
-TEST_CASE("run_command: a signal is 128 + its number") {
-    CHECK(run_command({"sh", "-c", "kill -TERM $$"}) == 128 + SIGTERM);
-}
-
-TEST_CASE("run_line sets $?") {
+TEST_CASE("a blank line, or a comment, leaves $? as it was") {
     Shell sh;
-    run_line(sh, "false");
-    CHECK(sh.last_status == 1);
-    run_line(sh, "true");
-    CHECK(sh.last_status == 0);
-    run_line(sh, "   ");  // nothing to run: $? stays
-    run_line(sh, "false");
-    run_line(sh, "# just a comment");
-    CHECK(sh.last_status == 1);
+    in_shell(sh, "false");
+    CHECK(in_shell(sh, "").status == 1);
+    CHECK(in_shell(sh, "   \t ").status == 1);
+    CHECK(in_shell(sh, "# just a comment").status == 1);
+    CHECK(in_shell(sh, "true # and a comment").status == 0);
 }
+
+TEST_CASE("a command killed by a signal: 128 plus the signal's number") {
+    write_file("term.sh", "kill -TERM $$\n");
+    Shell sh;
+    CHECK(in_shell(sh, "sh term.sh").status == 128 + SIGTERM);
+}
+
+TEST_CASE("a file that can't be run: a message, and status 126") {
+    write_file("plain.txt", "not a program\n");  // not executable
+    Shell sh;
+    Ran r = in_shell(sh, "./plain.txt");
+    CHECK(r.status == 126);
+    CHECK(r.err == "conch: ./plain.txt: Permission denied\n");
+}
+
+TEST_CASE("words are split at any run of spaces and tabs") {
+    Shell sh;
+    CHECK(in_shell(sh, "  printf [%s]  a \t b\t\tc  ").out == "[a][b][c]");
+    CHECK(in_shell(sh, "printf [%s] a#b #c d").out == "[a#b]");
+}
+
+}  // namespace shtest

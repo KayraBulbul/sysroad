@@ -1,26 +1,27 @@
 #include "doctest.h"
 
-#include "shell.hpp"
+#include <chrono>
 
-using Words = std::vector<std::string>;
+#include "conch_run.hpp"
 
-TEST_CASE("parse: a pipeline") {
-    List list = parse(tokenize("ls -l | grep x | wc -l"));
-    REQUIRE(list.size() == 1);
-    const auto& cmds = list[0].pipeline.commands;
-    REQUIRE(cmds.size() == 3);
-    CHECK(cmds[0].argv == Words{"ls", "-l"});
-    CHECK(cmds[1].argv == Words{"grep", "x"});
-    CHECK(cmds[2].argv == Words{"wc", "-l"});
-    CHECK(list[0].next == Step::End);
+namespace shtest {
+
+TEST_CASE("the commands of a pipeline run at the same time") {
+    Shell sh;
+    auto start = std::chrono::steady_clock::now();
+    in_shell(sh, "sleep 0.6 | sleep 0.6 | sleep 0.6");
+    auto took = std::chrono::steady_clock::now() - start;
+    // At once, about 0.6 s; one after another, 1.8 s.
+    CHECK_MESSAGE(took < std::chrono::milliseconds(1200), "three 0.6 s sleeps took over 1.2 s: one after another?");
 }
 
-TEST_CASE("parse: a list") {
-    List list = parse(tokenize("make && ./run || echo failed; echo done"));
-    REQUIRE(list.size() == 4);
-    CHECK(list[0].next == Step::And);
-    CHECK(list[1].next == Step::Or);
-    CHECK(list[2].next == Step::Then);
-    CHECK(list[3].next == Step::End);
-    CHECK(list[3].pipeline.commands[0].argv == Words{"echo", "done"});
+TEST_CASE("no pipe ends stay open in the shell") {
+    Shell sh;
+    int before = lowest_free_fd();
+    for (int i = 0; i < 20; ++i) {
+        in_shell(sh, "true | true | true");
+    }
+    CHECK_MESSAGE(lowest_free_fd() == before, "the shell has fds open after its pipelines ended");
 }
+
+}  // namespace shtest

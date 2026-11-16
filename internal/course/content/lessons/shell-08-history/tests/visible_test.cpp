@@ -1,48 +1,44 @@
 #include "doctest.h"
 
-#include "keys.hpp"
-#include "lineedit.hpp"
-#include "shell.hpp"
+#include <sys/stat.h>
+#include <unistd.h>
 
-static void type(LineEditor& e, const std::string& s) {
-    for (char c : s) {
-        e.feed(static_cast<unsigned char>(c));
-    }
+#include <cstdlib>
+
+#include "conch_pty.hpp"
+#include "conch_run.hpp"
+
+namespace shtest {
+
+// A fresh home folder for one test, as $HOME.
+inline std::string fresh_home(const std::string& name) {
+    std::string home = test_dir() + "/" + name;
+    mkdir(home.c_str(), 0755);
+    setenv("HOME", home.c_str(), 1);
+    return home;
 }
 
-TEST_CASE("typing, moving and deleting") {
-    std::vector<std::string> history;
-    LineEditor e(history);
-    type(e, "echo hllo");
-    for (int i = 0; i < 3; ++i) {
-        e.feed(kArrowLeft);
-    }
-    type(e, "e");
-    CHECK(e.text() == "echo hello");
-    CHECK(e.cursor() == 7);
-    e.feed(kBackspace);
-    e.feed(kBackspace);
-    CHECK(e.text() == "echo llo");
-    CHECK(e.feed(kEnter) == LineEditor::Done);
+TEST_CASE("on a terminal, history comes from ~/.conch_history and goes back there, readable only by you") {
+    std::string home = fresh_home("home-visible");
+    write_file(home + "/.conch_history", "echo from last time\n");
+    Conch c;
+    REQUIRE(c.prompt());
+    c.line("history");
+    CHECK_MESSAGE(c.expect("    1  echo from last time"), c.output());
+    REQUIRE(c.prompt());
+    c.line("echo new");
+    REQUIRE(c.prompt());
+    c.line("exit");
+    REQUIRE(c.wait() == 0);
+    CHECK(read_file(home + "/.conch_history") == "echo from last time\nhistory\necho new\nexit\n");
+    struct stat st{};
+    REQUIRE(stat((home + "/.conch_history").c_str(), &st) == 0);
+    CHECK_MESSAGE((st.st_mode & 0777) == 0600, "the history file should be readable by its owner only (0600)");
 }
 
-TEST_CASE("Up and Down walk the history") {
-    std::vector<std::string> history{"first", "second"};
-    LineEditor e(history);
-    type(e, "draft");
-    e.feed(kArrowUp);
-    CHECK(e.text() == "second");
-    e.feed(kArrowUp);
-    CHECK(e.text() == "first");
-    e.feed(kArrowDown);
-    CHECK(e.text() == "second");
-    e.feed(kArrowDown);
-    CHECK(e.text() == "draft");
+TEST_CASE("history numbers the lines from 1") {
+    Ran r = conch("echo a\necho b\nhistory\n");
+    CHECK(r.out == "a\nb\n    1  echo a\n    2  echo b\n    3  history\n");
 }
 
-TEST_CASE("history: add and list") {
-    Shell sh;
-    add_history(sh, "ls");
-    add_history(sh, "pwd");
-    CHECK(sh.history == std::vector<std::string>{"ls", "pwd"});
-}
+}  // namespace shtest

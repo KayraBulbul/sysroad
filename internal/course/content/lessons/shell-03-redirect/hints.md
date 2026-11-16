@@ -1,44 +1,31 @@
-Walk the tokens with an index, since a redirection uses two:
+A token is a kind (word or operator), its text, and the fd number
+(-1 for none). The lexer's loop: skip spaces and tabs; stop at a `#`;
+try to read an operator; otherwise read a word up to a space, tab, `<`
+or `>`. Reading an operator starts by skipping digits: if what follows
+is `<` or `>`, the digits were its fd number; if not, they belong to a
+word, and you start again at the first digit as a word.
+---
+After the `<` or `>`, the operator is two characters if the next one
+is `&`, or for `>` another `>`. `std::stoi` turns the digits into the
+fd, once you've checked there are at most 9 of them.
+---
+A redirection is what to do (read, write, append, copy), the fd, and
+either a path or the fd to copy. Parsing walks the tokens: a word goes
+on the command's words; an operator takes the next token, which must be
+a word, and makes a redirection. A `std::runtime_error` subclass for
+syntax errors, caught in `run_line`, gives the message and the 2.
+---
+Applying one redirection:
 
 ```cpp
-size_t i = 0;
-while (i < tokens.size()) {
-    if (tokens[i].kind == Token::Word) {
-        cmd.argv.push_back(tokens[i].text);
-        ++i;
-    } else {
-        // tokens[i] is the operator, tokens[i + 1] its target
-        cmd.redirects.push_back(...);
-        i += 2;
-    }
-}
-```
----
-```cpp
-r.fd = op.fd != -1 ? op.fd : (op.text[0] == '<' ? 0 : 1);
+int flags = O_RDONLY;                                    // <
+if (r.op == Write) flags = O_WRONLY | O_CREAT | O_TRUNC;  // >
+if (r.op == Append) flags = O_WRONLY | O_CREAT | O_APPEND; // >>
+int fd = open(r.path.c_str(), flags, 0666);
+// fd == -1: throw, naming r.path
+if (fd != r.fd) { dup2(fd, r.fd); close(fd); }
 ```
 
-For `<&` and `>&` the target must be all digits: `r.from =
-std::stoi(target)`.
----
-`apply_redirects` is your `apply_redirect` from 6.1.5 in a loop. For
-`>&`, check the source fd is open with `fcntl(from, F_GETFD)` and throw
-`std::system_error(EBADF, std::generic_category(), std::to_string(from))`
-if not.
----
-```cpp
-SavedFds::SavedFds(const std::vector<Redirect>& redirects) {
-    for (const Redirect& r : redirects) {
-        // skip it if r.fd is already in saved_        // above: 1 + the highest fd any redirection names (r.fd or r.from)
-        int copy = fcntl(r.fd, F_DUPFD_CLOEXEC, std::max(10, above));  // -1, EBADF: not open
-        if (copy == -1 && errno != EBADF) {            copy = fcntl(r.fd, F_DUPFD_CLOEXEC, above);  // the limit is below 10:
-                                                        // above every fd named
-        }
-        // still -1 and not EBADF: close the copies so far and throw
-        saved_.emplace_back(r.fd, copy);
-    }
-}
-```
-
-The destructor goes through `saved_` backwards: `dup2(copy, fd)` and
-`close(copy)`, or `close(fd)` if the copy is -1.
+For a copy, check the source is open first: `fcntl(from, F_GETFD)` is
+-1 if it isn't. `std::system_error(errno, std::generic_category(), path)`
+makes an exception whose `what()` is `path: reason`.

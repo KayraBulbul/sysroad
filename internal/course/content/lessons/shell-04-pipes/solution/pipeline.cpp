@@ -6,8 +6,9 @@
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include <system_error>
 
-#include "shell.hpp"
+#include "conch.hpp"
 
 int run_list(Shell& sh, const List& list) {
     Step::Next before = Step::Then;
@@ -25,18 +26,10 @@ int run_list(Shell& sh, const List& list) {
     return sh.last_status;
 }
 
-static bool runs_in_shell(const Pipeline& p) {
-    if (p.commands.size() != 1) {
-        return false;
-    }
-    const Command& c = p.commands[0];
-    return c.argv.empty() || find_builtin(c.argv[0]) != nullptr;
-}
-
 // Gives up on a pipeline that couldn't be started: ends the commands
-// already running (they'd wait forever on a half-built pipeline), says
-// why, and returns the status for it.
-static int abandon(const std::vector<pid_t>& pids, int prev_read, const char* what) {
+// already running (they'd wait forever on a half-built pipeline) and
+// throws, naming the call that failed.
+[[noreturn]] static void abandon(const std::vector<pid_t>& pids, int prev_read, const char* what) {
     int err = errno;
     if (prev_read != -1) {
         close(prev_read);
@@ -47,25 +40,21 @@ static int abandon(const std::vector<pid_t>& pids, int prev_read, const char* wh
     for (pid_t pid : pids) {
         waitpid(pid, nullptr, 0);
     }
-    std::cerr << "conch: " << what << ": " << std::strerror(err) << '\n';
-    return 1;
+    throw std::system_error(err, std::generic_category(), what);
 }
 
-int run_pipeline(Shell& sh, const Pipeline& p) {
-    if (runs_in_shell(p)) {
-        return run_in_shell(sh, p.commands[0]);
-    }
+// Starts each command in a child, stdout to the next one's stdin.
+static std::vector<pid_t> start(Shell& sh, const Pipeline& p) {
     std::vector<pid_t> pids;
     int prev_read = -1;
     for (size_t i = 0; i < p.commands.size(); ++i) {
         int fds[2] = {-1, -1};
         if (i + 1 < p.commands.size() && pipe(fds) == -1) {
-            return abandon(pids, prev_read, "pipe");
+            abandon(pids, prev_read, "pipe");
         }
         std::fflush(nullptr);
         pid_t pid = fork();
         if (pid == 0) {
-            signal(SIGPIPE, SIG_DFL);
             if (prev_read != -1) {
                 dup2(prev_read, 0);
                 close(prev_read);
@@ -85,16 +74,34 @@ int run_pipeline(Shell& sh, const Pipeline& p) {
         }
         prev_read = fds[0];
         if (pid == -1) {
-            return abandon(pids, prev_read, "fork");
+            abandon(pids, prev_read, "fork");
         }
         pids.push_back(pid);
     }
-    if (prev_read != -1) {
-        close(prev_read);
+    return pids;
+}
+
+int run_pipeline(Shell& sh, const Pipeline& p) {
+    if (p.commands.size() == 1) {
+        const Command& c = p.commands[0];
+        Builtin builtin = c.argv.empty() ? nullptr : find_builtin(c.argv[0]);
+        if (builtin != nullptr) {
+            return run_builtin(sh, builtin, c);
+        }
     }
-    int status = 1;
+    std::vector<pid_t> pids;
+    try {
+        pids = start(sh, p);
+    } catch (const std::system_error& e) {
+        std::cerr << "conch: " << e.what() << '\n';
+        return 1;
+    }
+    int status = 0;
     for (pid_t pid : pids) {
-        status = shell_status(wait_for(pid));
+        int wstatus = 0;
+        while (waitpid(pid, &wstatus, 0) == -1 && errno == EINTR) {
+        }
+        status = shell_status(wstatus);  // the last one's counts
     }
     return status;
 }

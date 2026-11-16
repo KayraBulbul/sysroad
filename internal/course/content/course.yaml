@@ -431,7 +431,7 @@ phases:
             kind: quiz
       - id: shell
         title: "Capstone: your shell"
-        project: "conch: builtins, redirection, pipelines, background jobs, job control, quoting, line editing"
+        project: "conch, written from an empty folder: builtins, redirection, pipelines, background jobs, job control, quoting and variables, history and line editing"
         lessons:
           - id: shell-01-repl
             title: "Read, parse, run"
@@ -442,6 +442,9 @@ phases:
           - id: shell-03-redirect
             title: Redirections
             kind: capstone
+          - id: shell-03b-builtin-redirect
+            title: Redirecting a builtin
+            kind: capstone
           - id: shell-04-pipes
             title: Pipelines
             kind: capstone
@@ -449,13 +452,22 @@ phases:
             title: Background jobs
             kind: capstone
           - id: shell-06-jobs
-            title: "fg, bg and Ctrl-Z"
+            title: "Ctrl-C, Ctrl-Z and process groups"
+            kind: capstone
+          - id: shell-06b-fg-bg
+            title: "fg, bg and stopped jobs"
             kind: capstone
           - id: shell-07-expand
-            title: Variables and quoting
+            title: Quoting and expansion
+            kind: capstone
+          - id: shell-07b-variables
+            title: Shell variables
             kind: capstone
           - id: shell-08-history
-            title: History and line editing
+            title: History
+            kind: capstone
+          - id: shell-08b-line-editing
+            title: Line editing
             kind: capstone
 
   - id: p7
